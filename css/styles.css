@@ -561,7 +561,7 @@ body::after {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: #050510 url('./img/hero-bg.webp') center/cover no-repeat;
+  background: #050510;
   color: #E8E8F0;
 }
 
@@ -597,7 +597,7 @@ body::after {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 60% 50% at center, rgba(5, 5, 16, 0.45) 0%, rgba(5, 5, 16, 0.35) 40%, rgba(5, 5, 16, 0.88) 100%);
+    radial-gradient(ellipse 60% 50% at center, rgba(5, 5, 16, 0.55) 0%, rgba(5, 5, 16, 0.4) 40%, rgba(5, 5, 16, 0.92) 100%);
   z-index: 1;
   pointer-events: none;
 }
