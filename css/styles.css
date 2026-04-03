@@ -2467,3 +2467,267 @@ body::after {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(10px); }
 }
+
+
+/* ============================================================
+   ENHANCEMENT: Splitting.js Character Reveal
+   ============================================================ */
+
+/* Keep the hero title visible by default (splitting handles visibility) */
+.hero__title {
+  opacity: 1 !important;
+}
+
+.hero__title .word {
+  overflow: hidden;
+  display: inline-block;
+  vertical-align: top;
+}
+
+.hero__title .char {
+  opacity: 0;
+  transform: translateY(40px);
+  display: inline-block;
+  animation: char-reveal 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: calc(0.8s + var(--char-index) * 30ms);
+}
+
+.hero__title-accent .char {
+  animation-delay: calc(1.2s + var(--char-index) * 35ms);
+}
+
+@keyframes char-reveal {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================================
+   ENHANCEMENT: Odometer Digit Spinner
+   ============================================================ */
+
+.stat-digit-wrapper {
+  display: inline-flex;
+  align-items: flex-start;
+  line-height: 1;
+  height: 1em;
+}
+
+.stat-digit-container {
+  display: inline-block;
+  height: 1em;
+  overflow: hidden;
+  vertical-align: top;
+  position: relative;
+}
+
+.stat-digit-column {
+  display: flex;
+  flex-direction: column;
+  transition: transform 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+.stat-digit-column span {
+  display: block;
+  height: 1em;
+  line-height: 1;
+  text-align: center;
+}
+
+.stat-suffix {
+  display: inline-block;
+  vertical-align: top;
+}
+
+/* Stat items fade in as a group */
+.stat-item {
+  opacity: 0;
+  transform: translateY(20px) scale(0.96);
+  transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stat-item.digit-ready {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* ============================================================
+   ENHANCEMENT: CSS Scroll-Driven Clip Reveal (progressive)
+   ============================================================ */
+
+@supports (animation-timeline: scroll()) {
+  /* Clip-path reveal only - GSAP handles opacity/transform to avoid conflicts */
+  .cap-card,
+  .industry-card,
+  .trust-item,
+  .platform-feature {
+    animation: clip-reveal linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 80%;
+  }
+
+  /* Product cards: keep clip-path reveal but don't override transform (needed for magnetic tilt) */
+  .product-card {
+    animation: clip-path-reveal linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 80%;
+  }
+}
+
+@keyframes clip-reveal {
+  from {
+    clip-path: inset(15% 0 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes clip-path-reveal {
+  from {
+    clip-path: polygon(0 15%, calc(100% - 20px) 15%, 100% calc(15% + 20px), 100% 100%, 20px 100%, 0 calc(100% - 20px));
+  }
+  to {
+    clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px));
+  }
+}
+
+/* ============================================================
+   ENHANCEMENT: Hover Glow Border (rotating gradient)
+   ============================================================ */
+
+@property --border-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+/* Overlay gradient ring via box-shadow + pseudo - compatible with clip-path cards */
+.product-card,
+.cap-card,
+.industry-card {
+  --border-angle: 0deg;
+}
+
+/* Use a separate ::after layer for the animated border glow */
+.product-card:hover,
+.cap-card:hover,
+.industry-card:hover {
+  animation: rotate-border 3s linear infinite;
+}
+
+@keyframes rotate-border {
+  to {
+    --border-angle: 360deg;
+  }
+}
+
+/* For cap-card and industry-card which don't have clip-path, use full border effect */
+.cap-card,
+.industry-card {
+  border: 1px solid var(--card-border);
+  background-clip: padding-box;
+}
+
+.cap-card:hover,
+.industry-card:hover {
+  border-color: transparent;
+  box-shadow:
+    0 0 0 1px transparent,
+    inset 0 0 0 1px rgba(0,229,255,0.4),
+    0 0 20px rgba(211,47,47,0.15),
+    0 0 40px rgba(0,229,255,0.08);
+  background: linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
+    linear-gradient(var(--border-angle), rgba(211, 47, 47, 0.7), rgba(0, 229, 255, 0.7), rgba(124, 77, 255, 0.5), rgba(211, 47, 47, 0.7)) border-box;
+  border: 1px solid transparent;
+}
+
+/* Product cards: glow ring via outline (avoids clip-path conflict) */
+.product-card:hover {
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(0, 229, 255, 0.3),
+    0 0 20px rgba(211, 47, 47, 0.2),
+    0 0 40px rgba(0, 229, 255, 0.1);
+}
+
+/* ============================================================
+   ENHANCEMENT: Typewriter Cursor for Section Labels
+   ============================================================ */
+
+.section__label.typing {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.section__label.typing::after {
+  content: '_';
+  display: inline-block;
+  margin-left: 2px;
+  opacity: 1;
+  animation: blink-label-cursor 0.75s step-end infinite;
+  color: var(--color-accent-cyan);
+  font-weight: 400;
+}
+
+@keyframes blink-label-cursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* ============================================================
+   ENHANCEMENT: Magnetic Card Tilt - transform-style
+   ============================================================ */
+
+.product-card {
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+/* ============================================================
+   MOBILE: Reduce animation intensity
+   ============================================================ */
+
+@media (max-width: 768px) {
+  .hero__title .char {
+    animation-duration: 0.4s;
+  }
+
+  @supports (animation-timeline: scroll()) {
+    .product-card,
+    .cap-card,
+    .industry-card,
+    .trust-item,
+    .platform-feature {
+      animation-range: entry 0% entry 60%;
+    }
+  }
+}
+
+/* ============================================================
+   ENHANCEMENT: Reduced motion - respect OS preference
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .hero__title .char {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .stat-digit-column {
+    transition: none;
+  }
+
+  @supports (animation-timeline: scroll()) {
+    .product-card,
+    .cap-card,
+    .industry-card,
+    .trust-item,
+    .platform-feature {
+      animation: none;
+    }
+  }
+}

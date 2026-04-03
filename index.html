@@ -28,6 +28,10 @@
   }
   </script>
 
+  <!-- Splitting.js for character-by-character text reveal -->
+  <link rel="stylesheet" href="https://unpkg.com/splitting/dist/splitting.css">
+  <script src="https://unpkg.com/splitting/dist/splitting.min.js" defer></script>
+
   <!-- GSAP + ScrollTrigger -->
   <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/ScrollTrigger.min.js" defer></script>
@@ -87,7 +91,7 @@
         <span class="hero__badge-dot"></span>
         Deployed Across 18 Industries
       </div>
-      <h1 class="hero__title gsap-fade-up">
+      <h1 class="hero__title" data-splitting>
         We Build AI<br><span class="hero__title-accent">That Works</span>
       </h1>
       <p class="hero__subtitle gsap-fade-up">
@@ -701,19 +705,19 @@
         <h2 class="section__title gsap-fade-up" style="color: #E8E8F0;">Performance You Can Measure</h2>
       </div>
       <div class="stats__grid">
-        <div class="stat-item gsap-scale-in">
+        <div class="stat-item">
           <div class="stat-item__number" data-count="83" data-suffix="%">0</div>
           <div class="stat-item__label">Cost savings vs. human staff</div>
         </div>
-        <div class="stat-item gsap-scale-in">
+        <div class="stat-item">
           <div class="stat-item__number" data-count="99.7" data-suffix="%" data-decimal="true">0</div>
           <div class="stat-item__label">Uptime across all systems</div>
         </div>
-        <div class="stat-item gsap-scale-in">
+        <div class="stat-item">
           <div class="stat-item__number" data-count="24" data-suffix="/7/365" data-nodash="true">0</div>
           <div class="stat-item__label">Always on</div>
         </div>
-        <div class="stat-item gsap-scale-in">
+        <div class="stat-item">
           <div class="stat-item__number" data-count="100" data-suffix="+" data-nodash="true">0</div>
           <div class="stat-item__label">AI skills</div>
         </div>

@@ -127,11 +127,8 @@ document.addEventListener('DOMContentLoaded', function() {
       { opacity: 1, y: 0, scale: 1, duration: 0.7, ease: 'power3.out' }
     );
 
-    heroTl.fromTo('.hero__title',
-      { opacity: 0, y: 50, skewX: -2 },
-      { opacity: 1, y: 0, skewX: 0, duration: 1.1, ease: 'power4.out' },
-      '-=0.3'
-    );
+    // Hero title is now handled by Splitting.js character reveal (CSS animation)
+    // Keeping badge and subsequent items in timeline
 
     heroTl.fromTo('.hero__subtitle',
       { opacity: 0, y: 25 },
@@ -340,35 +337,8 @@ document.addEventListener('DOMContentLoaded', function() {
       once: true
     });
 
-    // --- Counter Animation for Stats ---
-    function animateCounters() {
-      document.querySelectorAll('.stat-item__number[data-count]').forEach(function(el) {
-        const target = parseFloat(el.getAttribute('data-count'));
-        const suffix = el.getAttribute('data-suffix') || '';
-        const isDecimal = el.getAttribute('data-decimal') === 'true';
-
-        const obj = { val: 0 };
-        gsap.to(obj, {
-          val: target,
-          duration: 2.5,
-          ease: 'power2.out',
-          onUpdate: function() {
-            if (isDecimal) {
-              el.textContent = obj.val.toFixed(1) + suffix;
-            } else {
-              el.textContent = Math.floor(obj.val) + suffix;
-            }
-          }
-        });
-      });
-    }
-
-    ScrollTrigger.create({
-      trigger: '#stats',
-      start: 'top 77%',
-      onEnter: animateCounters,
-      once: true
-    });
+    // --- Counter Animation: handled by digit spinner below ---
+    // (Digit spinner uses IntersectionObserver, not GSAP)
 
     // --- Subtle parallax on section headers ---
     gsap.utils.toArray('.section__header').forEach(function(header) {
@@ -380,6 +350,20 @@ document.addEventListener('DOMContentLoaded', function() {
           start: 'top bottom',
           end: 'bottom top',
           scrub: 1.2
+        }
+      });
+    });
+
+    // --- Parallax depth on section titles ---
+    gsap.utils.toArray('.section__title').forEach(function(title) {
+      gsap.to(title, {
+        y: -30,
+        ease: 'none',
+        scrollTrigger: {
+          trigger: title,
+          start: 'top bottom',
+          end: 'bottom top',
+          scrub: 1
         }
       });
     });
@@ -417,25 +401,38 @@ document.addEventListener('DOMContentLoaded', function() {
   } // end GSAP check
 
   // ============================================================
-  // TERMINAL TYPING EFFECT (section labels)
+  // TYPEWRITER EFFECT (section labels)
   // ============================================================
-  (function initTerminalEffects() {
-    // Animate section labels with a subtle text reveal on scroll
-    const labels = document.querySelectorAll('.section__label');
+  (function initTypewriterLabels() {
+    var labels = document.querySelectorAll('.section__label');
 
     labels.forEach(function(label) {
-      const observer = new IntersectionObserver(function(entries) {
+      var originalText = label.textContent.trim();
+      var started = false;
+
+      var observer = new IntersectionObserver(function(entries) {
         entries.forEach(function(entry) {
-          if (entry.isIntersecting) {
-            label.style.opacity = '0';
-            label.style.transition = 'none';
-
-            setTimeout(function() {
-              label.style.transition = 'opacity 0.4s ease';
-              label.style.opacity = '1';
-            }, 100);
-
+          if (entry.isIntersecting && !started) {
+            started = true;
             observer.disconnect();
+
+            // Clear text and add typing class
+            label.textContent = '';
+            label.classList.add('typing');
+
+            var i = 0;
+            var interval = setInterval(function() {
+              if (i < originalText.length) {
+                label.textContent += originalText[i];
+                i++;
+              } else {
+                clearInterval(interval);
+                // Keep blinking cursor for 2s then remove
+                setTimeout(function() {
+                  label.classList.remove('typing');
+                }, 2000);
+              }
+            }, 40);
           }
         });
       }, { threshold: 0.5 });
@@ -555,4 +552,185 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   })();
 
+  // ============================================================
+  // SPLITTING.JS HERO TITLE CHARACTER REVEAL
+  // ============================================================
+  (function initSplitting() {
+    // Splitting.js is loaded deferred, so we poll until it's ready
+    function tryInit() {
+      if (typeof Splitting === 'undefined') {
+        setTimeout(tryInit, 50);
+        return;
+      }
+      Splitting({ target: '[data-splitting]', by: 'chars' });
+    }
+    tryInit();
+  })();
+
+  // ============================================================
+  // ODOMETER DIGIT SPINNER for Stats
+  // ============================================================
+  (function initDigitSpinner() {
+    function buildSpinner(el) {
+      var target = el.getAttribute('data-count');
+      var suffix = el.getAttribute('data-suffix') || '';
+      var isDecimal = el.getAttribute('data-decimal') === 'true';
+
+      // Format the target number
+      var targetStr;
+      if (isDecimal) {
+        targetStr = parseFloat(target).toFixed(1);
+      } else {
+        targetStr = Math.floor(parseFloat(target)).toString();
+      }
+
+      // Separate numeric part from suffix
+      // Build the spinner HTML
+      var html = '<span class="stat-digit-wrapper">';
+
+      for (var i = 0; i < targetStr.length; i++) {
+        var ch = targetStr[i];
+        if (ch === '.' || ch === '/') {
+          // Non-digit characters rendered as-is
+          html += '<span class="stat-digit-separator" style="display:inline-block;vertical-align:top;">' + ch + '</span>';
+        } else {
+          var finalDigit = parseInt(ch, 10);
+          html += '<span class="stat-digit-container" data-final="' + finalDigit + '">';
+          html += '<span class="stat-digit-column" style="transform: translateY(0);">';
+          // Build a column: 0 through 9, then the final digit again at bottom
+          for (var d = 0; d <= 9; d++) {
+            html += '<span>' + d + '</span>';
+          }
+          // Extra final digit copy so we land cleanly
+          html += '<span>' + finalDigit + '</span>';
+          html += '</span>'; // .stat-digit-column
+          html += '</span>'; // .stat-digit-container
+        }
+      }
+
+      // Suffix
+      if (suffix) {
+        html += '<span class="stat-suffix">' + suffix + '</span>';
+      }
+
+      html += '</span>'; // .stat-digit-wrapper
+
+      el.innerHTML = html;
+      el.style.overflow = 'hidden';
+    }
+
+    function spinDigits(el, index) {
+      var containers = el.querySelectorAll('.stat-digit-container');
+      containers.forEach(function(container, i) {
+        var finalDigit = parseInt(container.getAttribute('data-final'), 10);
+        var column = container.querySelector('.stat-digit-column');
+        if (!column) return;
+
+        // Target: land on the extra copy at position 10 (index = finalDigit in extra slot)
+        // Each span is 1em tall; we have digits 0-9 (10 spans) + final copy (1 span)
+        // We want to show the last span = index 10
+        var targetIndex = 10; // always land on the repeated final digit at position 10
+
+        setTimeout(function() {
+          column.style.transform = 'translateY(-' + targetIndex + 'em)';
+        }, index * 100 + i * 80);
+      });
+    }
+
+    var statNumbers = document.querySelectorAll('.stat-item__number[data-count]');
+    if (!statNumbers.length) return;
+
+    // Build spinners immediately
+    statNumbers.forEach(function(el) {
+      buildSpinner(el);
+    });
+
+    // Observe stats section
+    var statsSection = document.querySelector('#stats');
+    if (!statsSection) return;
+
+    var spinnerFired = false;
+    var observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting && !spinnerFired) {
+          spinnerFired = true;
+          observer.disconnect();
+
+          // Stagger stat items in
+          document.querySelectorAll('.stat-item').forEach(function(item, idx) {
+            setTimeout(function() {
+              item.classList.add('digit-ready');
+            }, idx * 120);
+          });
+
+          // Then spin digits
+          statNumbers.forEach(function(el, idx) {
+            setTimeout(function() {
+              spinDigits(el, idx);
+            }, 300);
+          });
+        }
+      });
+    }, { threshold: 0.4 });
+
+    observer.observe(statsSection);
+  })();
+
+  // ============================================================
+  // MAGNETIC TILT on product cards (desktop only)
+  // ============================================================
+  (function initMagneticTilt() {
+    if (window.innerWidth <= 768) return;
+
+    document.querySelectorAll('.product-card').forEach(function(card) {
+      card.addEventListener('mousemove', function(e) {
+        var rect = card.getBoundingClientRect();
+        var x = (e.clientX - rect.left) / rect.width - 0.5;
+        var y = (e.clientY - rect.top) / rect.height - 0.5;
+        card.style.transform = 'perspective(800px) rotateY(' + (x * 8) + 'deg) rotateX(' + (-y * 8) + 'deg) translateY(-2px)';
+      });
+
+      card.addEventListener('mouseleave', function() {
+        card.style.transform = 'perspective(800px) rotateY(0) rotateX(0) translateY(0)';
+        card.style.transition = 'transform 0.5s cubic-bezier(0.16, 1, 0.3, 1)';
+      });
+
+      card.addEventListener('mouseenter', function() {
+        card.style.transition = 'none';
+      });
+    });
+  })();
+
+  // ============================================================
+  // GLOWING CURSOR TRAIL (desktop only)
+  // ============================================================
+  (function initCursorTrail() {
+    if (window.innerWidth <= 768) return;
+
+    var glow = document.createElement('div');
+    glow.setAttribute('aria-hidden', 'true');
+    glow.style.cssText = [
+      'position:fixed',
+      'width:600px',
+      'height:600px',
+      'border-radius:50%',
+      'pointer-events:none',
+      'z-index:9999',
+      'mix-blend-mode:soft-light',
+      'background:radial-gradient(circle,rgba(0,229,255,0.07) 0%,transparent 70%)',
+      'transition:transform 0.15s ease-out',
+      'will-change:transform',
+      'top:0',
+      'left:0',
+      'transform:translate(-9999px,-9999px)'
+    ].join(';');
+
+    document.body.appendChild(glow);
+
+    document.addEventListener('mousemove', function(e) {
+      glow.style.transform = 'translate(' + (e.clientX - 300) + 'px,' + (e.clientY - 300) + 'px)';
+    }, { passive: true });
+  })();
+
 });
+
