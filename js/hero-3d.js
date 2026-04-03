@@ -76,14 +76,14 @@ import * as THREE from 'three';
           vUv = uv;
           vec3 pos = position;
           float dist = length(pos.xy) / 25.0;
-          // Multiple wave layers for more organic movement
-          float wave = sin(pos.x * 0.4 + uTime * 0.8) * 0.3 
-                     + cos(pos.y * 0.35 + uTime * 0.6) * 0.25
-                     + sin(pos.x * 0.15 + pos.y * 0.15 + uTime * 1.2) * 0.15;
-          // Mouse ripple effect
-          vec2 mousePos = uMouse * 10.0;
+          // FAST multi-layer waves
+          float wave = sin(pos.x * 0.5 + uTime * 1.6) * 0.4 
+                     + cos(pos.y * 0.45 + uTime * 1.2) * 0.35
+                     + sin(pos.x * 0.2 + pos.y * 0.2 + uTime * 2.4) * 0.2;
+          // STRONG mouse ripple
+          vec2 mousePos = uMouse * 12.0;
           float mouseDist = length(pos.xy - mousePos);
-          wave += sin(mouseDist * 0.8 - uTime * 3.0) * 0.4 * exp(-mouseDist * 0.15);
+          wave += sin(mouseDist * 1.0 - uTime * 5.0) * 0.6 * exp(-mouseDist * 0.12);
           float fade = 1.0 - dist;
           pos.z += wave * fade * 0.5;
           vElevation = fade;
@@ -251,9 +251,9 @@ import * as THREE from 'three';
         vColor = color;
         vSize = size;
         // Faster, more energetic pulsing
-        float pulseFactor = 1.0 + sin(uTime * 2.8 + pulse) * 0.3;
+        float pulseFactor = 1.0 + sin(uTime * 4.5 + pulse) * 0.35;
         // React to mouse speed - particles flare when mouse moves fast
-        pulseFactor += uMouseSpeed * 2.0;
+        pulseFactor += uMouseSpeed * 4.0;
         float finalSize = size * pulseFactor;
         vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
         gl_PointSize = finalSize * (200.0 / -mvPosition.z);
@@ -336,10 +336,10 @@ import * as THREE from 'three';
       void main() {
         vColor = color;
         vec3 pos = position;
-        // Faster, more noticeable drift
-        pos.y += sin(uTime * 0.4 + position.x * 0.5) * 0.6;
-        pos.x += cos(uTime * 0.3 + position.y * 0.4) * 0.5;
-        pos.z += sin(uTime * 0.2 + position.x * 0.3) * 0.3;
+        // Rapid drift
+        pos.y += sin(uTime * 0.8 + position.x * 0.5) * 0.8;
+        pos.x += cos(uTime * 0.6 + position.y * 0.4) * 0.7;
+        pos.z += sin(uTime * 0.5 + position.x * 0.3) * 0.5;
         vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
         gl_PointSize = size * (130.0 / -mvPosition.z);
         gl_Position = projectionMatrix * mvPosition;
