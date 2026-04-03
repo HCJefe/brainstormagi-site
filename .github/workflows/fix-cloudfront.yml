@@ -1,0 +1,223 @@
+name: Fix CloudFront Origin
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - diagnose
+          - fix-origin
+          - verify
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-west-2
+  BUCKET_NAME: brainstormagi-com-website
+  DOMAIN: brainstormagi.com
+
+jobs:
+  fix:
+    name: ${{ inputs.action }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::537501962693:role/github-actions-deploy
+          aws-region: us-east-1
+
+      # ========== DIAGNOSE ==========
+      - name: Diagnose CloudFront
+        if: inputs.action == 'diagnose'
+        run: |
+          echo "=== CloudFront Distribution ==="
+          DIST_ID=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?contains(Aliases.Items, '$DOMAIN')].Id | [0]" \
+            --output text)
+          echo "Distribution ID: $DIST_ID"
+          
+          echo ""
+          echo "=== Full Distribution Config ==="
+          aws cloudfront get-distribution-config --id $DIST_ID --output json | jq '.DistributionConfig.Origins'
+          
+          echo ""
+          echo "=== OAC Details ==="
+          OAC_ID=$(aws cloudfront get-distribution-config --id $DIST_ID \
+            --query 'DistributionConfig.Origins.Items[0].OriginAccessControlId' --output text)
+          echo "OAC ID: $OAC_ID"
+          aws cloudfront get-origin-access-control --id $OAC_ID --output json 2>/dev/null || echo "No OAC found"
+          
+          echo ""
+          echo "=== S3 Bucket Region ==="
+          aws s3api get-bucket-location --bucket $BUCKET_NAME --output json --region us-east-1
+          
+          echo ""
+          echo "=== S3 Bucket Policy ==="
+          aws s3api get-bucket-policy --bucket $BUCKET_NAME --output json --region $AWS_REGION 2>/dev/null | jq -r '.Policy' | jq '.' || echo "No bucket policy"
+          
+          echo ""
+          echo "=== S3 Website Config ==="
+          aws s3api get-bucket-website --bucket $BUCKET_NAME --region $AWS_REGION 2>/dev/null || echo "No website config"
+          
+          echo ""
+          echo "=== Test Direct S3 Access ==="
+          curl -sI "https://$BUCKET_NAME.s3.us-west-2.amazonaws.com/index.html" | head -20
+          
+          echo ""
+          echo "=== Test CloudFront ==="
+          CF_DOMAIN=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?contains(Aliases.Items, '$DOMAIN')].DomainName | [0]" \
+            --output text)
+          echo "CF Domain: $CF_DOMAIN"
+          curl -sI "https://$CF_DOMAIN/" | head -20
+          
+          echo ""
+          echo "=== Test brainstormagi.com ==="
+          curl -sI "https://brainstormagi.com/" | head -20
+
+      # ========== FIX ORIGIN ==========
+      - name: Fix CloudFront Origin
+        if: inputs.action == 'fix-origin'
+        run: |
+          DIST_ID=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?contains(Aliases.Items, '$DOMAIN')].Id | [0]" \
+            --output text)
+          echo "Distribution ID: $DIST_ID"
+
+          # Get the current config and ETag
+          CONFIG_JSON=$(aws cloudfront get-distribution-config --id $DIST_ID --output json)
+          ETAG=$(echo "$CONFIG_JSON" | jq -r '.ETag')
+          echo "ETag: $ETAG"
+          
+          # Extract current origin domain
+          CURRENT_ORIGIN=$(echo "$CONFIG_JSON" | jq -r '.DistributionConfig.Origins.Items[0].DomainName')
+          echo "Current origin: $CURRENT_ORIGIN"
+          
+          # The correct S3 regional endpoint for OAC
+          # For us-west-2, it should be: bucket.s3.us-west-2.amazonaws.com
+          # But we also need to disable S3 website hosting since OAC uses REST API
+          CORRECT_ORIGIN="$BUCKET_NAME.s3.us-west-2.amazonaws.com"
+          echo "Correct origin: $CORRECT_ORIGIN"
+
+          # First, disable S3 static website hosting (OAC requires REST API endpoint)
+          echo "Disabling S3 website hosting..."
+          aws s3api delete-bucket-website --bucket $BUCKET_NAME --region $AWS_REGION || echo "No website config to delete"
+
+          # Block all public access since we're using OAC
+          echo "Blocking public access..."
+          aws s3api put-public-access-block \
+            --bucket $BUCKET_NAME \
+            --public-access-block-configuration \
+            "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=false,RestrictPublicBuckets=false" \
+            --region $AWS_REGION
+
+          # Update the bucket policy to use the specific distribution ARN
+          CF_ARN=$(aws cloudfront get-distribution --id $DIST_ID --query 'Distribution.ARN' --output text)
+          echo "CloudFront ARN: $CF_ARN"
+          
+          aws s3api put-bucket-policy \
+            --bucket $BUCKET_NAME \
+            --region $AWS_REGION \
+            --policy "{
+              \"Version\": \"2012-10-17\",
+              \"Statement\": [{
+                \"Sid\": \"AllowCloudFrontServicePrincipalReadOnly\",
+                \"Effect\": \"Allow\",
+                \"Principal\": {\"Service\": \"cloudfront.amazonaws.com\"},
+                \"Action\": \"s3:GetObject\",
+                \"Resource\": \"arn:aws:s3:::$BUCKET_NAME/*\",
+                \"Condition\": {
+                  \"StringEquals\": {
+                    \"AWS:SourceArn\": \"$CF_ARN\"
+                  }
+                }
+              }]
+            }"
+          echo "Bucket policy updated with distribution ARN condition"
+          
+          # Extract the DistributionConfig and update origin if needed
+          NEW_CONFIG=$(echo "$CONFIG_JSON" | jq --arg origin "$CORRECT_ORIGIN" '.DistributionConfig | .Origins.Items[0].DomainName = $origin')
+          
+          # Also add a custom error response for 403 (since without website hosting, missing files return 403)
+          NEW_CONFIG=$(echo "$NEW_CONFIG" | jq '.CustomErrorResponses = {
+            "Quantity": 2,
+            "Items": [
+              {
+                "ErrorCode": 403,
+                "ResponsePagePath": "/index.html",
+                "ResponseCode": "200",
+                "ErrorCachingMinTTL": 10
+              },
+              {
+                "ErrorCode": 404,
+                "ResponsePagePath": "/index.html",
+                "ResponseCode": "200",
+                "ErrorCachingMinTTL": 10
+              }
+            ]
+          }')
+          
+          echo "Updating distribution..."
+          echo "$NEW_CONFIG" > /tmp/dist-config.json
+          
+          aws cloudfront update-distribution \
+            --id $DIST_ID \
+            --if-match $ETAG \
+            --distribution-config file:///tmp/dist-config.json
+          
+          echo ""
+          echo "Distribution updated! Invalidating cache..."
+          aws cloudfront create-invalidation \
+            --distribution-id $DIST_ID \
+            --paths "/*"
+          
+          echo ""
+          echo "Done! CloudFront will take 5-10 minutes to deploy the update."
+          echo "Origin: $CORRECT_ORIGIN"
+
+      # ========== VERIFY ==========
+      - name: Verify Site
+        if: inputs.action == 'verify'
+        run: |
+          echo "=== Testing CloudFront directly ==="
+          CF_DOMAIN=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?contains(Aliases.Items, '$DOMAIN')].DomainName | [0]" \
+            --output text)
+          echo "CF Domain: $CF_DOMAIN"
+          
+          echo ""
+          echo "--- Headers ---"
+          curl -sI "https://$CF_DOMAIN/" | head -30
+          
+          echo ""
+          echo "--- Body (first 500 chars) ---"
+          curl -s "https://$CF_DOMAIN/" | head -c 500
+          
+          echo ""
+          echo ""
+          echo "=== Testing brainstormagi.com ==="
+          echo "--- Headers ---"
+          curl -sI "https://brainstormagi.com/" | head -30
+          
+          echo ""
+          echo "--- Body (first 500 chars) ---"
+          curl -s "https://brainstormagi.com/" | head -c 500
+          
+          echo ""
+          echo ""
+          echo "=== Distribution Status ==="
+          DIST_ID=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?contains(Aliases.Items, '$DOMAIN')].Id | [0]" \
+            --output text)
+          aws cloudfront get-distribution --id $DIST_ID \
+            --query 'Distribution.{Status:Status,DomainName:DomainName,Origins:DistributionConfig.Origins.Items[0].DomainName}' \
+            --output json
