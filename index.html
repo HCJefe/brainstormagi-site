@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,6 +14,7 @@
 
   <!-- Fonts -->
   <link href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@400,500,700,800&f[]=satoshi@300,400,500,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
 
   <!-- Styles -->
   <link rel="stylesheet" href="./css/styles.css">
@@ -61,9 +62,9 @@
       </div>
 
       <div class="nav__actions">
-        <button class="theme-toggle" data-theme-toggle aria-label="Switch to dark mode">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        <button class="theme-toggle" data-theme-toggle aria-label="Switch to light mode">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
           </svg>
         </button>
         <a href="#contact" class="btn btn--primary btn--small nav__cta-desktop">Talk to Us</a>
@@ -85,7 +86,7 @@
     <div class="hero__content">
       <div class="hero__badge gsap-fade-in">
         <span class="hero__badge-dot"></span>
-        AI Technology Company -- Yuma, AZ
+        AI Technology Company &nbsp;|&nbsp; Yuma, AZ
       </div>
       <h1 class="hero__title gsap-fade-up">
         We Build AI<br><span class="hero__title-accent">That Works</span>
@@ -401,25 +402,31 @@
       </div>
       <div class="how-it-works__track" id="how-track">
         <div class="step-card gsap-fade-up">
-          <div class="step-card__number">1</div>
-          <h3 class="step-card__title">Define the Problem</h3>
-          <p class="step-card__desc">Tell us what your team spends too much time on. We map the workflow.</p>
+          <div class="step-card-inner">
+            <div class="step-card__number">01</div>
+            <h3 class="step-card__title">Define the Problem</h3>
+            <p class="step-card__desc">Tell us what your team spends too much time on. We map the workflow.</p>
+          </div>
         </div>
         <div class="step-connector gsap-fade-in">
           <div class="step-connector__line"></div>
         </div>
         <div class="step-card gsap-fade-up">
-          <div class="step-card__number">2</div>
-          <h3 class="step-card__title">We Build the Agent</h3>
-          <p class="step-card__desc">Custom voice, custom rules, trained on your data. HIPAA-ready from day one.</p>
+          <div class="step-card-inner">
+            <div class="step-card__number">02</div>
+            <h3 class="step-card__title">We Build the Agent</h3>
+            <p class="step-card__desc">Custom voice, custom rules, trained on your data. HIPAA-ready from day one.</p>
+          </div>
         </div>
         <div class="step-connector gsap-fade-in">
           <div class="step-connector__line"></div>
         </div>
         <div class="step-card gsap-fade-up">
-          <div class="step-card__number">3</div>
-          <h3 class="step-card__title">It Goes to Work</h3>
-          <p class="step-card__desc">Live on your phone system, in your dashboard, handling real tasks. 24/7/365.</p>
+          <div class="step-card-inner">
+            <div class="step-card__number">03</div>
+            <h3 class="step-card__title">It Goes to Work</h3>
+            <p class="step-card__desc">Live on your phone system, in your dashboard, handling real tasks. 24/7/365.</p>
+          </div>
         </div>
       </div>
     </div>
@@ -520,8 +527,8 @@
   <section class="section stats" id="stats">
     <div class="section__inner">
       <div class="section__header">
-        <span class="section__label gsap-fade-up" style="color: #FF5252;">By the Numbers</span>
-        <h2 class="section__title gsap-fade-up" style="color: #FFFFFF;">Performance You Can Measure</h2>
+        <span class="section__label gsap-fade-up" style="color: #D32F2F;">By the Numbers</span>
+        <h2 class="section__title gsap-fade-up" style="color: #E8E8F0;">Performance You Can Measure</h2>
       </div>
       <div class="stats__grid">
         <div class="stat-item gsap-scale-in">
@@ -629,7 +636,7 @@
   <section class="section contact" id="contact">
     <div class="section__inner">
       <div class="contact__inner">
-        <span class="section__label gsap-fade-up" style="color: #FF5252;">Get in Touch</span>
+        <span class="section__label gsap-fade-up" style="color: #D32F2F; justify-content: center; display: inline-flex;">Get in Touch</span>
         <h2 class="contact__title gsap-fade-up">Ready to See What AI Can Do for Your Business?</h2>
         <p class="contact__subtitle gsap-fade-up">Tell us about your operations. We will map the opportunity and show you what is possible.</p>
         <form class="contact__form gsap-fade-up" onsubmit="return false;">
