@@ -1,0 +1,549 @@
+name: Add Permissions and Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      step:
+        description: 'Step to run'
+        required: true
+        type: choice
+        options:
+          - check-permissions
+          - add-permissions
+          - create-s3-bucket
+          - request-acm-cert
+          - create-cloudfront
+          - update-dns
+          - deploy-files
+          - full-deploy
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-west-2
+  BUCKET_NAME: brainstormagi-com-website
+  DOMAIN: brainstormagi.com
+
+jobs:
+  check-permissions:
+    if: inputs.step == 'check-permissions' || inputs.step == 'full-deploy'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::537501962693:role/github-actions-deploy
+          aws-region: us-west-2
+
+      - name: Check Identity
+        run: |
+          echo "=== IDENTITY ==="
+          aws sts get-caller-identity
+          
+      - name: Check IAM permissions
+        run: |
+          echo "=== ATTACHED POLICIES ==="
+          ROLE_NAME="github-actions-deploy"
+          aws iam list-attached-role-policies --role-name $ROLE_NAME 2>&1 || echo "Cannot list attached policies"
+          
+          echo ""
+          echo "=== INLINE POLICIES ==="
+          aws iam list-role-policies --role-name $ROLE_NAME 2>&1 || echo "Cannot list inline policies"
+          
+          echo ""
+          echo "=== TRY S3 ==="
+          aws s3 ls 2>&1 || echo "S3 access denied"
+          
+          echo ""
+          echo "=== TRY CLOUDFRONT ==="
+          aws cloudfront list-distributions --max-items 1 2>&1 || echo "CloudFront access denied"
+          
+          echo ""
+          echo "=== TRY ACM (us-east-1) ==="
+          aws acm list-certificates --region us-east-1 2>&1 || echo "ACM access denied"
+          
+          echo ""
+          echo "=== TRY IAM PUT ROLE POLICY ==="
+          aws iam simulate-principal-policy \
+            --policy-source-arn arn:aws:iam::537501962693:role/github-actions-deploy \
+            --action-names iam:PutRolePolicy iam:AttachRolePolicy \
+            --query 'EvaluationResults[].{Action:EvalActionName,Decision:EvalDecision}' \
+            --output table 2>&1 || echo "Cannot simulate IAM policy"
+
+  add-permissions:
+    if: inputs.step == 'add-permissions'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::537501962693:role/github-actions-deploy
+          aws-region: us-west-2
+
+      - name: Add S3, CloudFront, ACM inline policy
+        run: |
+          ROLE_NAME="github-actions-deploy"
+          cat > /tmp/static-site-policy.json << 'POLICY'
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "S3StaticSite",
+                "Effect": "Allow",
+                "Action": [
+                  "s3:CreateBucket",
+                  "s3:DeleteBucket",
+                  "s3:PutBucketPolicy",
+                  "s3:GetBucketPolicy",
+                  "s3:PutBucketWebsite",
+                  "s3:GetBucketWebsite",
+                  "s3:PutObject",
+                  "s3:GetObject",
+                  "s3:DeleteObject",
+                  "s3:ListBucket",
+                  "s3:PutBucketPublicAccessBlock",
+                  "s3:GetBucketPublicAccessBlock",
+                  "s3:PutBucketAcl",
+                  "s3:GetBucketAcl",
+                  "s3:GetBucketLocation"
+                ],
+                "Resource": [
+                  "arn:aws:s3:::brainstormagi-com-website",
+                  "arn:aws:s3:::brainstormagi-com-website/*"
+                ]
+              },
+              {
+                "Sid": "CloudFrontManage",
+                "Effect": "Allow",
+                "Action": [
+                  "cloudfront:CreateDistribution",
+                  "cloudfront:UpdateDistribution",
+                  "cloudfront:GetDistribution",
+                  "cloudfront:ListDistributions",
+                  "cloudfront:CreateInvalidation",
+                  "cloudfront:GetInvalidation",
+                  "cloudfront:ListInvalidations",
+                  "cloudfront:TagResource",
+                  "cloudfront:CreateOriginAccessControl",
+                  "cloudfront:GetOriginAccessControl",
+                  "cloudfront:ListOriginAccessControls"
+                ],
+                "Resource": "*"
+              },
+              {
+                "Sid": "ACMCertificate",
+                "Effect": "Allow",
+                "Action": [
+                  "acm:RequestCertificate",
+                  "acm:DescribeCertificate",
+                  "acm:ListCertificates",
+                  "acm:DeleteCertificate",
+                  "acm:AddTagsToCertificate"
+                ],
+                "Resource": "*"
+              }
+            ]
+          }
+          POLICY
+          
+          aws iam put-role-policy \
+            --role-name $ROLE_NAME \
+            --policy-name StaticSiteDeployPolicy \
+            --policy-document file:///tmp/static-site-policy.json
+          
+          echo "Policy added successfully!"
+
+  create-s3-bucket:
+    if: inputs.step == 'create-s3-bucket' || inputs.step == 'full-deploy'
+    runs-on: ubuntu-latest
+    needs: [check-permissions]
+    continue-on-error: false
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::537501962693:role/github-actions-deploy
+          aws-region: us-west-2
+
+      - name: Create S3 Bucket
+        run: |
+          # Create bucket
+          aws s3api create-bucket \
+            --bucket $BUCKET_NAME \
+            --region $AWS_REGION \
+            --create-bucket-configuration LocationConstraint=$AWS_REGION 2>&1 || echo "Bucket may already exist"
+          
+          # Enable static website hosting
+          aws s3 website s3://$BUCKET_NAME/ \
+            --index-document index.html \
+            --error-document index.html
+          
+          echo "S3 bucket configured for static hosting"
+
+      - name: Configure bucket for CloudFront OAC
+        run: |
+          # Block all public access (CloudFront OAC will access it)
+          aws s3api put-public-access-block \
+            --bucket $BUCKET_NAME \
+            --public-access-block-configuration \
+            "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=false,RestrictPublicBuckets=false"
+          
+          echo "Public access block configured for OAC"
+
+  request-acm-cert:
+    if: inputs.step == 'request-acm-cert' || inputs.step == 'full-deploy'
+    runs-on: ubuntu-latest
+    needs: [check-permissions]
+    outputs:
+      cert_arn: ${{ steps.cert.outputs.cert_arn }}
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::537501962693:role/github-actions-deploy
+          aws-region: us-east-1
+
+      - name: Request ACM Certificate
+        id: cert
+        run: |
+          # Check if cert already exists
+          EXISTING=$(aws acm list-certificates \
+            --query "CertificateSummaryList[?DomainName=='$DOMAIN'].CertificateArn" \
+            --output text)
+          
+          if [ -n "$EXISTING" ] && [ "$EXISTING" != "None" ]; then
+            echo "Certificate already exists: $EXISTING"
+            echo "cert_arn=$EXISTING" >> $GITHUB_OUTPUT
+          else
+            CERT_ARN=$(aws acm request-certificate \
+              --domain-name $DOMAIN \
+              --subject-alternative-names "www.$DOMAIN" \
+              --validation-method DNS \
+              --query CertificateArn \
+              --output text)
+            echo "Certificate requested: $CERT_ARN"
+            echo "cert_arn=$CERT_ARN" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get DNS validation records
+        run: |
+          sleep 10
+          CERT_ARN="${{ steps.cert.outputs.cert_arn }}"
+          echo "Certificate ARN: $CERT_ARN"
+          
+          aws acm describe-certificate \
+            --certificate-arn $CERT_ARN \
+            --query 'Certificate.DomainValidationOptions[].ResourceRecord' \
+            --output json
+          
+          # Try to add validation records to Route 53 automatically
+          VALIDATION=$(aws acm describe-certificate \
+            --certificate-arn $CERT_ARN \
+            --query 'Certificate.DomainValidationOptions[0].ResourceRecord' \
+            --output json)
+          
+          RECORD_NAME=$(echo $VALIDATION | jq -r '.Name')
+          RECORD_VALUE=$(echo $VALIDATION | jq -r '.Value')
+          
+          if [ -n "$RECORD_NAME" ] && [ "$RECORD_NAME" != "null" ]; then
+            echo "Adding DNS validation record to Route 53..."
+            # Switch to us-west-2 for Route 53
+            aws route53 change-resource-record-sets \
+              --hosted-zone-id Z0634259PESIHO5MNZYR \
+              --change-batch "{
+                \"Changes\": [{
+                  \"Action\": \"UPSERT\",
+                  \"ResourceRecordSet\": {
+                    \"Name\": \"$RECORD_NAME\",
+                    \"Type\": \"CNAME\",
+                    \"TTL\": 300,
+                    \"ResourceRecords\": [{\"Value\": \"$RECORD_VALUE\"}]
+                  }
+                }]
+              }" --region us-east-1
+            echo "DNS validation record added!"
+          fi
+
+  create-cloudfront:
+    if: inputs.step == 'create-cloudfront'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::537501962693:role/github-actions-deploy
+          aws-region: us-east-1
+
+      - name: Get ACM cert ARN
+        id: cert
+        run: |
+          CERT_ARN=$(aws acm list-certificates \
+            --certificate-statuses ISSUED \
+            --query "CertificateSummaryList[?DomainName=='$DOMAIN'].CertificateArn" \
+            --output text)
+          echo "cert_arn=$CERT_ARN" >> $GITHUB_OUTPUT
+          echo "Certificate: $CERT_ARN"
+          
+          if [ -z "$CERT_ARN" ] || [ "$CERT_ARN" == "None" ]; then
+            echo "ERROR: No ISSUED certificate found. Wait for DNS validation."
+            exit 1
+          fi
+
+      - name: Create CloudFront OAC
+        id: oac
+        run: |
+          OAC_ID=$(aws cloudfront create-origin-access-control \
+            --origin-access-control-config "{
+              \"Name\": \"brainstormagi-oac\",
+              \"Description\": \"OAC for brainstormagi.com S3 bucket\",
+              \"SigningProtocol\": \"sigv4\",
+              \"SigningBehavior\": \"always\",
+              \"OriginAccessControlOriginType\": \"s3\"
+            }" \
+            --query 'OriginAccessControl.Id' \
+            --output text 2>&1)
+          
+          if echo "$OAC_ID" | grep -q "OriginAccessControlAlreadyExists"; then
+            OAC_ID=$(aws cloudfront list-origin-access-controls \
+              --query "OriginAccessControlList.Items[?Name=='brainstormagi-oac'].Id" \
+              --output text)
+          fi
+          echo "oac_id=$OAC_ID" >> $GITHUB_OUTPUT
+          echo "OAC ID: $OAC_ID"
+
+      - name: Create CloudFront Distribution
+        run: |
+          CERT_ARN="${{ steps.cert.outputs.cert_arn }}"
+          OAC_ID="${{ steps.oac.outputs.oac_id }}"
+          
+          # Check if distribution already exists
+          EXISTING=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?Aliases.Items[0]=='$DOMAIN'].Id" \
+            --output text 2>/dev/null)
+          
+          if [ -n "$EXISTING" ] && [ "$EXISTING" != "None" ]; then
+            echo "Distribution already exists: $EXISTING"
+            exit 0
+          fi
+          
+          cat > /tmp/cf-config.json << CFEOF
+          {
+            "CallerReference": "brainstormagi-$(date +%s)",
+            "Aliases": {
+              "Quantity": 2,
+              "Items": ["$DOMAIN", "www.$DOMAIN"]
+            },
+            "DefaultRootObject": "index.html",
+            "Origins": {
+              "Quantity": 1,
+              "Items": [{
+                "Id": "S3-$BUCKET_NAME",
+                "DomainName": "$BUCKET_NAME.s3.$AWS_REGION.amazonaws.com",
+                "OriginAccessControlId": "$OAC_ID",
+                "S3OriginConfig": {
+                  "OriginAccessIdentity": ""
+                }
+              }]
+            },
+            "DefaultCacheBehavior": {
+              "TargetOriginId": "S3-$BUCKET_NAME",
+              "ViewerProtocolPolicy": "redirect-to-https",
+              "AllowedMethods": {
+                "Quantity": 2,
+                "Items": ["GET", "HEAD"],
+                "CachedMethods": {
+                  "Quantity": 2,
+                  "Items": ["GET", "HEAD"]
+                }
+              },
+              "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6",
+              "Compress": true,
+              "ForwardedValues": {
+                "QueryString": false,
+                "Cookies": {"Forward": "none"}
+              },
+              "MinTTL": 0,
+              "DefaultTTL": 86400,
+              "MaxTTL": 31536000
+            },
+            "CustomErrorResponses": {
+              "Quantity": 1,
+              "Items": [{
+                "ErrorCode": 404,
+                "ResponsePagePath": "/index.html",
+                "ResponseCode": "200",
+                "ErrorCachingMinTTL": 300
+              }]
+            },
+            "ViewerCertificate": {
+              "ACMCertificateArn": "$CERT_ARN",
+              "SSLSupportMethod": "sni-only",
+              "MinimumProtocolVersion": "TLSv1.2_2021"
+            },
+            "HttpVersion": "http2and3",
+            "IsIPV6Enabled": true,
+            "Enabled": true,
+            "Comment": "brainstormagi.com static site",
+            "PriceClass": "PriceClass_100"
+          }
+          CFEOF
+          
+          DIST_ID=$(aws cloudfront create-distribution \
+            --distribution-config file:///tmp/cf-config.json \
+            --query 'Distribution.Id' \
+            --output text)
+          
+          echo "CloudFront Distribution created: $DIST_ID"
+          
+          # Get the domain name
+          CF_DOMAIN=$(aws cloudfront get-distribution \
+            --id $DIST_ID \
+            --query 'Distribution.DomainName' \
+            --output text)
+          echo "CloudFront domain: $CF_DOMAIN"
+
+      - name: Set S3 bucket policy for CloudFront OAC
+        run: |
+          # Switch to us-west-2 for S3
+          DIST_ARN="arn:aws:cloudfront::537501962693:distribution/*"
+          
+          cat > /tmp/bucket-policy.json << BPEOF
+          {
+            "Version": "2012-10-17",
+            "Statement": [{
+              "Sid": "AllowCloudFrontServicePrincipal",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudfront.amazonaws.com"
+              },
+              "Action": "s3:GetObject",
+              "Resource": "arn:aws:s3:::$BUCKET_NAME/*",
+              "Condition": {
+                "StringEquals": {
+                  "AWS:SourceAccount": "537501962693"
+                }
+              }
+            }]
+          }
+          BPEOF
+          
+          aws s3api put-bucket-policy \
+            --bucket $BUCKET_NAME \
+            --policy file:///tmp/bucket-policy.json \
+            --region $AWS_REGION
+          
+          echo "Bucket policy set for CloudFront access"
+
+  update-dns:
+    if: inputs.step == 'update-dns'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::537501962693:role/github-actions-deploy
+          aws-region: us-west-2
+
+      - name: Get CloudFront domain
+        id: cf
+        run: |
+          CF_DOMAIN=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?Aliases.Items[0]=='$DOMAIN'].DomainName" \
+            --output text)
+          CF_ID=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?Aliases.Items[0]=='$DOMAIN'].Id" \
+            --output text)
+          echo "cf_domain=$CF_DOMAIN" >> $GITHUB_OUTPUT
+          echo "cf_id=$CF_ID" >> $GITHUB_OUTPUT
+          echo "CloudFront: $CF_ID ($CF_DOMAIN)"
+
+      - name: Update Route 53 DNS
+        run: |
+          CF_DOMAIN="${{ steps.cf.outputs.cf_domain }}"
+          
+          aws route53 change-resource-record-sets \
+            --hosted-zone-id Z0634259PESIHO5MNZYR \
+            --change-batch "{
+              \"Changes\": [
+                {
+                  \"Action\": \"UPSERT\",
+                  \"ResourceRecordSet\": {
+                    \"Name\": \"$DOMAIN\",
+                    \"Type\": \"A\",
+                    \"AliasTarget\": {
+                      \"HostedZoneId\": \"Z2FDTNDATAQYW2\",
+                      \"DNSName\": \"$CF_DOMAIN\",
+                      \"EvaluateTargetHealth\": false
+                    }
+                  }
+                },
+                {
+                  \"Action\": \"UPSERT\",
+                  \"ResourceRecordSet\": {
+                    \"Name\": \"www.$DOMAIN\",
+                    \"Type\": \"A\",
+                    \"AliasTarget\": {
+                      \"HostedZoneId\": \"Z2FDTNDATAQYW2\",
+                      \"DNSName\": \"$CF_DOMAIN\",
+                      \"EvaluateTargetHealth\": false
+                    }
+                  }
+                }
+              ]
+            }"
+          
+          echo "DNS updated to point to CloudFront"
+
+  deploy-files:
+    if: inputs.step == 'deploy-files' || inputs.step == 'full-deploy'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::537501962693:role/github-actions-deploy
+          aws-region: us-west-2
+
+      - name: Upload files to S3
+        run: |
+          # Sync all site files (exclude .github and .git)
+          aws s3 sync . s3://$BUCKET_NAME/ \
+            --exclude ".git/*" \
+            --exclude ".github/*" \
+            --exclude ".gitignore" \
+            --delete \
+            --cache-control "public, max-age=3600" \
+            --content-type "text/html" \
+            --exclude "*.css" --exclude "*.js" --exclude "*.png" --exclude "*.jpg" --exclude "*.svg" --exclude "*.ico" --exclude "*.woff2"
+          
+          # Upload CSS with correct content type
+          aws s3 sync ./css s3://$BUCKET_NAME/css/ \
+            --content-type "text/css" \
+            --cache-control "public, max-age=86400"
+          
+          # Upload JS with correct content type  
+          aws s3 sync ./js s3://$BUCKET_NAME/js/ \
+            --content-type "application/javascript" \
+            --cache-control "public, max-age=86400"
+          
+          echo "Files uploaded to S3!"
+
+      - name: Invalidate CloudFront cache
+        run: |
+          DIST_ID=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?Aliases.Items[0]=='$DOMAIN'].Id" \
+            --output text 2>/dev/null)
+          
+          if [ -n "$DIST_ID" ] && [ "$DIST_ID" != "None" ]; then
+            aws cloudfront create-invalidation \
+              --distribution-id $DIST_ID \
+              --paths "/*"
+            echo "CloudFront cache invalidated"
+          else
+            echo "No CloudFront distribution found yet, skipping invalidation"
+          fi
