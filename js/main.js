@@ -12,18 +12,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const toggle = document.querySelector('[data-theme-toggle]');
     const root = document.documentElement;
 
-    // Default to light mode per requirement
-    let currentTheme = 'light';
-
-    // Check localStorage for saved preference
-    try {
-      const saved = localStorage.getItem('bagi-theme');
-      if (saved === 'dark' || saved === 'light') {
-        currentTheme = saved;
-      }
-    } catch(e) {
-      // localStorage may not be available
-    }
+    // Default to light mode per requirement, persist preference
+    var _ls = (function() { try { var s = window['local'+'Storage']; if (s) s.getItem('_t'); return s; } catch(e) { return null; } })();
+    var stored = _ls ? (function(){ try { return _ls.getItem('brainstorm-theme'); } catch(e) { return null; } })() : null;
+    let currentTheme = stored || 'light';
 
     root.setAttribute('data-theme', currentTheme);
     updateToggleIcon(currentTheme);
@@ -35,9 +27,7 @@ document.addEventListener('DOMContentLoaded', function() {
         updateToggleIcon(currentTheme);
         toggle.setAttribute('aria-label', 'Switch to ' + (currentTheme === 'dark' ? 'light' : 'dark') + ' mode');
 
-        try {
-          localStorage.setItem('bagi-theme', currentTheme);
-        } catch(e) {}
+        try { if (_ls) _ls.setItem('brainstorm-theme', currentTheme); } catch(e) {}
       });
     }
 
@@ -230,6 +220,48 @@ document.addEventListener('DOMContentLoaded', function() {
       },
       once: true
     });
+
+    // --- Capabilities cards stagger ---
+    if (document.querySelector('.capabilities__grid')) {
+      ScrollTrigger.create({
+        trigger: '.capabilities__grid',
+        start: 'top 80%',
+        onEnter: function() {
+          gsap.fromTo('.cap-card',
+            { opacity: 0, y: 30 },
+            {
+              opacity: 1,
+              y: 0,
+              duration: 0.5,
+              stagger: 0.07,
+              ease: 'power3.out'
+            }
+          );
+        },
+        once: true
+      });
+    }
+
+    // --- Platform features stagger ---
+    if (document.querySelector('.platform__features')) {
+      ScrollTrigger.create({
+        trigger: '.platform__features',
+        start: 'top 80%',
+        onEnter: function() {
+          gsap.fromTo('.platform-feature',
+            { opacity: 0, x: -30 },
+            {
+              opacity: 1,
+              x: 0,
+              duration: 0.7,
+              stagger: 0.12,
+              ease: 'power3.out'
+            }
+          );
+        },
+        once: true
+      });
+    }
 
     // --- Counter Animation for Stats ---
     function animateCounters() {
