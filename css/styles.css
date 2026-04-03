@@ -1463,11 +1463,7 @@ body::after {
 }
 
 .industry-card__icon::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 229, 255, 0.06);
-  border: 1px solid rgba(0, 229, 255, 0.12);
+  display: none;
 }
 
 .industry-card:hover .industry-card__icon {
