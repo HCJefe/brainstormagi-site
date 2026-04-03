@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Brainstorm AGI - We Build AI That Works</title>
+  <meta name="description" content="Brainstorm AGI builds autonomous AI agents, operational intelligence platforms, and voice AI systems for healthcare, legal, real estate, and professional services.">
+
+  <!-- Favicon -->
+  <link rel="icon" href="./favicon.ico" sizes="any">
+  <link rel="icon" href="./favicon-16.png" sizes="16x16" type="image/png">
+  <link rel="icon" href="./favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+
+  <!-- Fonts -->
+  <link href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@400,500,700,800&f[]=satoshi@300,400,500,700&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="./css/styles.css">
+
+  <!-- Three.js -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.183.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.183.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <!-- GSAP + ScrollTrigger -->
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/ScrollTrigger.min.js" defer></script>
+</head>
+<body>
+
+  <!-- ========== NAVIGATION ========== -->
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <div class="nav__inner">
+      <a href="#" class="nav__logo" aria-label="Brainstorm AGI home">
+        <svg viewBox="0 0 36 36" fill="none" aria-hidden="true">
+          <circle cx="18" cy="18" r="16" stroke="currentColor" stroke-width="2" opacity="0.3"/>
+          <circle cx="18" cy="14" r="5" stroke="currentColor" stroke-width="2"/>
+          <circle cx="12" cy="22" r="3" stroke="currentColor" stroke-width="2"/>
+          <circle cx="24" cy="22" r="3" stroke="currentColor" stroke-width="2"/>
+          <line x1="16" y1="18" x2="13" y2="20" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="20" y1="18" x2="23" y2="20" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="18" cy="14" r="1.5" fill="#D32F2F"/>
+          <circle cx="12" cy="22" r="1" fill="#D32F2F"/>
+          <circle cx="24" cy="22" r="1" fill="#D32F2F"/>
+        </svg>
+        <span>Brainstorm AGI</span>
+      </a>
+
+      <div class="nav__links" id="nav-links">
+        <a href="#products" class="nav__link">Products</a>
+        <a href="#how-it-works" class="nav__link">How It Works</a>
+        <a href="#industries" class="nav__link">Industries</a>
+        <a href="#trust" class="nav__link">Trust</a>
+        <a href="#contact" class="nav__link">Contact</a>
+      </div>
+
+      <div class="nav__actions">
+        <button class="theme-toggle" data-theme-toggle aria-label="Switch to dark mode">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+        </button>
+        <a href="#contact" class="btn btn--primary btn--small nav__cta-desktop">Talk to Us</a>
+        <button class="nav__mobile-toggle" id="mobile-toggle" aria-label="Toggle menu" aria-expanded="false">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ========== HERO ========== -->
+  <section class="hero" id="hero">
+    <div class="hero__canvas-container" id="hero-canvas"></div>
+    <div class="hero__overlay"></div>
+    <div class="hero__content">
+      <div class="hero__badge gsap-fade-in">
+        <span class="hero__badge-dot"></span>
+        AI Technology Company -- Yuma, AZ
+      </div>
+      <h1 class="hero__title gsap-fade-up">
+        We Build AI<br><span class="hero__title-accent">That Works</span>
+      </h1>
+      <p class="hero__subtitle gsap-fade-up">
+        Autonomous agents. Operational intelligence. Voice AI. Built for industries that can't afford downtime.
+      </p>
+      <div class="hero__ctas gsap-fade-up">
+        <a href="#products" class="btn btn--primary">
+          See Our Products
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17l9.2-9.2M17 17V8H8"/></svg>
+        </a>
+        <a href="#contact" class="btn btn--outline">
+          Talk to Us
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== PRODUCTS ========== -->
+  <section class="section" id="products">
+    <div class="section__inner">
+      <div class="section__header">
+        <span class="section__label gsap-fade-up">What We Build</span>
+        <h2 class="section__title gsap-fade-up">Products That Replace Entire Workflows</h2>
+        <p class="section__subtitle gsap-fade-up">Four platforms. One mission: make your operations run without you having to babysit them.</p>
+      </div>
+      <div class="products__grid">
+
+        <!-- AI Agency for Hire -->
+        <div class="product-card gsap-fade-up">
+          <div class="product-card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+          </div>
+          <h3 class="product-card__name">AI Agency for Hire</h3>
+          <p class="product-card__desc">Named AI employees with voice, phone, and their own dashboard. 20+ roles. 89% cost savings.</p>
+          <a href="https://aiagencyforhire.com" target="_blank" rel="noopener noreferrer" class="product-card__link">
+            Learn more
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </a>
+        </div>
+
+        <!-- Nerve Center -->
+        <div class="product-card gsap-fade-up">
+          <div class="product-card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+              <line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+              <polyline points="6 8 10 12 14 8 18 12"/>
+            </svg>
+          </div>
+          <h3 class="product-card__name">Nerve Center</h3>
+          <p class="product-card__desc">Operational intelligence for complex workflows. Call analytics, scheduling, compliance, all in one cockpit.</p>
+          <a href="#contact" class="product-card__link">
+            Learn more
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </a>
+        </div>
+
+        <!-- CareTrack -->
+        <div class="product-card gsap-fade-up">
+          <div class="product-card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+          </div>
+          <h3 class="product-card__name">CareTrack</h3>
+          <p class="product-card__desc">Real-time workforce performance. Attendance, compliance, risk scoring, and predictive analytics.</p>
+          <a href="#contact" class="product-card__link">
+            Learn more
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </a>
+        </div>
+
+        <!-- Agent Platform -->
+        <div class="product-card gsap-fade-up">
+          <div class="product-card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+              <path d="M2 17l10 5 10-5"/>
+              <path d="M2 12l10 5 10-5"/>
+            </svg>
+          </div>
+          <h3 class="product-card__name">Agent Platform</h3>
+          <p class="product-card__desc">Build custom AI agents with phone, email, Telegram, calendar, and a knowledge base. Deploy in minutes.</p>
+          <a href="#contact" class="product-card__link">
+            Learn more
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== HOW IT WORKS ========== -->
+  <section class="section section--alt" id="how-it-works">
+    <div class="section__inner">
+      <div class="section__header">
+        <span class="section__label gsap-fade-up">How It Works</span>
+        <h2 class="section__title gsap-fade-up">Three Steps. Then It Runs Itself.</h2>
+        <p class="section__subtitle gsap-fade-up">No six-month implementations. No consultants. Just results.</p>
+      </div>
+      <div class="how-it-works__track" id="how-track">
+        <div class="step-card gsap-fade-up">
+          <div class="step-card__number">1</div>
+          <h3 class="step-card__title">Define the Problem</h3>
+          <p class="step-card__desc">Tell us what your team spends too much time on. We map the workflow.</p>
+        </div>
+        <div class="step-connector gsap-fade-in">
+          <div class="step-connector__line"></div>
+        </div>
+        <div class="step-card gsap-fade-up">
+          <div class="step-card__number">2</div>
+          <h3 class="step-card__title">We Build the Agent</h3>
+          <p class="step-card__desc">Custom voice, custom rules, trained on your data. HIPAA-ready from day one.</p>
+        </div>
+        <div class="step-connector gsap-fade-in">
+          <div class="step-connector__line"></div>
+        </div>
+        <div class="step-card gsap-fade-up">
+          <div class="step-card__number">3</div>
+          <h3 class="step-card__title">It Goes to Work</h3>
+          <p class="step-card__desc">Live on your phone system, in your dashboard, handling real tasks. 24/7/365.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== INDUSTRIES ========== -->
+  <section class="section" id="industries">
+    <div class="section__inner">
+      <div class="section__header">
+        <span class="section__label gsap-fade-up">Industries</span>
+        <h2 class="section__title gsap-fade-up">Built for the Real World</h2>
+        <p class="section__subtitle gsap-fade-up">We work in industries where mistakes are expensive and downtime is not an option.</p>
+      </div>
+      <div class="industries__grid">
+
+        <div class="industry-card gsap-fade-up">
+          <div class="industry-card__icon">
+            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M24 4L24 8"/>
+              <path d="M24 40L24 44"/>
+              <circle cx="24" cy="24" r="12"/>
+              <path d="M18 24l4 4 8-8"/>
+            </svg>
+          </div>
+          <h3 class="industry-card__name">Healthcare and Hospice</h3>
+          <p class="industry-card__tagline">HIPAA-compliant AI for scheduling, compliance, and patient coordination.</p>
+        </div>
+
+        <div class="industry-card gsap-fade-up">
+          <div class="industry-card__icon">
+            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="8" y="6" width="32" height="36" rx="2"/>
+              <line x1="16" y1="14" x2="32" y2="14"/>
+              <line x1="16" y1="22" x2="32" y2="22"/>
+              <line x1="16" y1="30" x2="24" y2="30"/>
+            </svg>
+          </div>
+          <h3 class="industry-card__name">Legal</h3>
+          <p class="industry-card__tagline">Intake automation, document processing, and client management at scale.</p>
+        </div>
+
+        <div class="industry-card gsap-fade-up">
+          <div class="industry-card__icon">
+            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 40L24 8L42 40H6z"/>
+              <line x1="18" y1="32" x2="30" y2="32"/>
+              <line x1="14" y1="36" x2="34" y2="36"/>
+            </svg>
+          </div>
+          <h3 class="industry-card__name">Real Estate</h3>
+          <p class="industry-card__tagline">Lead qualification, showing coordination, and transaction management.</p>
+        </div>
+
+        <div class="industry-card gsap-fade-up">
+          <div class="industry-card__icon">
+            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="24" cy="20" r="8"/>
+              <path d="M8 40c0-8.837 7.163-16 16-16s16 7.163 16 16"/>
+              <path d="M24 12V8"/>
+              <path d="M30 14l2-3"/>
+              <path d="M18 14l-2-3"/>
+            </svg>
+          </div>
+          <h3 class="industry-card__name">Professional Services</h3>
+          <p class="industry-card__tagline">AI receptionists, billing agents, and scheduling for firms of all sizes.</p>
+        </div>
+
+        <div class="industry-card gsap-fade-up">
+          <div class="industry-card__icon">
+            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M24 6l-6 12h12l-6 12"/>
+              <rect x="10" y="30" width="28" height="12" rx="2"/>
+              <line x1="18" y1="36" x2="30" y2="36"/>
+            </svg>
+          </div>
+          <h3 class="industry-card__name">Trades and Field Service</h3>
+          <p class="industry-card__tagline">Dispatch, booking, and customer follow-up, fully automated.</p>
+        </div>
+
+        <div class="industry-card gsap-fade-up">
+          <div class="industry-card__icon">
+            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="6" y="10" width="14" height="14" rx="2"/>
+              <rect x="28" y="10" width="14" height="14" rx="2"/>
+              <rect x="6" y="28" width="14" height="14" rx="2"/>
+              <rect x="28" y="28" width="14" height="14" rx="2"/>
+            </svg>
+          </div>
+          <h3 class="industry-card__name">Franchise Operations</h3>
+          <p class="industry-card__tagline">Consistent AI agents across locations with centralized oversight.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== STATS ========== -->
+  <section class="section stats" id="stats">
+    <div class="section__inner">
+      <div class="section__header">
+        <span class="section__label gsap-fade-up" style="color: #FF5252;">By the Numbers</span>
+        <h2 class="section__title gsap-fade-up" style="color: #FFFFFF;">Performance You Can Measure</h2>
+      </div>
+      <div class="stats__grid">
+        <div class="stat-item gsap-scale-in">
+          <div class="stat-item__number" data-count="89" data-suffix="-91%">0</div>
+          <div class="stat-item__label">Cost savings vs. human staff</div>
+        </div>
+        <div class="stat-item gsap-scale-in">
+          <div class="stat-item__number" data-count="99.7" data-suffix="%" data-decimal="true">0</div>
+          <div class="stat-item__label">Uptime across all deployed agents</div>
+        </div>
+        <div class="stat-item gsap-scale-in">
+          <div class="stat-item__number" data-count="24" data-suffix="/7/365" data-nodash="true">0</div>
+          <div class="stat-item__label">Always on duty</div>
+        </div>
+        <div class="stat-item gsap-scale-in">
+          <div class="stat-item__number" data-count="20" data-suffix="+" data-nodash="true">0</div>
+          <div class="stat-item__label">AI roles available</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== TRUST ========== -->
+  <section class="section section--alt" id="trust">
+    <div class="section__inner">
+      <div class="section__header">
+        <span class="section__label gsap-fade-up">Built on Trust</span>
+        <h2 class="section__title gsap-fade-up">Security is Not an Afterthought</h2>
+        <p class="section__subtitle gsap-fade-up">Every system we deploy meets the highest standards for data protection and transparency.</p>
+      </div>
+      <div class="trust__grid">
+
+        <div class="trust-item gsap-fade-up">
+          <div class="trust-item__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              <path d="M9 12l2 2 4-4"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="trust-item__title">HIPAA-Ready Infrastructure</h3>
+            <p class="trust-item__desc">Built for healthcare from the ground up. PHI is encrypted at rest and in transit.</p>
+          </div>
+        </div>
+
+        <div class="trust-item gsap-fade-up">
+          <div class="trust-item__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="trust-item__title">256-Bit Encryption</h3>
+            <p class="trust-item__desc">Every call, text, and email is encrypted end-to-end. No exceptions.</p>
+          </div>
+        </div>
+
+        <div class="trust-item gsap-fade-up">
+          <div class="trust-item__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M9 12l2 2 4-4"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="trust-item__title">SOC 2 Compliant</h3>
+            <p class="trust-item__desc">Audited controls for security, availability, and confidentiality of customer data.</p>
+          </div>
+        </div>
+
+        <div class="trust-item gsap-fade-up">
+          <div class="trust-item__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="trust-item__title">Transparent AI Disclosure</h3>
+            <p class="trust-item__desc">Every agent identifies as AI on every interaction. No deception, ever.</p>
+          </div>
+        </div>
+
+        <div class="trust-item gsap-fade-up">
+          <div class="trust-item__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+              <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+              <line x1="6" y1="6" x2="6.01" y2="6"/>
+              <line x1="6" y1="18" x2="6.01" y2="18"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="trust-item__title">AWS-Hosted Infrastructure</h3>
+            <p class="trust-item__desc">Deployed on Amazon Web Services with redundancy, auto-scaling, and geographic failover.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== CONTACT ========== -->
+  <section class="section contact" id="contact">
+    <div class="section__inner">
+      <div class="contact__inner">
+        <span class="section__label gsap-fade-up" style="color: #FF5252;">Get in Touch</span>
+        <h2 class="contact__title gsap-fade-up">Ready to See What AI Can Do for Your Business?</h2>
+        <p class="contact__subtitle gsap-fade-up">Tell us about your operations. We will map the opportunity and show you what is possible.</p>
+        <form class="contact__form gsap-fade-up" onsubmit="return false;">
+          <div>
+            <input type="text" class="contact__input" placeholder="Your Name" required>
+          </div>
+          <div>
+            <input type="email" class="contact__input" placeholder="Email Address" required>
+          </div>
+          <div class="contact__form-full">
+            <input type="text" class="contact__input" placeholder="Company">
+          </div>
+          <div class="contact__form-full">
+            <textarea class="contact__textarea" placeholder="Tell us about your biggest operational bottleneck..." rows="4"></textarea>
+          </div>
+          <div class="contact__submit-row">
+            <button type="submit" class="btn btn--primary">
+              Send Message
+              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== FOOTER ========== -->
+  <footer class="footer">
+    <div class="footer__inner">
+      <div class="footer__top">
+        <div class="footer__brand">
+          <div class="footer__logo">
+            <svg viewBox="0 0 36 36" fill="none" aria-hidden="true">
+              <circle cx="18" cy="18" r="16" stroke="currentColor" stroke-width="2" opacity="0.3"/>
+              <circle cx="18" cy="14" r="5" stroke="currentColor" stroke-width="2"/>
+              <circle cx="12" cy="22" r="3" stroke="currentColor" stroke-width="2"/>
+              <circle cx="24" cy="22" r="3" stroke="currentColor" stroke-width="2"/>
+              <line x1="16" y1="18" x2="13" y2="20" stroke="currentColor" stroke-width="1.5"/>
+              <line x1="20" y1="18" x2="23" y2="20" stroke="currentColor" stroke-width="1.5"/>
+              <circle cx="18" cy="14" r="1.5" fill="#D32F2F"/>
+              <circle cx="12" cy="22" r="1" fill="#D32F2F"/>
+              <circle cx="24" cy="22" r="1" fill="#D32F2F"/>
+            </svg>
+            <span>Brainstorm AGI</span>
+          </div>
+          <p class="footer__tagline">AI technology company building autonomous agents and operational intelligence for industries that demand reliability.</p>
+        </div>
+
+        <div>
+          <h4 class="footer__col-title">Company</h4>
+          <div class="footer__col-links">
+            <a href="#products" class="footer__col-link">Products</a>
+            <a href="#industries" class="footer__col-link">Industries</a>
+            <a href="#trust" class="footer__col-link">About</a>
+            <a href="#contact" class="footer__col-link">Contact</a>
+          </div>
+        </div>
+
+        <div>
+          <h4 class="footer__col-title">Products</h4>
+          <div class="footer__col-links">
+            <a href="https://aiagencyforhire.com" target="_blank" rel="noopener noreferrer" class="footer__col-link">AI Agency for Hire</a>
+            <a href="#products" class="footer__col-link">Nerve Center</a>
+            <a href="#products" class="footer__col-link">CareTrack</a>
+            <a href="#products" class="footer__col-link">Agent Platform</a>
+          </div>
+        </div>
+
+        <div>
+          <h4 class="footer__col-title">Legal</h4>
+          <div class="footer__col-links">
+            <a href="#" class="footer__col-link">Privacy Policy</a>
+            <a href="#" class="footer__col-link">Terms of Service</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer__bottom">
+        <p class="footer__copyright">&copy; 2026 Brainstorm AGI, LLC</p>
+        <div class="footer__socials">
+          <a href="#" class="footer__social-link" aria-label="LinkedIn" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+          </a>
+          <a href="#" class="footer__social-link" aria-label="X (Twitter)" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          </a>
+          <a href="#" class="footer__social-link" aria-label="GitHub" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script type="module" src="./js/hero-3d.js"></script>
+  <script src="./js/main.js" defer></script>
+</body>
+</html>
