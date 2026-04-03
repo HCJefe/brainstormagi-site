@@ -12,17 +12,17 @@ import * as THREE from 'three';
 
   // --- Configuration ---
   const isMobile = window.innerWidth < 768;
-  const PARTICLE_COUNT = isMobile ? 250 : 700;
-  const CONNECTION_DISTANCE = isMobile ? 2.8 : 2.6;
-  const MAX_CONNECTIONS = isMobile ? 500 : 2000;
-  const BRAIN_SCALE = isMobile ? 3.5 : 5.2;
+  const PARTICLE_COUNT = isMobile ? 180 : 400;
+  const CONNECTION_DISTANCE = isMobile ? 2.8 : 2.8;
+  const MAX_CONNECTIONS = isMobile ? 400 : 1200;
+  const BRAIN_SCALE = isMobile ? 3.5 : 4.8;
 
   // --- Scene Setup ---
   const scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(0x050510, 0.018);
 
   const camera = new THREE.PerspectiveCamera(58, container.clientWidth / container.clientHeight, 0.1, 100);
-  camera.position.set(0, 0, 13);
+  camera.position.set(0, 0.5, 16);
 
   const renderer = new THREE.WebGLRenderer({
     antialias: !isMobile,
@@ -33,7 +33,7 @@ import * as THREE from 'three';
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setClearColor(0x000000, 0);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.2;
+  renderer.toneMappingExposure = 0.9;
   container.appendChild(renderer.domElement);
 
   // --- Mouse tracking (enhanced responsiveness) ---
@@ -198,25 +198,25 @@ import * as THREE from 'three';
     let color;
     if (colorRoll < 0.3) {
       color = colors[0]; // Deep red
-      particleSizes[i] = 3 + Math.random() * 5;
+      particleSizes[i] = 2 + Math.random() * 3;
     } else if (colorRoll < 0.45) {
       color = colors[1]; // Bright red
-      particleSizes[i] = 2 + Math.random() * 4;
+      particleSizes[i] = 1.5 + Math.random() * 2.5;
     } else if (colorRoll < 0.60) {
       color = colors[2]; // Cyan
-      particleSizes[i] = 2.5 + Math.random() * 4;
+      particleSizes[i] = 1.5 + Math.random() * 2.5;
     } else if (colorRoll < 0.68) {
       color = colors[3]; // Dark cyan
-      particleSizes[i] = 1.5 + Math.random() * 3;
+      particleSizes[i] = 1 + Math.random() * 2;
     } else if (colorRoll < 0.75) {
       color = colors[4]; // Purple
-      particleSizes[i] = 2 + Math.random() * 3;
+      particleSizes[i] = 1.5 + Math.random() * 2;
     } else if (colorRoll < 0.88) {
       color = colors[5]; // Near white
-      particleSizes[i] = 1.5 + Math.random() * 3;
+      particleSizes[i] = 1 + Math.random() * 2;
     } else {
       color = colors[6]; // Pink red
-      particleSizes[i] = 1 + Math.random() * 2.5;
+      particleSizes[i] = 0.8 + Math.random() * 1.5;
     }
 
     particleColors[i * 3] = color.r;
