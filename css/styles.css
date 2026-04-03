@@ -873,11 +873,17 @@ body::after {
    ============================================================ */
 .products__grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: var(--space-5);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
+  .products__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
   .products__grid {
     grid-template-columns: 1fr;
   }
@@ -2219,3 +2225,188 @@ body::after {
   left: 8px;
   border-width: 0 0 1px 1px;
 }
+
+/* ============================================================
+   MOBILE ENHANCEMENTS
+   Added: April 2026 — Mobile polish pass
+   ============================================================ */
+
+/* ---- Hero: reduce empty space on mobile ---- */
+@media (max-width: 768px) {
+  .hero {
+    min-height: 85vh;
+    align-items: center;
+  }
+
+  .hero__content {
+    padding-top: calc(var(--nav-height, 64px) + var(--space-8));
+    padding-bottom: var(--space-8);
+  }
+
+  .hero__title {
+    font-size: clamp(2.4rem, 6vw + 1rem, 5rem);
+  }
+
+  .hero__badge {
+    margin-bottom: var(--space-5);
+  }
+}
+
+@media (max-width: 480px) {
+  .hero {
+    min-height: 80vh;
+  }
+
+  .hero__title {
+    font-size: clamp(2.2rem, 9vw, 3.6rem);
+  }
+}
+
+/* ---- Touch targets: product card "Learn more" links ---- */
+@media (max-width: 768px) {
+  .product-card__link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: var(--space-2) 0;
+  }
+}
+
+/* ---- "Talk to Us" hero outline button: taller on mobile ---- */
+@media (max-width: 768px) {
+  .btn--outline {
+    min-height: 48px;
+  }
+}
+
+/* ---- Nav: spacing between theme toggle and hamburger ---- */
+@media (max-width: 768px) {
+  .nav__actions {
+    gap: var(--space-3);
+  }
+}
+
+/* ---- Section vertical padding: tighten on mobile ---- */
+@media (max-width: 768px) {
+  .section {
+    padding-top: clamp(var(--space-10), 7vw, var(--space-16));
+    padding-bottom: clamp(var(--space-10), 7vw, var(--space-16));
+  }
+
+  .section__header {
+    margin-bottom: clamp(var(--space-8), 5vw, var(--space-12));
+  }
+}
+
+/* ---- Product card padding: reduce on mobile ---- */
+@media (max-width: 640px) {
+  .product-card {
+    padding: 1.25rem;
+  }
+}
+
+/* ---- Capability cards: single column at 480px ---- */
+@media (max-width: 480px) {
+  .capabilities__grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+
+  .cap-card {
+    padding: var(--space-4);
+  }
+}
+
+/* ---- Industries grid: 2-col tablet, 1-col phone with left-aligned content ---- */
+@media (max-width: 992px) {
+  .industries__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .industries__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .industry-card {
+    text-align: left;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-4);
+    padding: var(--space-5);
+  }
+
+  .industry-card__icon {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    margin: 0;
+  }
+
+  .industry-card__name {
+    margin-top: 0;
+  }
+}
+
+/* ---- Footer nav links: larger tap targets ---- */
+@media (max-width: 768px) {
+  .footer__col-link {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    padding: var(--space-1) 0;
+  }
+
+  .footer__col-links {
+    gap: 0;
+  }
+}
+
+/* ---- Stats: tighten on phone ---- */
+@media (max-width: 480px) {
+  .stats__grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-4);
+  }
+
+  .stat-item {
+    padding: var(--space-4) var(--space-2);
+  }
+
+  .stat-item__number {
+    font-size: clamp(2rem, 8vw, 3rem);
+  }
+}
+
+/* ---- Trust grid: single column on phone ---- */
+@media (max-width: 480px) {
+  .trust__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .trust__grid .trust-item:last-child:nth-child(odd) {
+    grid-column: auto;
+    max-width: 100%;
+  }
+}
+
+/* ---- How It Works: tighten on mobile ---- */
+@media (max-width: 768px) {
+  .how-it-works__track {
+    gap: var(--space-3);
+  }
+}
+
+/* ---- Platform features: more readable on mobile ---- */
+@media (max-width: 600px) {
+  .platform-feature {
+    gap: var(--space-3);
+  }
+
+  .platform-feature__num {
+    font-size: 1.25rem;
+    min-width: 2rem;
+  }
+}
+
