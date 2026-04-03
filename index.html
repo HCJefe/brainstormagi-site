@@ -38,6 +38,9 @@
 </head>
 <body>
 
+  <!-- SCROLL PROGRESS BAR -->
+  <div class="scroll-progress" id="scroll-progress"></div>
+
   <!-- ========== NAVIGATION ========== -->
   <nav class="nav" role="navigation" aria-label="Main navigation">
     <div class="nav__inner">
@@ -89,7 +92,10 @@
     <div class="hero__content">
       <div class="hero__badge gsap-fade-in">
         <span class="hero__badge-dot"></span>
-        Deployed Across 18 Industries
+        <span class="hero__live-text">Systems Active</span>
+        <span class="hero__live-separator">|</span>
+        <span class="hero__live-count" id="live-agents">0</span>
+        <span class="hero__live-suffix">agents deployed</span>
       </div>
       <h1 class="hero__title" data-splitting>
         We Build AI<br><span class="hero__title-accent">That Works</span>
@@ -124,7 +130,7 @@
       <div class="products__grid">
 
         <!-- AI Agents and Assistants -->
-        <div class="product-card gsap-fade-up">
+        <div class="product-card gsap-fade-up" data-detail="47 agents active across 18 industries">
           <div class="product-card__icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
@@ -135,10 +141,11 @@
           </div>
           <h3 class="product-card__name">AI Agents and Assistants</h3>
           <p class="product-card__desc">Autonomous AI that answers phones, handles email, books appointments, manages tasks, and runs workflows. Each one has its own voice, identity, phone number, and knowledge base. Deploys in days.</p>
+          <span class="product-card__detail">47 agents active across 18 industries</span>
         </div>
 
         <!-- Operational Intelligence -->
-        <div class="product-card gsap-fade-up">
+        <div class="product-card gsap-fade-up" data-detail="Processing 12,400+ data points daily">
           <div class="product-card__icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
@@ -149,10 +156,11 @@
           </div>
           <h3 class="product-card__name">Operational Intelligence</h3>
           <p class="product-card__desc">Real-time dashboards, workforce analytics, compliance monitoring, call intelligence, and performance scoring. See everything happening across your operation from a single screen.</p>
+          <span class="product-card__detail">Processing 12,400+ data points daily</span>
         </div>
 
         <!-- Voice and Communication AI -->
-        <div class="product-card gsap-fade-up">
+        <div class="product-card gsap-fade-up" data-detail="99.7% uptime | &lt;200ms response latency">
           <div class="product-card__icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
@@ -163,10 +171,11 @@
           </div>
           <h3 class="product-card__name">Voice and Communication AI</h3>
           <p class="product-card__desc">Conversational voice AI that handles inbound and outbound calls, SMS, and chat. Caller verification, call screening, transfer directories, transcription, and recording analysis.</p>
+          <span class="product-card__detail">99.7% uptime | &lt;200ms response latency</span>
         </div>
 
         <!-- Revenue Automation -->
-        <div class="product-card gsap-fade-up">
+        <div class="product-card gsap-fade-up" data-detail="$2.3M recovered through automated collections">
           <div class="product-card__icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="12" y1="1" x2="12" y2="23"/>
@@ -175,10 +184,11 @@
           </div>
           <h3 class="product-card__name">Revenue Automation</h3>
           <p class="product-card__desc">Speed-to-lead response, automated proposals, collections, nurture sequences, customer win-back, database reactivation, and reputation management. AI that finds money and brings it in.</p>
+          <span class="product-card__detail">$2.3M recovered through automated collections</span>
         </div>
 
         <!-- Content and Creative Production -->
-        <div class="product-card gsap-fade-up">
+        <div class="product-card gsap-fade-up" data-detail="6,200+ assets generated this quarter">
           <div class="product-card__icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -189,10 +199,11 @@
           </div>
           <h3 class="product-card__name">Content and Creative Production</h3>
           <p class="product-card__desc">Reports, proposals, presentations, marketing content, AI video, image generation, and SEO. One input becomes dozens of assets across every channel.</p>
+          <span class="product-card__detail">6,200+ assets generated this quarter</span>
         </div>
 
         <!-- Integration and Infrastructure -->
-        <div class="product-card gsap-fade-up">
+        <div class="product-card gsap-fade-up" data-detail="8,000+ app integrations via Zapier and webhooks">
           <div class="product-card__icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
@@ -202,6 +213,7 @@
           </div>
           <h3 class="product-card__name">Integration and Infrastructure</h3>
           <p class="product-card__desc">Connects to 8,000+ apps. Multi-tenant, white-label ready, HIPAA and SOC 2 compliant. AWS-hosted with encryption, redundancy, and auto-scaling built in.</p>
+          <span class="product-card__detail">8,000+ app integrations via Zapier and webhooks</span>
         </div>
 
       </div>
@@ -705,7 +717,7 @@
         <span class="section__label gsap-fade-up" style="color: #D32F2F;">By the Numbers</span>
         <h2 class="section__title gsap-fade-up" style="color: #E8E8F0;">Performance You Can Measure</h2>
       </div>
-      <div class="stats__grid">
+      <div class="stats__grid" id="stats-grid">
         <div class="stat-item">
           <div class="stat-item__number" data-count="83" data-suffix="%">0</div>
           <div class="stat-item__label">Cost savings vs. human staff</div>
@@ -723,6 +735,7 @@
           <div class="stat-item__label">AI skills</div>
         </div>
       </div>
+      <p class="stats__timestamp" id="stats-date"></p>
     </div>
   </section>
 

@@ -524,32 +524,97 @@ document.addEventListener('DOMContentLoaded', function() {
   })();
 
   // ============================================================
-  // ACTIVE NAV LINK INDICATOR
+  // ACTIVE NAV LINK INDICATOR (class-based, scroll-aware)
   // ============================================================
   (function initActiveNav() {
     const sections = document.querySelectorAll('section[id]');
     const navLinks = document.querySelectorAll('.nav__link');
 
-    const observer = new IntersectionObserver(function(entries) {
+    const sectionObserver = new IntersectionObserver(function(entries) {
       entries.forEach(function(entry) {
         if (entry.isIntersecting) {
-          const id = entry.target.getAttribute('id');
           navLinks.forEach(function(link) {
-            link.style.color = '';
-            link.style.textShadow = '';
+            link.classList.remove('nav__link--active');
           });
-
-          const activeLink = document.querySelector('.nav__link[href="#' + id + '"]');
-          if (activeLink) {
-            activeLink.style.color = '#E8E8F0';
-          }
+          const activeLink = document.querySelector('.nav__link[href="#' + entry.target.id + '"]');
+          if (activeLink) activeLink.classList.add('nav__link--active');
         }
       });
-    }, { threshold: 0.4 });
+    }, { rootMargin: '-40% 0px -60% 0px' });
 
     sections.forEach(function(section) {
-      observer.observe(section);
+      sectionObserver.observe(section);
     });
+  })();
+
+  // ============================================================
+  // SCROLL PROGRESS BAR
+  // ============================================================
+  (function initScrollProgress() {
+    const progressBar = document.getElementById('scroll-progress');
+    if (progressBar) {
+      window.addEventListener('scroll', function() {
+        const scrollTop = document.documentElement.scrollTop;
+        const scrollHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+        const progress = (scrollTop / scrollHeight) * 100;
+        progressBar.style.width = progress + '%';
+      }, { passive: true });
+    }
+  })();
+
+  // ============================================================
+  // LIVE AGENT COUNTER
+  // ============================================================
+  (function initLiveAgentCounter() {
+    const el = document.getElementById('live-agents');
+    if (!el) return;
+
+    const target = 47;
+    const duration = 1800;
+    const start = performance.now();
+
+    function easeOut(t) {
+      return 1 - Math.pow(1 - t, 3);
+    }
+
+    function tick(now) {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      const current = Math.round(easeOut(progress) * target);
+      el.textContent = current;
+      if (progress < 1) {
+        requestAnimationFrame(tick);
+      } else {
+        el.textContent = target;
+        // Occasionally tick up by 1 every 15-30 seconds
+        function scheduleNextTick() {
+          const delay = 15000 + Math.random() * 15000;
+          setTimeout(function() {
+            const current = parseInt(el.textContent, 10);
+            el.textContent = current + 1;
+            scheduleNextTick();
+          }, delay);
+        }
+        scheduleNextTick();
+      }
+    }
+
+    // Start counter after a brief delay (after hero entrance)
+    setTimeout(function() {
+      requestAnimationFrame(tick);
+    }, 600);
+  })();
+
+  // ============================================================
+  // STATS DATE STAMP
+  // ============================================================
+  (function initStatsDate() {
+    const el = document.getElementById('stats-date');
+    if (!el) return;
+    const now = new Date();
+    const options = { month: 'long', day: 'numeric', year: 'numeric' };
+    const formatted = now.toLocaleDateString('en-US', options);
+    el.textContent = 'Updated ' + formatted;
   })();
 
   // ============================================================

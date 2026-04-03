@@ -2825,3 +2825,132 @@ body::after {
 [data-theme="light"] .showcase__caption {
   color: var(--color-text-muted);
 }
+
+/* ============================================================
+   INNOVATION: Scroll Progress Bar
+   ============================================================ */
+
+.scroll-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--color-accent-red), var(--color-accent-cyan));
+  width: 0%;
+  z-index: 10001;
+  transition: width 0.1s linear;
+  box-shadow: 0 0 8px rgba(0, 229, 255, 0.4);
+}
+
+/* ============================================================
+   INNOVATION: Hero Live Badge
+   ============================================================ */
+
+.hero__live-text {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.hero__live-separator {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: rgba(136, 136, 170, 0.4);
+  margin: 0 0.35em;
+}
+
+.hero__live-count {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-accent-cyan);
+  letter-spacing: 0.05em;
+}
+
+.hero__live-suffix {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-left: 0.25em;
+}
+
+/* ============================================================
+   INNOVATION: Stats Timestamp
+   ============================================================ */
+
+.stats__timestamp {
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: rgba(136, 136, 170, 0.5);
+  margin-top: 2rem;
+  position: relative;
+  z-index: 1;
+}
+
+/* ============================================================
+   INNOVATION: Product Card Hover Detail Line
+   ============================================================ */
+
+.product-card__detail {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 0.6rem 2rem;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  color: var(--color-accent-cyan);
+  background: linear-gradient(0deg, rgba(0, 229, 255, 0.07) 0%, transparent 100%);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.product-card:hover .product-card__detail {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ============================================================
+   INNOVATION: Subtle Noise Texture (dark mode)
+   ============================================================ */
+
+[data-theme="dark"] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  opacity: 0.015;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ============================================================
+   INNOVATION: Nav Active Section Indicator
+   ============================================================ */
+
+.nav__link--active {
+  color: var(--color-text) !important;
+}
+
+/* Active dot: override the hover underline pseudo-element */
+.nav__link--active::after {
+  width: 4px !important;
+  height: 4px !important;
+  border-radius: 50% !important;
+  background: var(--color-accent-red) !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  bottom: -6px !important;
+  box-shadow: 0 0 6px rgba(211, 47, 47, 0.7);
+}
