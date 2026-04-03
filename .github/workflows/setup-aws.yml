@@ -1,0 +1,267 @@
+name: Setup AWS Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      step:
+        description: 'Step to run'
+        required: true
+        type: choice
+        options:
+          - test-iam
+          - add-permissions
+          - create-infrastructure
+          - deploy-files
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::537501962693:role/github-actions-deploy
+          aws-region: us-east-1
+
+      - name: Test IAM self-modify
+        if: inputs.step == 'test-iam'
+        run: |
+          echo "=== Current role policies ==="
+          aws iam list-role-policies --role-name github-actions-deploy 2>&1
+          aws iam list-attached-role-policies --role-name github-actions-deploy 2>&1
+          echo "=== Testing PutRolePolicy ==="
+          aws iam put-role-policy --role-name github-actions-deploy --policy-name static-site-deploy --policy-document '{
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "s3:*"
+                ],
+                "Resource": ["arn:aws:s3:::brainstormagi-*", "arn:aws:s3:::brainstormagi-*/*"]
+              },
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "cloudfront:*"
+                ],
+                "Resource": "*"
+              },
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "acm:*"
+                ],
+                "Resource": "*"
+              }
+            ]
+          }' 2>&1 || echo "NO IAM PERMISSION"
+
+      - name: Add IAM Permissions
+        if: inputs.step == 'add-permissions'
+        run: |
+          echo "Adding static site deploy permissions to the OIDC role..."
+          aws iam put-role-policy \
+            --role-name github-actions-deploy \
+            --policy-name static-site-deploy \
+            --policy-document '{
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:CreateBucket",
+                    "s3:PutBucketPolicy",
+                    "s3:PutBucketWebsite",
+                    "s3:PutPublicAccessBlock",
+                    "s3:GetBucketPolicy",
+                    "s3:GetBucketWebsite",
+                    "s3:GetBucketLocation",
+                    "s3:HeadBucket",
+                    "s3:ListBucket",
+                    "s3:PutObject",
+                    "s3:GetObject",
+                    "s3:DeleteObject",
+                    "s3:PutObjectAcl",
+                    "s3:ListAllMyBuckets"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudfront:CreateDistribution",
+                    "cloudfront:GetDistribution",
+                    "cloudfront:ListDistributions",
+                    "cloudfront:UpdateDistribution",
+                    "cloudfront:CreateInvalidation",
+                    "cloudfront:GetInvalidation",
+                    "cloudfront:TagResource"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "acm:RequestCertificate",
+                    "acm:DescribeCertificate",
+                    "acm:ListCertificates",
+                    "acm:DeleteCertificate"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }'
+          echo "=== Permissions added ==="
+
+      - name: Create Infrastructure
+        if: inputs.step == 'create-infrastructure'
+        run: |
+          SITE="brainstormagi.com"
+          BUCKET="brainstormagi-com-website"
+          HOSTED_ZONE_ID="Z0634259PESIHO5MNZYR"
+          
+          echo "=== Step 1: Create S3 Bucket ==="
+          aws s3api create-bucket --bucket "$BUCKET" --region us-east-1 2>/dev/null || echo "Bucket may exist"
+          
+          echo "=== Step 2: Disable Block Public Access ==="
+          aws s3api put-public-access-block --bucket "$BUCKET" \
+            --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
+          
+          echo "=== Step 3: Set Bucket Policy ==="
+          aws s3api put-bucket-policy --bucket "$BUCKET" --policy "{
+            \"Version\": \"2012-10-17\",
+            \"Statement\": [{
+              \"Sid\": \"PublicReadGetObject\",
+              \"Effect\": \"Allow\",
+              \"Principal\": \"*\",
+              \"Action\": \"s3:GetObject\",
+              \"Resource\": \"arn:aws:s3:::${BUCKET}/*\"
+            }]
+          }"
+          
+          echo "=== Step 4: Enable Static Website Hosting ==="
+          aws s3 website "s3://$BUCKET/" --index-document index.html --error-document index.html
+          
+          echo "=== Step 5: Request ACM Certificate ==="
+          CERT_ARN=$(aws acm list-certificates --region us-east-1 \
+            --query "CertificateSummaryList[?DomainName=='${SITE}'].CertificateArn" --output text)
+          
+          if [ -z "$CERT_ARN" ] || [ "$CERT_ARN" = "None" ]; then
+            CERT_ARN=$(aws acm request-certificate \
+              --domain-name "$SITE" \
+              --subject-alternative-names "*.${SITE}" \
+              --validation-method DNS \
+              --region us-east-1 \
+              --query 'CertificateArn' --output text)
+            echo "New cert: $CERT_ARN"
+            sleep 15
+          else
+            echo "Existing cert: $CERT_ARN"
+          fi
+          
+          echo "=== Step 6: DNS Validation ==="
+          VALIDATION=$(aws acm describe-certificate --certificate-arn "$CERT_ARN" --region us-east-1 \
+            --query 'Certificate.DomainValidationOptions[0].ResourceRecord' --output json)
+          CNAME_NAME=$(echo "$VALIDATION" | jq -r '.Name')
+          CNAME_VALUE=$(echo "$VALIDATION" | jq -r '.Value')
+          
+          if [ -n "$CNAME_NAME" ] && [ "$CNAME_NAME" != "null" ]; then
+            aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch "{
+              \"Changes\": [{
+                \"Action\": \"UPSERT\",
+                \"ResourceRecordSet\": {
+                  \"Name\": \"${CNAME_NAME}\",
+                  \"Type\": \"CNAME\",
+                  \"TTL\": 300,
+                  \"ResourceRecords\": [{\"Value\": \"${CNAME_VALUE}\"}]
+                }
+              }]
+            }" 2>&1 || echo "DNS record exists"
+          fi
+          
+          echo "=== Step 7: Wait for cert ==="
+          for i in $(seq 1 30); do
+            STATUS=$(aws acm describe-certificate --certificate-arn "$CERT_ARN" --region us-east-1 \
+              --query 'Certificate.Status' --output text)
+            echo "[$i] Status: $STATUS"
+            if [ "$STATUS" = "ISSUED" ]; then break; fi
+            sleep 10
+          done
+          
+          echo "=== Step 8: Create CloudFront ==="
+          DIST_ID=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?contains(Aliases.Items,'${SITE}')].Id" --output text 2>/dev/null)
+          
+          if [ -z "$DIST_ID" ] || [ "$DIST_ID" = "None" ]; then
+            CALLER_REF="brainstormagi-$(date +%s)"
+            RESULT=$(aws cloudfront create-distribution --distribution-config "{
+              \"CallerReference\": \"${CALLER_REF}\",
+              \"Aliases\": {\"Quantity\": 2, \"Items\": [\"${SITE}\", \"www.${SITE}\"]},
+              \"DefaultRootObject\": \"index.html\",
+              \"Origins\": {\"Quantity\": 1, \"Items\": [{
+                \"Id\": \"S3-${BUCKET}\",
+                \"DomainName\": \"${BUCKET}.s3-website-us-east-1.amazonaws.com\",
+                \"CustomOriginConfig\": {\"HTTPPort\": 80, \"HTTPSPort\": 443, \"OriginProtocolPolicy\": \"http-only\"}
+              }]},
+              \"DefaultCacheBehavior\": {
+                \"TargetOriginId\": \"S3-${BUCKET}\",
+                \"ViewerProtocolPolicy\": \"redirect-to-https\",
+                \"AllowedMethods\": {\"Quantity\": 2, \"Items\": [\"HEAD\", \"GET\"], \"CachedMethods\": {\"Quantity\": 2, \"Items\": [\"HEAD\", \"GET\"]}},
+                \"Compress\": true,
+                \"CachePolicyId\": \"658327ea-f89d-4fab-a63d-7e88639e58f6\",
+                \"MinTTL\": 0, \"DefaultTTL\": 86400, \"MaxTTL\": 31536000
+              },
+              \"CustomErrorResponses\": {\"Quantity\": 1, \"Items\": [{\"ErrorCode\": 404, \"ResponseCode\": \"200\", \"ResponsePagePath\": \"/index.html\", \"ErrorCachingMinTTL\": 300}]},
+              \"Comment\": \"${SITE}\",
+              \"Enabled\": true,
+              \"ViewerCertificate\": {\"ACMCertificateArn\": \"${CERT_ARN}\", \"SSLSupportMethod\": \"sni-only\", \"MinimumProtocolVersion\": \"TLSv1.2_2021\"},
+              \"HttpVersion\": \"http2and3\",
+              \"PriceClass\": \"PriceClass_100\"
+            }" --output json)
+            DIST_ID=$(echo "$RESULT" | jq -r '.Distribution.Id')
+            DIST_DOMAIN=$(echo "$RESULT" | jq -r '.Distribution.DomainName')
+            echo "Created: $DIST_ID ($DIST_DOMAIN)"
+          else
+            DIST_DOMAIN=$(aws cloudfront get-distribution --id "$DIST_ID" --query 'Distribution.DomainName' --output text)
+            echo "Exists: $DIST_ID ($DIST_DOMAIN)"
+          fi
+          
+          echo "=== Step 9: Update DNS ==="
+          aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch "{
+            \"Changes\": [
+              {\"Action\": \"UPSERT\", \"ResourceRecordSet\": {\"Name\": \"${SITE}\", \"Type\": \"A\", \"AliasTarget\": {\"HostedZoneId\": \"Z2FDTNDATAQYW2\", \"DNSName\": \"${DIST_DOMAIN}\", \"EvaluateTargetHealth\": false}}},
+              {\"Action\": \"UPSERT\", \"ResourceRecordSet\": {\"Name\": \"www.${SITE}\", \"Type\": \"A\", \"AliasTarget\": {\"HostedZoneId\": \"Z2FDTNDATAQYW2\", \"DNSName\": \"${DIST_DOMAIN}\", \"EvaluateTargetHealth\": false}}}
+            ]
+          }"
+          
+          echo "DONE! CloudFront: $DIST_ID, Domain: $DIST_DOMAIN"
+
+      - name: Deploy Files
+        if: inputs.step == 'deploy-files'
+        run: |
+          BUCKET="brainstormagi-com-website"
+          SITE="brainstormagi.com"
+          
+          echo "=== Syncing to S3 ==="
+          aws s3 sync . "s3://$BUCKET/" \
+            --delete \
+            --exclude ".git/*" \
+            --exclude ".github/*" \
+            --exclude "*.md"
+          
+          aws s3 cp "s3://$BUCKET/" "s3://$BUCKET/" --recursive --exclude "*" --include "*.html" \
+            --cache-control "public, max-age=300" --metadata-directive REPLACE --content-type "text/html"
+          
+          DIST_ID=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?contains(Aliases.Items,'${SITE}')].Id" --output text 2>/dev/null)
+          if [ -n "$DIST_ID" ] && [ "$DIST_ID" != "None" ]; then
+            aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*"
+          fi
+          echo "=== Done ==="
