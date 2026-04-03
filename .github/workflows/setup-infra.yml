@@ -340,23 +340,23 @@ jobs:
             --cache-control "public, max-age=86400"
 
           # Upload images with correct content types
-          if [ -d "./img" ]; then
-            for f in ./img/*.webp; do
+          if [ -d "img" ]; then
+            for f in img/*.webp; do
               [ -f "$f" ] && aws s3 cp "$f" "s3://$BUCKET_NAME/$f" \
                 --content-type "image/webp" \
                 --cache-control "public, max-age=604800"
             done
-            for f in ./img/*.png; do
+            for f in img/*.png; do
               [ -f "$f" ] && aws s3 cp "$f" "s3://$BUCKET_NAME/$f" \
                 --content-type "image/png" \
                 --cache-control "public, max-age=604800"
             done
-            for f in ./img/*.jpg ./img/*.jpeg; do
+            for f in img/*.jpg img/*.jpeg; do
               [ -f "$f" ] && aws s3 cp "$f" "s3://$BUCKET_NAME/$f" \
                 --content-type "image/jpeg" \
                 --cache-control "public, max-age=604800"
             done
-            for f in ./img/*.svg; do
+            for f in img/*.svg; do
               [ -f "$f" ] && aws s3 cp "$f" "s3://$BUCKET_NAME/$f" \
                 --content-type "image/svg+xml" \
                 --cache-control "public, max-age=604800"
