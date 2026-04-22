@@ -1,912 +1,196 @@
-<!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<!doctype html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Brainstorm AGI - We Build AI That Works</title>
-  <meta name="description" content="Brainstorm AGI is a multi-industry AI technology company. Custom AI systems for operations, revenue, and scale. Deployed across 18 industries.">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Brainstorm AGI — We Build AI That Works</title>
+<meta name="description" content="Brainstorm AGI is a multi-industry AI technology company. Custom AI systems for operations, revenue, and scale. Deployed across 18 industries." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Space+Grotesk:wght@400;500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <!-- 3D CANVAS STAYS FIXED -->
+  <canvas id="scene"></canvas>
 
-  <!-- Favicon -->
-  <link rel="icon" href="./favicon.ico" sizes="any">
-  <link rel="icon" href="./favicon-16.png" sizes="16x16" type="image/png">
-  <link rel="icon" href="./favicon-32.png" sizes="32x32" type="image/png">
-  <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+  <!-- FIXED HUD -->
+  <div class="hud">
+    <div class="hud-top">
+      <div class="hud-brand">BRAINSTORM<span>AGI</span></div>
+      <nav class="hud-nav">
+        <a href="#spire">HQ</a>
+        <a href="#foundry">Agents</a>
+        <a href="#voice">Voice</a>
+        <a href="#ops">Ops</a>
+        <a href="#revenue">Revenue</a>
+        <a href="#content">Content</a>
+        <a href="#integration">Integration</a>
+        <a href="#contact">Contact</a>
+      </nav>
+      <a class="hud-btn primary" href="mailto:rob@brainstormagi.com">START A PROJECT</a>
+    </div>
+    <div class="hud-metrics">
+      <span class="pulse"></span>
+      <span><b>47</b> agents</span>
+      <span class="sep">/</span>
+      <span><b>18</b> industries</span>
+      <span class="sep">/</span>
+      <span><b>99.7%</b> uptime</span>
+      <span class="sep">/</span>
+      <span><b>&lt;200ms</b> latency</span>
+    </div>
+    <div class="scroll-indicator">
+      <span>SCROLL TO EXPLORE</span>
+      <div class="scroll-arrow"></div>
+    </div>
+    <div class="progress-rail"><div class="progress-fill" id="progressFill"></div></div>
+  </div>
 
-  <!-- Fonts -->
-  <link href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@400,500,700,800&f[]=satoshi@300,400,500,700&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <!-- SCROLL SECTIONS (content overlays camera stops) -->
+  <main id="scroll-root">
+    <!-- 0. HERO -->
+    <section class="sec hero" data-cam="hero">
+      <div class="sec-inner center">
+        <div class="hero-mark">BRAINSTORM<span>AGI</span></div>
+        <h1 class="hero-title">We Build AI<br/><em>That Works.</em></h1>
+        <p class="hero-sub">Custom AI systems for operations, revenue, and scale. Deployed across 18 industries. Not science projects.</p>
+        <div class="hero-stats">
+          <div><b>47</b><span>agents active</span></div>
+          <div><b>18</b><span>industries</span></div>
+          <div><b>99.7%</b><span>uptime</span></div>
+          <div><b>&lt;200ms</b><span>response latency</span></div>
+        </div>
+      </div>
+    </section>
 
-  <!-- Styles -->
-  <link rel="stylesheet" href="./css/styles.css">
-  <!-- Three.js -->
+    <!-- 1. THE SPIRE -->
+    <section class="sec" id="spire" data-cam="spire">
+      <div class="sec-inner left">
+        <div class="chip">01 / HQ</div>
+        <h2>The Spire</h2>
+        <p class="lede">Complete AI systems that ship with the architecture to run in production, not just demo well.</p>
+        <p>Every system is configured for your industry, your workflows, and your data. No generic chatbots. No one-size-fits-all. Real systems in real operations.</p>
+        <div class="metrics">
+          <div class="m"><b>30 days</b><span>to working solution</span></div>
+          <div class="m"><b>Days</b><span>to deploy</span></div>
+          <div class="m"><b>Custom</b><span>to your data</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. AGENT FOUNDRY -->
+    <section class="sec" id="foundry" data-cam="foundry">
+      <div class="sec-inner right">
+        <div class="chip">02 / Agents</div>
+        <h2>Agent Foundry</h2>
+        <p class="lede">Named AI employees with voice, phone, email, and dashboard.</p>
+        <p>20+ specialist roles, 270+ preset employees, deployed in days. Each one has its own voice, identity, phone number, and knowledge base. Autonomous AI that answers phones, handles email, books appointments, manages tasks, and runs workflows.</p>
+        <div class="metrics">
+          <div class="m"><b>270+</b><span>preset employees</span></div>
+          <div class="m"><b>20+</b><span>specialist roles</span></div>
+          <div class="m"><b>Days</b><span>to deploy</span></div>
+        </div>
+        <div class="agent-wall" id="agentWall"></div>
+      </div>
+    </section>
+
+    <!-- 3. VOICE GRID -->
+    <section class="sec" id="voice" data-cam="voice">
+      <div class="sec-inner left">
+        <div class="chip">03 / Voice</div>
+        <h2>Voice Grid</h2>
+        <p class="lede">Conversational voice AI on every line. Inbound and outbound.</p>
+        <p>Calls, SMS, and chat. Caller verification, call screening, transfer directories, transcription, and recording analysis. Ultralow-latency voice with human-grade mannerisms and handoff-ready escalation.</p>
+        <div class="metrics">
+          <div class="m"><b>&lt;200ms</b><span>voice latency</span></div>
+          <div class="m"><b>24/7</b><span>coverage</span></div>
+          <div class="m"><b>100+</b><span>languages</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. OPS TOWER -->
+    <section class="sec" id="ops" data-cam="ops">
+      <div class="sec-inner right">
+        <div class="chip">04 / Operations</div>
+        <h2>Ops Tower</h2>
+        <p class="lede">See everything happening across your operation from a single screen.</p>
+        <p>Real-time dashboards, workforce analytics, compliance monitoring, call intelligence, and performance scoring. Drill down from roll-up KPIs to individual records. Alerts, heat maps, predictive signals.</p>
+        <div class="metrics">
+          <div class="m"><b>12,400+</b><span>data points / day</span></div>
+          <div class="m"><b>Real-time</b><span>sync</span></div>
+          <div class="m"><b>Role-based</b><span>access</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. REVENUE ENGINE -->
+    <section class="sec" id="revenue" data-cam="revenue">
+      <div class="sec-inner left">
+        <div class="chip">05 / Revenue</div>
+        <h2>Revenue Engine</h2>
+        <p class="lede">AI that finds money and brings it in.</p>
+        <p>Speed-to-lead response, automated proposals, collections, nurture sequences, customer win-back, database reactivation, and reputation management. Every touch logged, every promise tracked.</p>
+        <div class="metrics">
+          <div class="m"><b>$2.3M</b><span>recovered</span></div>
+          <div class="m"><b>22%</b><span>reactivation rate</span></div>
+          <div class="m"><b>4x</b><span>close-rate lift</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. CONTENT FORGE -->
+    <section class="sec" id="content" data-cam="content">
+      <div class="sec-inner right">
+        <div class="chip">06 / Content</div>
+        <h2>Content Forge</h2>
+        <p class="lede">One input becomes dozens of assets across every channel.</p>
+        <p>Reports, proposals, presentations, marketing content, AI video, image generation, and SEO. Brand-locked output. Multi-platform distribution ready. Built on top of the best image, video, and voice models available.</p>
+        <div class="metrics">
+          <div class="m"><b>6,200+</b><span>assets / quarter</span></div>
+          <div class="m"><b>Multi-platform</b><span>distribution</span></div>
+          <div class="m"><b>Brand-locked</b><span>output</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. INTEGRATION HUB -->
+    <section class="sec" id="integration" data-cam="integration">
+      <div class="sec-inner left">
+        <div class="chip">07 / Integration</div>
+        <h2>Integration Hub</h2>
+        <p class="lede">Connects to 8,000+ apps. Multi-tenant, white-label ready.</p>
+        <p>HIPAA and SOC 2 compliant. AWS-hosted with encryption, redundancy, and auto-scaling built in. Phone, SMS, email, web chat, calendar, and task automation ship standard. No add-ons or upsells.</p>
+        <div class="metrics">
+          <div class="m"><b>8,000+</b><span>apps</span></div>
+          <div class="m"><b>HIPAA</b><span>compliant</span></div>
+          <div class="m"><b>SOC 2</b><span>aligned</span></div>
+          <div class="m"><b>AWS</b><span>hosted</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8. CONTACT -->
+    <section class="sec" id="contact" data-cam="contact">
+      <div class="sec-inner center">
+        <div class="chip">08 / Contact</div>
+        <h2>Start a Project</h2>
+        <p class="lede">Describe your biggest operational challenge.<br/>We will show you a working solution within 30 days.</p>
+        <p>No six-month implementations. No consultants. Just results.</p>
+        <a class="cta big" href="mailto:rob@brainstormagi.com">rob@brainstormagi.com</a>
+        <div class="footer-line">Brainstorm AGI LLC</div>
+      </div>
+    </section>
+  </main>
+
   <script type="importmap">
   {
     "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.183.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.183.0/examples/jsm/"
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
     }
   }
   </script>
-
-  <!-- Splitting.js for character-by-character text reveal -->
-  <link rel="stylesheet" href="https://unpkg.com/splitting/dist/splitting.css">
-  <script src="https://unpkg.com/splitting/dist/splitting.min.js" defer></script>
-
-  <!-- GSAP + ScrollTrigger -->
-  <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/ScrollTrigger.min.js" defer></script>
-</head>
-<body>
-
-  <!-- SCROLL PROGRESS BAR -->
-  <div class="scroll-progress" id="scroll-progress"></div>
-
-  <!-- ========== NAVIGATION ========== -->
-  <nav class="nav" role="navigation" aria-label="Main navigation">
-    <div class="nav__inner">
-      <a href="#" class="nav__logo" aria-label="Brainstorm AGI home">
-        <svg viewBox="0 0 36 36" fill="none" aria-hidden="true">
-          <circle cx="18" cy="18" r="16" stroke="currentColor" stroke-width="2" opacity="0.3"/>
-          <circle cx="18" cy="14" r="5" stroke="currentColor" stroke-width="2"/>
-          <circle cx="12" cy="22" r="3" stroke="currentColor" stroke-width="2"/>
-          <circle cx="24" cy="22" r="3" stroke="currentColor" stroke-width="2"/>
-          <line x1="16" y1="18" x2="13" y2="20" stroke="currentColor" stroke-width="1.5"/>
-          <line x1="20" y1="18" x2="23" y2="20" stroke="currentColor" stroke-width="1.5"/>
-          <circle cx="18" cy="14" r="1.5" fill="#D32F2F"/>
-          <circle cx="12" cy="22" r="1" fill="#D32F2F"/>
-          <circle cx="24" cy="22" r="1" fill="#D32F2F"/>
-        </svg>
-        <span>Brainstorm AGI</span>
-      </a>
-
-      <div class="nav__links" id="nav-links">
-        <a href="#products" class="nav__link">Products</a>
-        <a href="#capabilities" class="nav__link">Capabilities</a>
-        <a href="#platform" class="nav__link">Platform</a>
-        <a href="#industries" class="nav__link">Industries</a>
-        <a href="#contact" class="nav__link">Contact</a>
-      </div>
-
-      <div class="nav__actions">
-        <button class="theme-toggle" data-theme-toggle aria-label="Switch to light mode">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-          </svg>
-        </button>
-        <a href="#contact" class="btn btn--primary btn--small nav__cta-desktop">Talk to Us</a>
-        <button class="nav__mobile-toggle" id="mobile-toggle" aria-label="Toggle menu" aria-expanded="false">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <line x1="3" y1="6" x2="21" y2="6"/>
-            <line x1="3" y1="12" x2="21" y2="12"/>
-            <line x1="3" y1="18" x2="21" y2="18"/>
-          </svg>
-        </button>
-      </div>
-    </div>
-  </nav>
-
-  <!-- ========== HERO ========== -->
-  <section class="hero" id="hero">
-    <div class="hero__canvas-container" id="hero-canvas"></div>
-    <div class="hero__overlay"></div>
-    <div class="hero__content">
-      <div class="hero__badge gsap-fade-in">
-        <span class="hero__badge-dot"></span>
-        <span class="hero__live-text">Systems Active</span>
-        <span class="hero__live-separator">|</span>
-        <span class="hero__live-count" id="live-agents">0</span>
-        <span class="hero__live-suffix">agents deployed</span>
-      </div>
-      <h1 class="hero__title" data-splitting>
-        We Build AI<br><span class="hero__title-accent">That Works</span>
-      </h1>
-      <p class="hero__subtitle gsap-fade-up">
-        Complete AI systems for operations, revenue, and scale. Not science projects.
-      </p>
-      <div class="hero__ctas gsap-fade-up">
-        <a href="#products" class="btn btn--primary">
-          See What We Build
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-        </a>
-        <a href="#contact" class="btn btn--outline">
-          Talk to Us
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-        </a>
-      </div>
-      <div class="hero__scroll-hint gsap-fade-in">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
-      </div>
-    </div>
-  </section>
-
-  <!-- ========== PRODUCTS ========== -->
-  <section class="section" id="products">
-    <div class="section__inner">
-      <div class="section__header">
-        <span class="section__label gsap-fade-up">What We Build</span>
-        <h2 class="section__title gsap-fade-up">Not a Wrapper. A Full Operating System.</h2>
-        <p class="section__subtitle gsap-fade-up">Custom-built AI that runs inside your business. Every system is configured for your industry, your workflows, your data.</p>
-      </div>
-      <div class="products__grid">
-
-        <!-- AI Agents and Assistants -->
-        <div class="product-card gsap-fade-up" data-detail="47 agents active across 18 industries">
-          <div class="product-card__icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-              <circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-          </div>
-          <h3 class="product-card__name">AI Agents and Assistants</h3>
-          <p class="product-card__desc">Autonomous AI that answers phones, handles email, books appointments, manages tasks, and runs workflows. Each one has its own voice, identity, phone number, and knowledge base. Deploys in days.</p>
-          <span class="product-card__detail">47 agents active across 18 industries</span>
-        </div>
-
-        <!-- Operational Intelligence -->
-        <div class="product-card gsap-fade-up" data-detail="Processing 12,400+ data points daily">
-          <div class="product-card__icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-              <line x1="8" y1="21" x2="16" y2="21"/>
-              <line x1="12" y1="17" x2="12" y2="21"/>
-              <polyline points="6 8 10 12 14 8 18 12"/>
-            </svg>
-          </div>
-          <h3 class="product-card__name">Operational Intelligence</h3>
-          <p class="product-card__desc">Real-time dashboards, workforce analytics, compliance monitoring, call intelligence, and performance scoring. See everything happening across your operation from a single screen.</p>
-          <span class="product-card__detail">Processing 12,400+ data points daily</span>
-        </div>
-
-        <!-- Voice and Communication AI -->
-        <div class="product-card gsap-fade-up" data-detail="99.7% uptime | &lt;200ms response latency">
-          <div class="product-card__icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-              <line x1="12" y1="19" x2="12" y2="23"/>
-              <line x1="8" y1="23" x2="16" y2="23"/>
-            </svg>
-          </div>
-          <h3 class="product-card__name">Voice and Communication AI</h3>
-          <p class="product-card__desc">Conversational voice AI that handles inbound and outbound calls, SMS, and chat. Caller verification, call screening, transfer directories, transcription, and recording analysis.</p>
-          <span class="product-card__detail">99.7% uptime | &lt;200ms response latency</span>
-        </div>
-
-        <!-- Revenue Automation -->
-        <div class="product-card gsap-fade-up" data-detail="$2.3M recovered through automated collections">
-          <div class="product-card__icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="12" y1="1" x2="12" y2="23"/>
-              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-            </svg>
-          </div>
-          <h3 class="product-card__name">Revenue Automation</h3>
-          <p class="product-card__desc">Speed-to-lead response, automated proposals, collections, nurture sequences, customer win-back, database reactivation, and reputation management. AI that finds money and brings it in.</p>
-          <span class="product-card__detail">$2.3M recovered through automated collections</span>
-        </div>
-
-        <!-- Content and Creative Production -->
-        <div class="product-card gsap-fade-up" data-detail="6,200+ assets generated this quarter">
-          <div class="product-card__icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-              <line x1="16" y1="13" x2="8" y2="13"/>
-              <line x1="16" y1="17" x2="8" y2="17"/>
-            </svg>
-          </div>
-          <h3 class="product-card__name">Content and Creative Production</h3>
-          <p class="product-card__desc">Reports, proposals, presentations, marketing content, AI video, image generation, and SEO. One input becomes dozens of assets across every channel.</p>
-          <span class="product-card__detail">6,200+ assets generated this quarter</span>
-        </div>
-
-        <!-- Integration and Infrastructure -->
-        <div class="product-card gsap-fade-up" data-detail="8,000+ app integrations via Zapier and webhooks">
-          <div class="product-card__icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-              <line x1="12" y1="22.08" x2="12" y2="12"/>
-            </svg>
-          </div>
-          <h3 class="product-card__name">Integration and Infrastructure</h3>
-          <p class="product-card__desc">Connects to 8,000+ apps. Multi-tenant, white-label ready, HIPAA and SOC 2 compliant. AWS-hosted with encryption, redundancy, and auto-scaling built in.</p>
-          <span class="product-card__detail">8,000+ app integrations via Zapier and webhooks</span>
-        </div>
-
-      </div>
-      <div class="products__cta gsap-fade-up" style="text-align: center; margin-top: 3rem;">
-        <a href="#contact" class="btn btn--primary">Talk to Us About Your Business
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-        </a>
-      </div>
-    </div>
-  </section>
-
-
-  <!-- ========== CAPABILITIES ========== -->
-  <section class="section section--alt" id="capabilities">
-    <div class="section__inner">
-      <div class="section__header">
-        <span class="section__label gsap-fade-up">Capabilities</span>
-        <h2 class="section__title gsap-fade-up">The Engine Under the Hood</h2>
-        <p class="section__subtitle gsap-fade-up">The technical depth behind every system we build.</p>
-      </div>
-      <div class="capabilities__grid">
-
-        <div class="cap-card gsap-fade-up">
-          <div class="cap-card__icon-wrap">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-              <line x1="8" y1="21" x2="16" y2="21"/>
-              <line x1="12" y1="17" x2="12" y2="21"/>
-            </svg>
-          </div>
-          <h3 class="cap-card__title">Multi-Model AI Orchestration</h3>
-          <p class="cap-card__desc">Routes across 20+ AI models (Claude, GPT, Gemini, Grok, open source), picking the right model for each task automatically.</p>
-        </div>
-
-        <div class="cap-card gsap-fade-up">
-          <div class="cap-card__icon-wrap">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="2" y1="12" x2="22" y2="12"/>
-              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-            </svg>
-          </div>
-          <h3 class="cap-card__title">Self-Improving Memory</h3>
-          <p class="cap-card__desc">Systems learn from every interaction. Persistent memory, pattern recognition, autonomous skill creation, and continuous prompt optimization.</p>
-        </div>
-
-        <div class="cap-card gsap-fade-up">
-          <div class="cap-card__icon-wrap">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-            </svg>
-          </div>
-          <h3 class="cap-card__title">Real-Time Analytics</h3>
-          <p class="cap-card__desc">Live dashboards with custom metrics, anomaly detection, predictive scoring, and drill-down reporting built on demand.</p>
-        </div>
-
-        <div class="cap-card gsap-fade-up">
-          <div class="cap-card__icon-wrap">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="11" cy="11" r="8"/>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              <line x1="8" y1="11" x2="14" y2="11"/>
-              <line x1="11" y1="8" x2="11" y2="14"/>
-            </svg>
-          </div>
-          <h3 class="cap-card__title">Automated Research</h3>
-          <p class="cap-card__desc">Continuous market intelligence, competitor monitoring, regulatory tracking, and trend analysis across hundreds of sources.</p>
-        </div>
-
-        <div class="cap-card gsap-fade-up">
-          <div class="cap-card__icon-wrap">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-              <line x1="16" y1="2" x2="16" y2="6"/>
-              <line x1="8" y1="2" x2="8" y2="6"/>
-              <line x1="3" y1="10" x2="21" y2="10"/>
-            </svg>
-          </div>
-          <h3 class="cap-card__title">Scheduling Intelligence</h3>
-          <p class="cap-card__desc">Shift coverage, calendar management, appointment booking, outreach sequences, confirmation workflows, and clock-in monitoring.</p>
-        </div>
-
-        <div class="cap-card gsap-fade-up">
-          <div class="cap-card__icon-wrap">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-              <line x1="16" y1="13" x2="8" y2="13"/>
-              <line x1="16" y1="17" x2="8" y2="17"/>
-            </svg>
-          </div>
-          <h3 class="cap-card__title">Document and Proposal AI</h3>
-          <p class="cap-card__desc">Automated document generation, contract processing, proposal creation, and report writing with brand-consistent formatting.</p>
-        </div>
-
-        <div class="cap-card gsap-fade-up">
-          <div class="cap-card__icon-wrap">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-              <line x1="12" y1="22.08" x2="12" y2="12"/>
-            </svg>
-          </div>
-          <h3 class="cap-card__title">8,000+ App Integrations</h3>
-          <p class="cap-card__desc">Native connectors for CRMs, ERPs, scheduling platforms, phone systems, accounting software, and custom APIs via Zapier and webhooks.</p>
-        </div>
-
-        <div class="cap-card gsap-fade-up">
-          <div class="cap-card__icon-wrap">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-              <line x1="12" y1="19" x2="12" y2="23"/>
-              <line x1="8" y1="23" x2="16" y2="23"/>
-            </svg>
-          </div>
-          <h3 class="cap-card__title">Voice Cloning and Synthesis</h3>
-          <p class="cap-card__desc">Ultrarealistic AI voices across multiple providers. Custom personas, speech tags for natural expression, and HIPAA-eligible telephony.</p>
-        </div>
-
-        <div class="cap-card gsap-fade-up">
-          <div class="cap-card__icon-wrap">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
-              <line x1="4" y1="22" x2="4" y2="15"/>
-            </svg>
-          </div>
-          <h3 class="cap-card__title">Reputation Management</h3>
-          <p class="cap-card__desc">Automated Google Business Profile optimization, review response, review solicitation, local SEO, and competitor monitoring.</p>
-        </div>
-
-        <div class="cap-card gsap-fade-up">
-          <div class="cap-card__icon-wrap">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="7" y1="15" x2="13" y2="15"/></svg>
-          </div>
-          <h3 class="cap-card__title">Collections and AR</h3>
-          <p class="cap-card__desc">Autonomous accounts receivable that chases invoices, sends context-aware follow-ups, tracks promises, and escalates when needed.</p>
-        </div>
-
-        <div class="cap-card gsap-fade-up">
-          <div class="cap-card__icon-wrap">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-            </svg>
-          </div>
-          <h3 class="cap-card__title">Customer Reactivation</h3>
-          <p class="cap-card__desc">Scans for dormant contacts, segments by probability, runs multi-channel outreach, handles objections, and books appointments.</p>
-        </div>
-
-        <div class="cap-card gsap-fade-up">
-          <div class="cap-card__icon-wrap">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-              <circle cx="12" cy="12" r="3"/>
-            </svg>
-          </div>
-          <h3 class="cap-card__title">Competitor Intelligence</h3>
-          <p class="cap-card__desc">Monitors competitor websites, pricing, product launches, social channels, and reviews. Delivers daily briefs and instant alerts.</p>
-        </div>
-
-      </div>
-    </div>
-  </section>
-
-  <!-- ========== PLATFORM ========== -->
-  <section class="section" id="platform">
-    <div class="section__inner">
-      <div class="section__header">
-        <span class="section__label gsap-fade-up">The Platform</span>
-        <h2 class="section__title gsap-fade-up">Not a Wrapper. A Full Operating System.</h2>
-        <p class="section__subtitle gsap-fade-up">Every system ships with the architecture to run in production, not just demo well.</p>
-      </div>
-      <div class="platform__layout">
-        <div class="platform__features">
-          <div class="platform-feature gsap-fade-up">
-            <div class="platform-feature__num">01</div>
-            <div>
-              <h3 class="platform-feature__title">Custom-Built for Your Business</h3>
-              <p class="platform-feature__desc">Every system is configured for your industry, your workflows, and your data. No generic chatbots. No one-size-fits-all.</p>
-            </div>
-          </div>
-          <div class="platform-feature gsap-fade-up">
-            <div class="platform-feature__num">02</div>
-            <div>
-              <h3 class="platform-feature__title">Multi-Channel by Default</h3>
-              <p class="platform-feature__desc">Phone, SMS, email, web chat, calendar, and task automation ship standard. No add-ons or upsells.</p>
-            </div>
-          </div>
-          <div class="platform-feature gsap-fade-up">
-            <div class="platform-feature__num">03</div>
-            <div>
-              <h3 class="platform-feature__title">Your Data, Your Knowledge Base</h3>
-              <p class="platform-feature__desc">Upload documents, SOPs, FAQs, and training materials. Systems answer from your data, not the open internet.</p>
-            </div>
-          </div>
-          <div class="platform-feature gsap-fade-up">
-            <div class="platform-feature__num">04</div>
-            <div>
-              <h3 class="platform-feature__title">Autonomous Execution</h3>
-              <p class="platform-feature__desc">These systems do not just answer questions. They execute: schedule, follow up, update records, generate reports, and escalate when human judgment is needed.</p>
-            </div>
-          </div>
-          <div class="platform-feature gsap-fade-up">
-            <div class="platform-feature__num">05</div>
-            <div>
-              <h3 class="platform-feature__title">Gets Smarter Over Time</h3>
-              <p class="platform-feature__desc">A built-in learning engine stores patterns, creates new skills from successful workflows, and optimizes its own performance continuously.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ========== HOW IT WORKS ========== -->
-  <section class="section section--alt" id="how-it-works">
-    <div class="section__inner">
-      <div class="section__header">
-        <span class="section__label gsap-fade-up">How It Works</span>
-        <h2 class="section__title gsap-fade-up">Three Steps. Then It Runs Itself.</h2>
-        <p class="section__subtitle gsap-fade-up">No six-month implementations. No consultants. Just results.</p>
-      </div>
-      <div class="how-it-works__track" id="how-track">
-        <div class="step-card gsap-fade-up">
-          <div class="step-card-inner">
-            <div class="step-card__number">01</div>
-            <h3 class="step-card__title">Tell Us the Problem</h3>
-            <p class="step-card__desc">Describe what your team spends too much time on. We map the workflow and identify where AI fits.</p>
-          </div>
-        </div>
-        <div class="step-connector gsap-fade-in">
-          <div class="step-connector__line"></div>
-        </div>
-        <div class="step-card gsap-fade-up">
-          <div class="step-card-inner">
-            <div class="step-card__number">02</div>
-            <h3 class="step-card__title">We Build the System</h3>
-            <p class="step-card__desc">Custom configuration, trained on your data, connected to your tools. Ready for production.</p>
-          </div>
-        </div>
-        <div class="step-connector gsap-fade-in">
-          <div class="step-connector__line"></div>
-        </div>
-        <div class="step-card gsap-fade-up">
-          <div class="step-card-inner">
-            <div class="step-card__number">03</div>
-            <h3 class="step-card__title">It Goes to Work</h3>
-            <p class="step-card__desc">Live in your operation, handling real tasks, learning and improving. 24/7/365.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ========== INDUSTRIES ========== -->
-  <section class="section" id="industries">
-    <div class="section__inner">
-      <div class="section__header">
-        <span class="section__label gsap-fade-up">Industries</span>
-        <h2 class="section__title gsap-fade-up">Deployed Across 18 Industries</h2>
-        <p class="section__subtitle gsap-fade-up">Real systems in real operations. Not theoretical use cases.</p>
-      </div>
-      <div class="industries__grid">
-
-
-        <div class="industry-card gsap-fade-up">
-          <div class="industry-card__icon">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="8" y="6" width="32" height="36" rx="2"/>
-              <line x1="16" y1="14" x2="32" y2="14"/>
-              <line x1="16" y1="22" x2="32" y2="22"/>
-              <line x1="16" y1="30" x2="24" y2="30"/>
-            </svg>
-          </div>
-          <h3 class="industry-card__name">Legal</h3>
-          <p class="industry-card__tagline">Client intake, document processing, contract review, case management, and billing automation.</p>
-        </div>
-
-        <div class="industry-card gsap-fade-up">
-          <div class="industry-card__icon">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M8 38h32v-20L24 8 8 18z"/>
-              <rect x="18" y="28" width="12" height="10"/>
-            </svg>
-          </div>
-          <h3 class="industry-card__name">Real Estate</h3>
-          <p class="industry-card__tagline">Lead qualification, showing coordination, transaction management, and follow-up sequences.</p>
-        </div>
-
-        <div class="industry-card gsap-fade-up">
-          <div class="industry-card__icon">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="24" cy="20" r="8"/>
-              <path d="M8 40c0-8.837 7.163-16 16-16s16 7.163 16 16"/>
-            </svg>
-          </div>
-          <h3 class="industry-card__name">Professional Services</h3>
-          <p class="industry-card__tagline">Receptionist AI, client scheduling, billing, intake forms, and practice management.</p>
-        </div>
-
-        <div class="industry-card gsap-fade-up">
-          <div class="industry-card__icon">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M10 34l6-18h16l6 18"/>
-              <circle cx="24" cy="12" r="4"/>
-              <line x1="14" y1="26" x2="34" y2="26"/>
-            </svg>
-          </div>
-          <h3 class="industry-card__name">Trades and Field Service</h3>
-          <p class="industry-card__tagline">Dispatch, job booking, customer follow-up, estimate generation, and parts ordering.</p>
-        </div>
-
-        <div class="industry-card gsap-fade-up">
-          <div class="industry-card__icon">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="6" y="10" width="14" height="14" rx="2"/>
-              <rect x="28" y="10" width="14" height="14" rx="2"/>
-              <rect x="6" y="28" width="14" height="14" rx="2"/>
-              <rect x="28" y="28" width="14" height="14" rx="2"/>
-            </svg>
-          </div>
-          <h3 class="industry-card__name">Franchise Operations</h3>
-          <p class="industry-card__tagline">Consistent AI across every location with centralized oversight and multi-location analytics.</p>
-        </div>
-
-        <div class="industry-card gsap-fade-up">
-          <div class="industry-card__icon">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="24" y1="6" x2="24" y2="42"/>
-              <path d="M34 12H19a6 6 0 0 0 0 12h10a6 6 0 0 1 0 12H14"/>
-            </svg>
-          </div>
-          <h3 class="industry-card__name">Financial Services</h3>
-          <p class="industry-card__tagline">Collections, payment processing, compliance monitoring, client communications, and reporting.</p>
-        </div>
-
-        <div class="industry-card gsap-fade-up">
-          <div class="industry-card__icon">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M24 8L10 20v20h28V20z"/>
-              <path d="M18 40v-10h12v10"/>
-              <path d="M14 20l10-10 10 10"/>
-            </svg>
-          </div>
-          <h3 class="industry-card__name">Insurance</h3>
-          <p class="industry-card__tagline">Claims intake, policy inquiries, renewal campaigns, agent support, and document processing.</p>
-        </div>
-
-        <div class="industry-card gsap-fade-up">
-          <div class="industry-card__icon">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M24 4L24 8"/><path d="M24 40L24 44"/>
-              <circle cx="24" cy="24" r="12"/>
-              <path d="M18 24l4 4 8-8"/>
-            </svg>
-          </div>
-          <h3 class="industry-card__name">Healthcare and Hospice</h3>
-          <p class="industry-card__tagline">Scheduling, compliance, EVV verification, and patient coordination. HIPAA-compliant from day one.</p>
-        </div>
-
-        <div class="industry-card gsap-fade-up">
-          <div class="industry-card__icon">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="6" y="14" width="36" height="26" rx="2"/>
-              <path d="M16 14V10a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4"/>
-              <line x1="24" y1="22" x2="24" y2="32"/>
-              <line x1="19" y1="27" x2="29" y2="27"/>
-            </svg>
-          </div>
-          <h3 class="industry-card__name">E-Commerce</h3>
-          <p class="industry-card__tagline">Customer service, order tracking, returns, product recommendations, and post-purchase engagement.</p>
-        </div>
-
-        <div class="industry-card gsap-fade-up">
-          <div class="industry-card__icon">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M8 40V18L24 6l16 12v22"/>
-              <rect x="16" y="26" width="8" height="14"/>
-              <rect x="28" y="26" width="8" height="8"/>
-            </svg>
-          </div>
-          <h3 class="industry-card__name">Hospitality</h3>
-          <p class="industry-card__tagline">Reservations, concierge, guest communications, review management, and upsell automation.</p>
-        </div>
-
-        <div class="industry-card gsap-fade-up">
-          <div class="industry-card__icon">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 38V14a2 2 0 0 1 2-2h20a2 2 0 0 1 2 2v24"/>
-              <line x1="8" y1="38" x2="40" y2="38"/>
-              <line x1="18" y1="20" x2="30" y2="20"/>
-              <line x1="18" y1="28" x2="30" y2="28"/>
-              <line x1="24" y1="12" x2="24" y2="8"/>
-            </svg>
-          </div>
-          <h3 class="industry-card__name">Education</h3>
-          <p class="industry-card__tagline">Enrollment, student support, class scheduling, administrative workflows, and parent communications.</p>
-        </div>
-
-        <div class="industry-card gsap-fade-up">
-          <div class="industry-card__icon">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="18" cy="16" r="7"/>
-              <path d="M6 40c0-7.18 5.37-13 12-13"/>
-              <line x1="28" y1="20" x2="42" y2="20"/>
-              <line x1="28" y1="28" x2="42" y2="28"/>
-              <line x1="28" y1="36" x2="36" y2="36"/>
-            </svg>
-          </div>
-          <h3 class="industry-card__name">Recruiting and Staffing</h3>
-          <p class="industry-card__tagline">Candidate screening, interview scheduling, onboarding automation, and placement tracking.</p>
-        </div>
-
-        <div class="industry-card gsap-fade-up">
-          <div class="industry-card__icon">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="6" y="8" width="36" height="32" rx="2"/>
-              <line x1="6" y1="18" x2="42" y2="18"/>
-              <line x1="18" y1="8" x2="18" y2="40"/>
-              <line x1="14" y1="28" x2="14.01" y2="28"/>
-            </svg>
-          </div>
-          <h3 class="industry-card__name">Property Management</h3>
-          <p class="industry-card__tagline">Tenant communications, maintenance requests, lease management, and rent collection.</p>
-        </div>
-
-        <div class="industry-card gsap-fade-up">
-          <div class="industry-card__icon">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M38 16c0 10-14 24-14 24S10 26 10 16a14 14 0 0 1 28 0z"/>
-              <circle cx="24" cy="16" r="4"/>
-            </svg>
-          </div>
-          <h3 class="industry-card__name">Veterinary and Pet Care</h3>
-          <p class="industry-card__tagline">Appointment booking, prescription reminders, client communications, and follow-up automation.</p>
-        </div>
-
-        <div class="industry-card gsap-fade-up">
-          <div class="industry-card__icon">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M6 36l8-8 6 6 14-16 8 8"/>
-              <rect x="4" y="36" width="40" height="6" rx="1"/>
-              <circle cx="14" cy="20" r="2"/>
-            </svg>
-          </div>
-          <h3 class="industry-card__name">Automotive</h3>
-          <p class="industry-card__tagline">Service scheduling, parts inquiries, recall notifications, customer retention, and review management.</p>
-        </div>
-
-        <div class="industry-card gsap-fade-up">
-          <div class="industry-card__icon">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="24" cy="24" r="14"/>
-              <circle cx="24" cy="24" r="6"/>
-              <line x1="24" y1="4" x2="24" y2="10"/>
-              <line x1="24" y1="38" x2="24" y2="44"/>
-              <line x1="4" y1="24" x2="10" y2="24"/>
-              <line x1="38" y1="24" x2="44" y2="24"/>
-            </svg>
-          </div>
-          <h3 class="industry-card__name">AI Agentic Automation</h3>
-          <p class="industry-card__tagline">Named AI employees with voice, phone, email, and dashboard. 20+ specialist roles deployed in days. The AI agency model.</p>
-        </div>
-
-        <div class="industry-card gsap-fade-up">
-          <div class="industry-card__icon">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="8 36 16 24 24 30 32 16 40 20"/>
-              <line x1="8" y1="42" x2="40" y2="42"/>
-              <line x1="8" y1="8" x2="8" y2="42"/>
-              <circle cx="32" cy="16" r="3"/>
-            </svg>
-          </div>
-          <h3 class="industry-card__name">Data Analytics</h3>
-          <p class="industry-card__tagline">Deep analytics, predictive modeling, anomaly detection, custom dashboards, and automated reporting across any data source.</p>
-        </div>
-
-        <div class="industry-card gsap-fade-up">
-          <div class="industry-card__icon">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="6" y="28" width="12" height="14" rx="2"/>
-              <rect x="30" y="6" width="12" height="36" rx="2"/>
-              <line x1="12" y1="14" x2="36" y2="14"/>
-              <polyline points="22 10 26 14 22 18"/>
-            </svg>
-          </div>
-          <h3 class="industry-card__name">Logistics and Supply Chain</h3>
-          <p class="industry-card__tagline">Route optimization, shipment tracking, warehouse coordination, vendor communications, and demand forecasting.</p>
-        </div>
-
-      </div>
-
-      </div>
-    </div>
-  </section>
-
-  <!-- ========== STATS ========== -->
-  <section class="section stats" id="stats">
-    <div class="section__inner">
-      <div class="section__header">
-        <span class="section__label gsap-fade-up" style="color: #D32F2F;">By the Numbers</span>
-        <h2 class="section__title gsap-fade-up" style="color: #E8E8F0;">Performance You Can Measure</h2>
-      </div>
-      <div class="stats__grid" id="stats-grid">
-        <div class="stat-item">
-          <div class="stat-item__number" data-count="83" data-suffix="%">0</div>
-          <div class="stat-item__label">Cost savings vs. human staff</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-item__number" data-count="99.7" data-suffix="%" data-decimal="true">0</div>
-          <div class="stat-item__label">Uptime across all systems</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-item__number" data-count="24" data-suffix="/7/365" data-nodash="true">0</div>
-          <div class="stat-item__label">Always on</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-item__number" data-count="100" data-suffix="+" data-nodash="true">0</div>
-          <div class="stat-item__label">AI skills</div>
-        </div>
-      </div>
-      <p class="stats__timestamp" id="stats-date"></p>
-    </div>
-  </section>
-
-  <!-- ========== TRUST ========== -->
-  <section class="section section--alt" id="trust">
-    <div class="section__inner">
-      <div class="section__header">
-        <span class="section__label gsap-fade-up">Built on Trust</span>
-        <h2 class="section__title gsap-fade-up">Security is Not an Afterthought</h2>
-        <p class="section__subtitle gsap-fade-up">Every system we deploy meets the highest standards for data protection and transparency.</p>
-      </div>
-      <div class="trust__grid">
-
-        <div class="trust-item gsap-fade-up">
-          <div class="trust-item__icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-              <path d="M9 12l2 2 4-4"/>
-            </svg>
-          </div>
-          <div>
-            <h3 class="trust-item__title">HIPAA-Ready Infrastructure</h3>
-            <p class="trust-item__desc">Built for healthcare from the ground up. PHI is encrypted at rest and in transit.</p>
-          </div>
-        </div>
-
-        <div class="trust-item gsap-fade-up">
-          <div class="trust-item__icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-            </svg>
-          </div>
-          <div>
-            <h3 class="trust-item__title">256-Bit Encryption</h3>
-            <p class="trust-item__desc">Every call, text, and email is encrypted end-to-end. No exceptions.</p>
-          </div>
-        </div>
-
-        <div class="trust-item gsap-fade-up">
-          <div class="trust-item__icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"/>
-              <path d="M9 12l2 2 4-4"/>
-            </svg>
-          </div>
-          <div>
-            <h3 class="trust-item__title">SOC 2 Compliant</h3>
-            <p class="trust-item__desc">Audited controls for security, availability, and confidentiality of customer data.</p>
-          </div>
-        </div>
-
-        <div class="trust-item gsap-fade-up">
-          <div class="trust-item__icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-              <circle cx="12" cy="12" r="3"/>
-            </svg>
-          </div>
-          <div>
-            <h3 class="trust-item__title">Transparent AI Disclosure</h3>
-            <p class="trust-item__desc">Every agent identifies as AI on every interaction. No deception, ever.</p>
-          </div>
-        </div>
-
-        <div class="trust-item gsap-fade-up">
-          <div class="trust-item__icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
-              <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
-              <line x1="6" y1="6" x2="6.01" y2="6"/>
-              <line x1="6" y1="18" x2="6.01" y2="18"/>
-            </svg>
-          </div>
-          <div>
-            <h3 class="trust-item__title">AWS-Hosted Infrastructure</h3>
-            <p class="trust-item__desc">Deployed on Amazon Web Services with redundancy, auto-scaling, and geographic failover.</p>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  </section>
-
-  <!-- ========== CONTACT ========== -->
-  <section class="section contact" id="contact">
-    <div class="section__inner">
-      <div class="contact__inner">
-        <span class="section__label gsap-fade-up" style="color: #D32F2F; justify-content: center; display: inline-flex;">Get in Touch</span>
-        <h2 class="contact__title gsap-fade-up">Ready to See What AI Can Do for Your Business?</h2>
-        <p class="contact__subtitle gsap-fade-up">Describe your biggest operational challenge. We will show you a working solution within 30 days.</p>
-        <form class="contact__form gsap-fade-up" onsubmit="return false;">
-          <div>
-            <input type="text" class="contact__input" placeholder="Your Name" required>
-          </div>
-          <div>
-            <input type="email" class="contact__input" placeholder="Email Address" required>
-          </div>
-          <div class="contact__form-full">
-            <input type="text" class="contact__input" placeholder="Company">
-          </div>
-          <div class="contact__form-full">
-            <textarea class="contact__textarea" placeholder="Tell us about your biggest operational bottleneck..." rows="4"></textarea>
-          </div>
-          <div class="contact__submit-row">
-            <button type="submit" class="btn btn--primary">
-              Send Message
-              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            </button>
-          </div>
-        </form>
-        <div class="contact__info gsap-fade-up" style="margin-top: 2.5rem; text-align: center; color: rgba(136, 136, 170, 0.7); font-size: 0.85rem; font-family: var(--font-mono);">
-          <p>rob@brainstormagi.com</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ========== FOOTER ========== -->
-  <footer class="footer">
-    <div class="footer__inner">
-      <div class="footer__top">
-        <div class="footer__brand">
-          <div class="footer__logo">
-            <svg viewBox="0 0 36 36" fill="none" aria-hidden="true">
-              <circle cx="18" cy="18" r="16" stroke="currentColor" stroke-width="2" opacity="0.3"/>
-              <circle cx="18" cy="14" r="5" stroke="currentColor" stroke-width="2"/>
-              <circle cx="12" cy="22" r="3" stroke="currentColor" stroke-width="2"/>
-              <circle cx="24" cy="22" r="3" stroke="currentColor" stroke-width="2"/>
-              <line x1="16" y1="18" x2="13" y2="20" stroke="currentColor" stroke-width="1.5"/>
-              <line x1="20" y1="18" x2="23" y2="20" stroke="currentColor" stroke-width="1.5"/>
-              <circle cx="18" cy="14" r="1.5" fill="#D32F2F"/>
-              <circle cx="12" cy="22" r="1" fill="#D32F2F"/>
-              <circle cx="24" cy="22" r="1" fill="#D32F2F"/>
-            </svg>
-            <span>Brainstorm AGI</span>
-          </div>
-          <p class="footer__tagline">AI technology company building complete AI systems for operations, revenue, and scale across 18 industries.</p>
-        </div>
-
-        <div>
-          <h4 class="footer__col-title">Company</h4>
-          <div class="footer__col-links">
-            <a href="#products" class="footer__col-link">Products</a>
-            <a href="#industries" class="footer__col-link">Industries</a>
-            <a href="#trust" class="footer__col-link">About</a>
-            <a href="#contact" class="footer__col-link">Contact</a>
-          </div>
-        </div>
-
-        <div>
-          <h4 class="footer__col-title">Products</h4>
-          <div class="footer__col-links">
-            <a href="#products" class="footer__col-link">AI Agents</a>
-            <a href="#products" class="footer__col-link">Operations</a>
-            <a href="#products" class="footer__col-link">Voice</a>
-            <a href="#products" class="footer__col-link">Revenue</a>
-            <a href="#products" class="footer__col-link">Content</a>
-            <a href="#products" class="footer__col-link">Infrastructure</a>
-          </div>
-        </div>
-      </div>
-
-      <div class="footer__bottom">
-        <p class="footer__copyright">&copy; 2026 Brainstorm AGI, LLC</p>
-      </div>
-    </div>
-  </footer>
-
-  <!-- Scripts -->
-  <script type="module" src="./js/hero-3d.js"></script>
-  <script src="./js/main.js" defer></script>
+  <script type="module" src="./main.js"></script>
 </body>
 </html>
