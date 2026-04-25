@@ -432,29 +432,53 @@ if (hudToggle && hudNav) {
   hudNav.querySelectorAll("a").forEach(a => a.addEventListener("click", closeNav));
 }
 
-// ---------- LABEL EDGE SAFETY ----------
-// A label must NEVER render partially clipped by the canvas viewport. Opacity
-// fade alone leaves a visible partial chip at the rim. Each frame we project
-// the sprite to screen space, estimate its on-screen width from text length
-// (the visible text panel is what readers see, not the sprite background),
-// and hide the sprite entirely if any edge of that box would fall within a
-// safe margin of the viewport edge. Otherwise show fully.
+// ---------- LABEL EDGE + PANEL SAFETY ----------
+// A label must NEVER render partially clipped by the canvas viewport, AND must
+// never visually intersect a foreground content panel (e.g. the hero card or
+// any `.sec-inner`). Two failure modes we're guarding against:
+//   1. Viewport-edge clip: opacity fade alone leaves a partial chip at the rim.
+//   2. Panel overlap: the chip sits behind a content card and the card's edge
+//      slices the chip mid-letter (e.g. "INTEGRATION HU" cut by hero panel).
+// Each frame we project the sprite to screen space, build its on-screen bbox,
+// and hide the sprite entirely if it clips a viewport edge OR overlaps the
+// rect of any visible foreground panel (with a small safety margin).
 //
 // The remaining road, energy nodes, pulses, and 3D buildings are unaffected.
 const tmpProj = new THREE.Vector3();
 const tmpView = new THREE.Vector3();
 const EDGE_SAFE_MARGIN_PX = 48;   // hide if any sprite edge is within this many px of viewport edge
+const PANEL_SAFE_MARGIN_PX = 18;  // hide if sprite bbox comes within this many px of any visible panel
+// Cache the live list of panels — `.sec-inner` covers every section card,
+// including the hero panel that was slicing INTEGRATION HUB.
+const panelEls = Array.from(document.querySelectorAll(".sec-inner"));
+function rectsOverlap(a, b) {
+  return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
+}
 function updateLabelEdgeSafety() {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const halfW = vw * 0.5;
   const halfH = vh * 0.5;
+  // Collect bounding rects of panels currently on screen. Only on-screen panels
+  // can occlude a label, so off-screen sections are skipped to avoid wasted work.
+  const panelRects = [];
+  for (const el of panelEls) {
+    const r = el.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) continue;
+    if (r.bottom < 0 || r.top > vh || r.right < 0 || r.left > vw) continue;
+    panelRects.push({
+      left:   r.left   - PANEL_SAFE_MARGIN_PX,
+      right:  r.right  + PANEL_SAFE_MARGIN_PX,
+      top:    r.top    - PANEL_SAFE_MARGIN_PX,
+      bottom: r.bottom + PANEL_SAFE_MARGIN_PX
+    });
+  }
   for (const s of labelSprites) {
     // View-space Z < 0 is in front of camera in three.js convention.
     tmpView.copy(s.position).applyMatrix4(camera.matrixWorldInverse);
-    if (tmpView.z >= 0) { s.visible = false; continue; }
+    if (tmpView.z >= 0) { s.visible = false; s.material.opacity = 0; continue; }
     tmpProj.copy(s.position).project(camera);
-    if (tmpProj.z < -1 || tmpProj.z > 1) { s.visible = false; continue; }
+    if (tmpProj.z < -1 || tmpProj.z > 1) { s.visible = false; s.material.opacity = 0; continue; }
     const screenX = tmpProj.x * halfW + halfW;
     const screenY = -tmpProj.y * halfH + halfH;
     // Convert sprite world-unit scale to pixel size at the sprite's distance.
@@ -469,19 +493,27 @@ function updateLabelEdgeSafety() {
     const textHalfWidthPx = (s.userData.textLen || 12) * 11 * 0.5;
     const halfWidthPx  = Math.max(panelHalfWidthPx, textHalfWidthPx);
     const halfHeightPx = Math.max((s.scale.y * 0.5) * pxPerWorld, 16);
-    // Hide if any edge of the projected box is within the safe margin of any
-    // viewport edge. This is hard hide — no partial render at any rim.
     const leftEdge   = screenX - halfWidthPx;
     const rightEdge  = screenX + halfWidthPx;
     const topEdge    = screenY - halfHeightPx;
     const bottomEdge = screenY + halfHeightPx;
+    // Rule 1: hide if any edge is within safe margin of viewport edge.
     const clipsEdge =
       leftEdge   < EDGE_SAFE_MARGIN_PX ||
       rightEdge  > vw - EDGE_SAFE_MARGIN_PX ||
       topEdge    < EDGE_SAFE_MARGIN_PX ||
       bottomEdge > vh - EDGE_SAFE_MARGIN_PX;
-    s.visible = !clipsEdge;
-    s.material.opacity = clipsEdge ? 0 : 1;
+    // Rule 2: hide if the projected bbox overlaps any visible foreground panel.
+    let overlapsPanel = false;
+    if (!clipsEdge && panelRects.length > 0) {
+      const labelRect = { left: leftEdge, right: rightEdge, top: topEdge, bottom: bottomEdge };
+      for (const pr of panelRects) {
+        if (rectsOverlap(labelRect, pr)) { overlapsPanel = true; break; }
+      }
+    }
+    const hide = clipsEdge || overlapsPanel;
+    s.visible = !hide;
+    s.material.opacity = hide ? 0 : 1;
   }
 }
 
