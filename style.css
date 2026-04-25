@@ -102,14 +102,19 @@ body::after{
     0 0 28px rgba(92,242,255,.12),
     0 0 14px rgba(255,42,42,.06);
 }
-/* Live tick caret on the HUD metrics — sits inside right padding so its glow
-   never bleeds past the panel and never gets clipped at the right edge. */
+/* Live tick caret on the HUD metrics. Rendered as a styled block via a
+   pseudo-element rectangle so it reads as a blinking cursor and never as a
+   stray underscore character. Sits inside right padding so its glow never
+   bleeds past the panel and never gets clipped at the right edge. */
 .hud-metrics::after{
-  content:"_";color:var(--electric);
-  margin-left:6px;padding-right:2px;
+  content:"";
+  display:inline-block;
+  width:7px;height:11px;
+  margin-left:8px;
+  background:var(--electric);
   flex-shrink:0;
   animation:caret 1.1s steps(2,end) infinite;
-  text-shadow:0 0 8px rgba(92,242,255,.7);
+  box-shadow:0 0 8px rgba(92,242,255,.75);
 }
 @keyframes caret{0%,49%{opacity:1}50%,100%{opacity:0}}
 .hud-metrics .sep{color:var(--electric);opacity:.55}
