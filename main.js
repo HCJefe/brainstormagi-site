@@ -21,64 +21,188 @@ const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerH
 camera.position.set(0, 400, 600);
 camera.lookAt(0, 0, 0);
 
-scene.add(new THREE.AmbientLight(0x334466, 0.55));
-const key = new THREE.DirectionalLight(0xffd0c0, 0.8); key.position.set(300, 400, 200); scene.add(key);
-const rim = new THREE.DirectionalLight(0xff3344, 0.55); rim.position.set(-300, 200, -400); scene.add(rim);
+scene.add(new THREE.AmbientLight(0x334466, 0.5));
+const key = new THREE.DirectionalLight(0xffd0c0, 0.7); key.position.set(300, 400, 200); scene.add(key);
+const rim = new THREE.DirectionalLight(0xff3344, 0.5); rim.position.set(-300, 200, -400); scene.add(rim);
+const cyanLight = new THREE.DirectionalLight(0x4ff3ff, 0.35); cyanLight.position.set(0, 200, 400); scene.add(cyanLight);
 
 // ---------- CIRCUIT BOARD FLOOR ----------
 const BOARD = 1800;
 const floor = new THREE.Mesh(
   new THREE.PlaneGeometry(BOARD, BOARD),
-  new THREE.MeshStandardMaterial({ color: 0x061018, roughness: 0.7, metalness: 0.4 })
+  new THREE.MeshStandardMaterial({ color: 0x040810, roughness: 0.85, metalness: 0.3 })
 );
 floor.rotation.x = -Math.PI / 2;
 scene.add(floor);
-const gridFine = new THREE.GridHelper(BOARD, 180, 0x112034, 0x0b1626);
-gridFine.material.transparent = true; gridFine.material.opacity = 0.45; scene.add(gridFine);
-const gridCoarse = new THREE.GridHelper(BOARD, 22, 0xff2a2a, 0x661010);
-gridCoarse.material.transparent = true; gridCoarse.material.opacity = 0.55; gridCoarse.position.y = 0.02; scene.add(gridCoarse);
+const gridFine = new THREE.GridHelper(BOARD, 180, 0x0e1a2c, 0x070d18);
+gridFine.material.transparent = true; gridFine.material.opacity = 0.35; scene.add(gridFine);
+const gridCoarse = new THREE.GridHelper(BOARD, 22, 0xff2a2a, 0x4a0c0c);
+gridCoarse.material.transparent = true; gridCoarse.material.opacity = 0.42; gridCoarse.position.y = 0.02; scene.add(gridCoarse);
 
-// PCB traces spire -> each district
-function addTrace(from, to, color = 0xff2a2a) {
-  const pts = [
-    new THREE.Vector3(from[0], 0.1, from[2]),
-    new THREE.Vector3(to[0],   0.1, from[2]),
-    new THREE.Vector3(to[0],   0.1, to[2])
-  ];
-  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.9 })));
-  const curve = new THREE.CatmullRomCurve3(pts, false, "catmullrom", 0);
-  const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.6, 8, false), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.35 }));
-  scene.add(tube);
-  return pts;
-}
-DISTRICTS.filter(d => d.id !== "spire").forEach(d => addTrace([0,0,0], d.pos, d.color));
-function addPad(x, z, r = 8, c = 0xff2a2a) {
-  const pad = new THREE.Mesh(new THREE.CircleGeometry(r, 32), new THREE.MeshBasicMaterial({ color: c }));
-  pad.rotation.x = -Math.PI / 2; pad.position.set(x, 0.05, z); scene.add(pad);
-}
-DISTRICTS.forEach(d => addPad(d.pos[0], d.pos[2], 9, d.color));
+// ---------- ELECTRIFIED ROAD ----------
+// Replace simple traces with a multi-layer "road":
+//   - dark asphalt strip (the road surface)
+//   - twin neon edge lines (cyan/red), the electrified rails
+//   - a glowing center spine (pulses of current)
+//   - dashed lane markers
+//   - energy nodes at corners and endpoints
+const ROAD_HALF_WIDTH = 7;          // road width = 14 world units
+const ROAD_Y = 0.12;                // slightly above floor to avoid z-fighting
+const RAIL_OFFSET = ROAD_HALF_WIDTH; // rails sit at the edges
+const ROAD_EDGE_COLOR = 0x5cf2ff;   // electric cyan rails — the "electrified" structure
+const energyNodes = [];             // pulsing markers at corners/endpoints
 
-// ---------- DATA PACKETS (flowing along traces) ----------
-const packetGeo = new THREE.SphereGeometry(0.8, 8, 8);
-const packetMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+function addRoadSegment(ax, az, bx, bz, color) {
+  // axis-aligned segment from (ax,az) to (bx,bz) — exactly one of x/z changes
+  const horizontal = Math.abs(bx - ax) > Math.abs(bz - az);
+  const length = horizontal ? Math.abs(bx - ax) : Math.abs(bz - az);
+  const cx = (ax + bx) / 2;
+  const cz = (az + bz) / 2;
+
+  // 1. Asphalt strip
+  const widthX = horizontal ? length : ROAD_HALF_WIDTH * 2;
+  const widthZ = horizontal ? ROAD_HALF_WIDTH * 2 : length;
+  const asphalt = new THREE.Mesh(
+    new THREE.PlaneGeometry(widthX, widthZ),
+    new THREE.MeshStandardMaterial({ color: 0x0a121e, roughness: 0.65, metalness: 0.35 })
+  );
+  asphalt.rotation.x = -Math.PI / 2;
+  asphalt.position.set(cx, ROAD_Y, cz);
+  scene.add(asphalt);
+
+  // 2. Twin electrified rails — cyan core, brand-red secondary (cross district color)
+  const railColors = [ROAD_EDGE_COLOR, color];
+  for (let r = 0; r < 2; r++) {
+    const rcol = railColors[r];
+    // Use thin emissive boxes for the rails so they catch the eye
+    const rw = horizontal ? length : 0.8;
+    const rd = horizontal ? 0.8 : length;
+    for (const sign of [-1, 1]) {
+      const rail = new THREE.Mesh(
+        new THREE.BoxGeometry(rw, 0.6, rd),
+        new THREE.MeshBasicMaterial({ color: rcol, transparent: true, opacity: r === 0 ? 0.9 : 0.6 })
+      );
+      const ox = horizontal ? 0 : sign * (RAIL_OFFSET - r * 1.2);
+      const oz = horizontal ? sign * (RAIL_OFFSET - r * 1.2) : 0;
+      rail.position.set(cx + ox, ROAD_Y + 0.3 + r * 0.05, cz + oz);
+      scene.add(rail);
+    }
+  }
+
+  // 3. Center spine — solid emissive line (white/red mix) — the live wire
+  const spine = new THREE.Mesh(
+    new THREE.BoxGeometry(horizontal ? length : 0.5, 0.4, horizontal ? 0.5 : length),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 })
+  );
+  spine.position.set(cx, ROAD_Y + 0.2, cz);
+  scene.add(spine);
+
+  // 4. Dashed lane markers — short emissive dashes alternating along the spine
+  const dashCount = Math.floor(length / 14);
+  for (let i = 0; i < dashCount; i++) {
+    const t = (i + 0.5) / dashCount;
+    const dx = ax + (bx - ax) * t;
+    const dz = az + (bz - az) * t;
+    const dash = new THREE.Mesh(
+      new THREE.BoxGeometry(horizontal ? 5 : 0.7, 0.3, horizontal ? 0.7 : 5),
+      new THREE.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.85 })
+    );
+    dash.position.set(dx, ROAD_Y + 0.35, dz);
+    scene.add(dash);
+  }
+}
+
+function addEnergyNode(x, z, color, size = 6) {
+  // A glowing pad with a pulsing ring — placed at corners and endpoints
+  const pad = new THREE.Mesh(
+    new THREE.CircleGeometry(size, 32),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85 })
+  );
+  pad.rotation.x = -Math.PI / 2;
+  pad.position.set(x, ROAD_Y + 0.4, z);
+  scene.add(pad);
+
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(size + 1, size + 1.6, 48),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.6, side: THREE.DoubleSide })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.set(x, ROAD_Y + 0.5, z);
+  scene.add(ring);
+
+  // Vertical light shaft at the node — adds a "data uplink" feel
+  const shaft = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.7, 0.7, 36, 8, 1, true),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.22, side: THREE.DoubleSide })
+  );
+  shaft.position.set(x, 18, z);
+  scene.add(shaft);
+
+  energyNodes.push({ ring, baseR: size + 1, baseR2: size + 1.6, phase: Math.random() * Math.PI * 2 });
+}
+
+// Build the road network: spire (0,0) -> each district, L-shaped, with corner nodes
+const roadPaths = []; // for packet routing: each entry is array of points
+DISTRICTS.filter(d => d.id !== "spire").forEach(d => {
+  const ax = 0, az = 0;
+  const bx = d.pos[0], bz = d.pos[2];
+  const cornerX = bx, cornerZ = az; // L-shape: go x first, then z
+  // Avoid zero-length segments when district is on an axis
+  if (Math.abs(bx - ax) > 1) addRoadSegment(ax, az, cornerX, cornerZ, d.color);
+  if (Math.abs(bz - az) > 1) addRoadSegment(cornerX, cornerZ, bx, bz, d.color);
+  // Energy nodes at corner and endpoint
+  addEnergyNode(cornerX, cornerZ, d.color, 5);
+  addEnergyNode(bx, bz, d.color, 9);
+
+  roadPaths.push({
+    color: d.color,
+    points: [
+      new THREE.Vector3(ax, ROAD_Y + 0.6, az),
+      new THREE.Vector3(cornerX, ROAD_Y + 0.6, cornerZ),
+      new THREE.Vector3(bx, ROAD_Y + 0.6, bz)
+    ]
+  });
+});
+// Central hub node at origin (the spire)
+addEnergyNode(0, 0, 0xff2a2a, 12);
+
+// ---------- DATA PULSES (electric current flowing along the roads) ----------
+// Brighter, larger packets that visually read as electric current
+const packetGeo = new THREE.SphereGeometry(1.4, 10, 10);
+const packetMatWhite = new THREE.MeshBasicMaterial({ color: 0xffffff });
 const packets = [];
-const PACKET_COUNT = lowPower ? 80 : 220;
+const PACKET_COUNT = lowPower ? 90 : 240;
 for (let i = 0; i < PACKET_COUNT; i++) {
-  const d = DISTRICTS[1 + (i % (DISTRICTS.length - 1))];
-  const p = new THREE.Mesh(packetGeo, packetMat);
-  p.userData = { target: d, t: Math.random(), speed: 0.08 + Math.random() * 0.1 };
-  scene.add(p); packets.push(p);
+  const route = roadPaths[i % roadPaths.length];
+  // Mix white-hot and tinted packets so the current reads as electricity, not just lights
+  const tinted = i % 3 === 0;
+  const mat = tinted
+    ? new THREE.MeshBasicMaterial({ color: route.color })
+    : packetMatWhite;
+  const p = new THREE.Mesh(packetGeo, mat);
+  p.userData = {
+    route,
+    t: Math.random(),
+    speed: 0.07 + Math.random() * 0.13
+  };
+  scene.add(p);
+  packets.push(p);
 }
 function updatePackets(dt) {
   for (const p of packets) {
     p.userData.t += dt * p.userData.speed;
     if (p.userData.t > 1) p.userData.t = 0;
-    const d = p.userData.target;
     const t = p.userData.t;
-    let x, z;
-    if (t < 0.5) { x = THREE.MathUtils.lerp(0, d.pos[0], t / 0.5); z = 0; }
-    else          { x = d.pos[0]; z = THREE.MathUtils.lerp(0, d.pos[2], (t - 0.5) / 0.5); }
-    p.position.set(x, 0.6, z);
+    const pts = p.userData.route.points;
+    // Two segments per route: 0..0.5 = pts[0]->pts[1], 0.5..1 = pts[1]->pts[2]
+    let from, to, lt;
+    if (t < 0.5) { from = pts[0]; to = pts[1]; lt = t / 0.5; }
+    else         { from = pts[1]; to = pts[2]; lt = (t - 0.5) / 0.5; }
+    p.position.set(
+      THREE.MathUtils.lerp(from.x, to.x, lt),
+      ROAD_Y + 0.7,
+      THREE.MathUtils.lerp(from.z, to.z, lt)
+    );
   }
 }
 
@@ -285,8 +409,10 @@ if (hudToggle && hudNav) {
 // ---------- LOOP ----------
 const clock = new THREE.Clock();
 const tmpPos = new THREE.Vector3(), tmpLook = new THREE.Vector3();
+let elapsed = 0;
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.05);
+  elapsed += dt;
   // smooth scroll progress
   scrollProgress += (targetProgress - scrollProgress) * 0.08;
   // camera follows full path across 0..1
@@ -297,6 +423,14 @@ function tick() {
 
   // progress rail
   progressFill.style.height = (scrollProgress * 100).toFixed(1) + "%";
+
+  // Pulsing energy nodes — gentle scale + opacity breathing
+  for (const n of energyNodes) {
+    const pulse = 0.5 + 0.5 * Math.sin(elapsed * 2.4 + n.phase);
+    const s = 1 + pulse * 0.18;
+    n.ring.scale.set(s, s, 1);
+    n.ring.material.opacity = 0.35 + pulse * 0.45;
+  }
 
   updatePackets(dt);
   renderer.render(scene, camera);
