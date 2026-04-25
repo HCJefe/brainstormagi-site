@@ -11,20 +11,21 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: !lowPower, powerPr
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, lowPower ? 1.5 : 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = lowPower ? 1.1 : 1.05;
+renderer.toneMappingExposure = lowPower ? 1.35 : 1.3;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x03050a);
-scene.fog = new THREE.FogExp2(0x03060c, lowPower ? 0.00085 : 0.00115);
+scene.background = new THREE.Color(0x05091a);
+scene.fog = new THREE.FogExp2(0x070d1c, lowPower ? 0.00028 : 0.00038);
 
 const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.5, 8000);
-camera.position.set(0, 380, 720);
-camera.lookAt(0, 40, -200);
+camera.position.set(0, 220, 480);
+camera.lookAt(0, 50, -260);
 
-scene.add(new THREE.AmbientLight(0x2a3a5a, lowPower ? 0.55 : 0.5));
-const key = new THREE.DirectionalLight(0xffd0c0, lowPower ? 0.85 : 0.7); key.position.set(300, 500, 300); scene.add(key);
-const rim = new THREE.DirectionalLight(0xff3344, lowPower ? 0.55 : 0.45); rim.position.set(-400, 240, -600); scene.add(rim);
-const cyanLight = new THREE.DirectionalLight(0x4ff3ff, lowPower ? 0.55 : 0.4); cyanLight.position.set(0, 240, -400); scene.add(cyanLight);
+scene.add(new THREE.AmbientLight(0x4a5a7a, lowPower ? 1.1 : 1.0));
+const key = new THREE.DirectionalLight(0xffe0d0, lowPower ? 1.45 : 1.3); key.position.set(300, 500, 300); scene.add(key);
+const rim = new THREE.DirectionalLight(0xff5566, lowPower ? 1.0 : 0.85); rim.position.set(-400, 240, -600); scene.add(rim);
+const cyanLight = new THREE.DirectionalLight(0x6ff5ff, lowPower ? 1.05 : 0.9); cyanLight.position.set(0, 240, -400); scene.add(cyanLight);
+const fillLight = new THREE.DirectionalLight(0xaad0ff, 0.55); fillLight.position.set(120, 300, 200); scene.add(fillLight);
 
 // ---------- CIRCUIT-BOARD GROUND ----------
 // The ground is a long PCB stretching from the hero (Z=+300) down to past
@@ -36,20 +37,22 @@ const BOARD_OFFSET_Z = -700;  // shift board so it covers the full highway
 
 const floor = new THREE.Mesh(
   new THREE.PlaneGeometry(BOARD_W, BOARD_L),
-  new THREE.MeshStandardMaterial({ color: 0x040a14, roughness: 0.85, metalness: 0.35 })
+  new THREE.MeshStandardMaterial({ color: 0x0a1426, roughness: 0.7, metalness: 0.45, emissive: 0x081626, emissiveIntensity: 0.595 })
 );
 floor.rotation.x = -Math.PI / 2;
 floor.position.z = BOARD_OFFSET_Z;
 scene.add(floor);
 
 // Etched PCB grid — fine lines that read as the underlying board substrate.
-const gridFine = new THREE.GridHelper(Math.max(BOARD_W, BOARD_L), 240, 0x12243a, 0x081222);
-gridFine.material.transparent = true; gridFine.material.opacity = 0.42;
+const gridFine = new THREE.GridHelper(Math.max(BOARD_W, BOARD_L), 240, 0x2a4868, 0x12243a);
+gridFine.material.transparent = true; gridFine.material.opacity = 0.7;
+gridFine.material.fog = false;
 gridFine.position.z = BOARD_OFFSET_Z;
 scene.add(gridFine);
 // Coarser brand-red copper grid overlay
-const gridCoarse = new THREE.GridHelper(Math.max(BOARD_W, BOARD_L), 26, 0xff2a2a, 0x4a0c0c);
-gridCoarse.material.transparent = true; gridCoarse.material.opacity = 0.32;
+const gridCoarse = new THREE.GridHelper(Math.max(BOARD_W, BOARD_L), 26, 0xff4444, 0x7a1818);
+gridCoarse.material.transparent = true; gridCoarse.material.opacity = 0.5;
+gridCoarse.material.fog = false;
 gridCoarse.position.set(0, 0.02, BOARD_OFFSET_Z); scene.add(gridCoarse);
 
 // ---------- THE CIRCUIT HIGHWAY ----------
@@ -66,7 +69,7 @@ const ROAD_Y = 0.15;
 // Road core — wide dark trace (the "trace metal" of the PCB).
 const roadCore = new THREE.Mesh(
   new THREE.PlaneGeometry(HIGHWAY_HALF_WIDTH * 2, HIGHWAY_LENGTH),
-  new THREE.MeshStandardMaterial({ color: 0x0c1828, roughness: 0.55, metalness: 0.55 })
+  new THREE.MeshStandardMaterial({ color: 0x162640, roughness: 0.45, metalness: 0.7, emissive: 0x0a1830, emissiveIntensity: 0.850 })
 );
 roadCore.rotation.x = -Math.PI / 2;
 roadCore.position.set(HIGHWAY_X, ROAD_Y, (HIGHWAY_Z_START + HIGHWAY_Z_END) / 2);
@@ -75,7 +78,7 @@ scene.add(roadCore);
 // Inner copper-tone band — the warm tint that reads as PCB copper trace.
 const copperBand = new THREE.Mesh(
   new THREE.PlaneGeometry(HIGHWAY_HALF_WIDTH * 1.4, HIGHWAY_LENGTH),
-  new THREE.MeshBasicMaterial({ color: 0x6a1a14, transparent: true, opacity: 0.32 })
+  new THREE.MeshBasicMaterial({ color: 0xa8341e, transparent: true, opacity: 0.45, fog: false })
 );
 copperBand.rotation.x = -Math.PI / 2;
 copperBand.position.set(HIGHWAY_X, ROAD_Y + 0.05, (HIGHWAY_Z_START + HIGHWAY_Z_END) / 2);
@@ -84,22 +87,22 @@ scene.add(copperBand);
 // Twin rails — cyan (left) and red copper (right) glowing edges.
 function addRail(xOffset, color, opacity) {
   const rail = new THREE.Mesh(
-    new THREE.BoxGeometry(1.4, 1.0, HIGHWAY_LENGTH),
-    new THREE.MeshBasicMaterial({ color, transparent: true, opacity })
+    new THREE.BoxGeometry(1.6, 1.2, HIGHWAY_LENGTH),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity, fog: false })
   );
   rail.position.set(HIGHWAY_X + xOffset, ROAD_Y + 0.5, (HIGHWAY_Z_START + HIGHWAY_Z_END) / 2);
   scene.add(rail);
 }
-addRail(-HIGHWAY_HALF_WIDTH, 0x5cf2ff, 0.95);
-addRail( HIGHWAY_HALF_WIDTH, 0xff3a3a, 0.85);
+addRail(-HIGHWAY_HALF_WIDTH, 0x8cf8ff, 1.0);
+addRail( HIGHWAY_HALF_WIDTH, 0xff5a5a, 0.95);
 // Secondary inner trace lines
-addRail(-HIGHWAY_HALF_WIDTH * 0.55, 0x2a8aa0, 0.55);
-addRail( HIGHWAY_HALF_WIDTH * 0.55, 0x8a1a1a, 0.55);
+addRail(-HIGHWAY_HALF_WIDTH * 0.55, 0x4abad0, 0.85);
+addRail( HIGHWAY_HALF_WIDTH * 0.55, 0xc83838, 0.85);
 
 // Center current spine — glowing white live wire.
 const spine = new THREE.Mesh(
-  new THREE.BoxGeometry(0.7, 0.4, HIGHWAY_LENGTH),
-  new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 })
+  new THREE.BoxGeometry(0.9, 0.5, HIGHWAY_LENGTH),
+  new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, fog: false })
 );
 spine.position.set(HIGHWAY_X, ROAD_Y + 0.3, (HIGHWAY_Z_START + HIGHWAY_Z_END) / 2);
 scene.add(spine);
@@ -110,8 +113,8 @@ const dashCount = Math.floor(HIGHWAY_LENGTH / DASH_SPACING);
 for (let i = 0; i < dashCount; i++) {
   const z = HIGHWAY_Z_START - (i + 0.5) * DASH_SPACING;
   const dash = new THREE.Mesh(
-    new THREE.BoxGeometry(1.6, 0.3, 7),
-    new THREE.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.85 })
+    new THREE.BoxGeometry(1.8, 0.4, 8),
+    new THREE.MeshBasicMaterial({ color: 0xff5a3a, transparent: true, opacity: 1.0, fog: false })
   );
   dash.position.set(HIGHWAY_X, ROAD_Y + 0.4, z);
   scene.add(dash);
@@ -122,24 +125,24 @@ for (let i = 0; i < dashCount; i++) {
 // solder pads at their ends. Sells the "circuit board" reading from above.
 function addMicroTrace(z, side, length, color = 0x5cf2ff) {
   const trace = new THREE.Mesh(
-    new THREE.BoxGeometry(length, 0.25, 0.6),
-    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.5 })
+    new THREE.BoxGeometry(length, 0.3, 0.7),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85, fog: false })
   );
   const sx = HIGHWAY_X + side * (HIGHWAY_HALF_WIDTH + length / 2);
   trace.position.set(sx, ROAD_Y + 0.18, z);
   scene.add(trace);
   // Solder pad at the tip
   const pad = new THREE.Mesh(
-    new THREE.CircleGeometry(2.2, 18),
-    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7 })
+    new THREE.CircleGeometry(2.4, 18),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, fog: false })
   );
   pad.rotation.x = -Math.PI / 2;
   pad.position.set(HIGHWAY_X + side * (HIGHWAY_HALF_WIDTH + length), ROAD_Y + 0.22, z);
   scene.add(pad);
   // Tiny via dot at the junction
   const via = new THREE.Mesh(
-    new THREE.CircleGeometry(0.9, 14),
-    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 })
+    new THREE.CircleGeometry(1.0, 14),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1.0, fog: false })
   );
   via.rotation.x = -Math.PI / 2;
   via.position.set(HIGHWAY_X + side * HIGHWAY_HALF_WIDTH, ROAD_Y + 0.2, z);
@@ -164,7 +167,7 @@ for (let i = 0; i < CHIP_COUNT; i++) {
   const d = 6 + Math.random() * 14;
   const chip = new THREE.Mesh(
     new THREE.BoxGeometry(w, 1.2, d),
-    new THREE.MeshStandardMaterial({ color: 0x0e1a2a, roughness: 0.4, metalness: 0.6, emissive: 0x081826, emissiveIntensity: 0.4 })
+    new THREE.MeshStandardMaterial({ color: 0x223850, roughness: 0.4, metalness: 0.6, emissive: 0x081826, emissiveIntensity: 0.680 })
   );
   chip.position.set(x, ROAD_Y + 0.6, z);
   scene.add(chip);
@@ -193,7 +196,7 @@ function addBranchTrace(z, targetX, color) {
   // Wide branch road
   const branch = new THREE.Mesh(
     new THREE.PlaneGeometry(length, 12),
-    new THREE.MeshStandardMaterial({ color: 0x0a1424, roughness: 0.5, metalness: 0.55 })
+    new THREE.MeshStandardMaterial({ color: 0x1a2a44, roughness: 0.5, metalness: 0.55 })
   );
   branch.rotation.x = -Math.PI / 2;
   branch.position.set(cx, ROAD_Y + 0.04, z);
@@ -221,7 +224,7 @@ function addCircuitPad(x, z, color, radius) {
   // Circular solder/chip pad the building stands on.
   const pad = new THREE.Mesh(
     new THREE.CylinderGeometry(radius, radius + 1.6, 1.6, 48),
-    new THREE.MeshStandardMaterial({ color: 0x0a1424, metalness: 0.7, roughness: 0.35, emissive: new THREE.Color(color), emissiveIntensity: 0.25 })
+    new THREE.MeshStandardMaterial({ color: 0x1a2a44, metalness: 0.7, roughness: 0.35, emissive: new THREE.Color(color), emissiveIntensity: 0.425 })
   );
   pad.position.set(x, ROAD_Y + 0.8, z);
   scene.add(pad);
@@ -248,7 +251,7 @@ function addCircuitPad(x, z, color, radius) {
     const vz = z + Math.sin(ang) * (radius + 0.8);
     const via = new THREE.Mesh(
       new THREE.CylinderGeometry(0.9, 0.9, 1.2, 12),
-      new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 1, roughness: 0.25, emissive: 0xffffff, emissiveIntensity: 0.2 })
+      new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 1, roughness: 0.25, emissive: 0xffffff, emissiveIntensity: 0.340 })
     );
     via.position.set(vx, ROAD_Y + 1.4, vz);
     scene.add(via);
@@ -301,7 +304,7 @@ function makeSpire(d) {
   // Wide foundation block
   const found = new THREE.Mesh(
     new THREE.BoxGeometry(baseW + 24, 6, baseW + 24),
-    new THREE.MeshStandardMaterial({ color: 0x0c1424, metalness: 0.7, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.18 })
+    new THREE.MeshStandardMaterial({ color: 0x1c2c44, metalness: 0.7, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.306 })
   );
   found.position.y = 3; g.add(found);
   // Stepped tower body — narrows as it rises
@@ -309,7 +312,7 @@ function makeSpire(d) {
     const w = baseW - i * 6;
     const sec = new THREE.Mesh(
       new THREE.BoxGeometry(w, segH, w),
-      new THREE.MeshStandardMaterial({ color: 0x10182a, metalness: 0.8, roughness: 0.25, emissive: new THREE.Color(d.color), emissiveIntensity: 0.12 })
+      new THREE.MeshStandardMaterial({ color: 0x223852, metalness: 0.8, roughness: 0.25, emissive: new THREE.Color(d.color), emissiveIntensity: 0.204 })
     );
     sec.position.y = 6 + i * segH + segH / 2;
     g.add(sec);
@@ -356,7 +359,7 @@ function makeFoundry(d) {
   const tower = (x, h) => {
     const body = new THREE.Mesh(
       new THREE.BoxGeometry(18, h, 18),
-      new THREE.MeshStandardMaterial({ color: 0x10182a, metalness: 0.8, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.15 })
+      new THREE.MeshStandardMaterial({ color: 0x223852, metalness: 0.8, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.255 })
     );
     body.position.set(x, h / 2, 0);
     g.add(body);
@@ -375,7 +378,7 @@ function makeFoundry(d) {
   // Skybridge between the two towers
   const bridge = new THREE.Mesh(
     new THREE.BoxGeometry(44, 4, 8),
-    new THREE.MeshStandardMaterial({ color: 0x141e30, metalness: 0.7, roughness: 0.3, emissive: 0x5cf2ff, emissiveIntensity: 0.4 })
+    new THREE.MeshStandardMaterial({ color: 0x2a4060, metalness: 0.7, roughness: 0.3, emissive: 0x5cf2ff, emissiveIntensity: 0.680 })
   );
   bridge.position.set(0, d.tall * 0.6, 0);
   g.add(bridge);
@@ -392,7 +395,7 @@ function makeFoundry(d) {
     const pz = Math.sin(ang) * 22;
     const pod = new THREE.Mesh(
       new THREE.BoxGeometry(8, 6, 8),
-      new THREE.MeshStandardMaterial({ color: 0x12182a, metalness: 0.7, roughness: 0.4, emissive: new THREE.Color(d.color), emissiveIntensity: 0.25 })
+      new THREE.MeshStandardMaterial({ color: 0x243a55, metalness: 0.7, roughness: 0.4, emissive: new THREE.Color(d.color), emissiveIntensity: 0.425 })
     );
     pod.position.set(px, 3, pz);
     g.add(pod);
@@ -419,7 +422,7 @@ function makeAntenna(d) {
   // Tapered tower base
   const cone = new THREE.Mesh(
     new THREE.CylinderGeometry(1.2, 14, d.tall, 10),
-    new THREE.MeshStandardMaterial({ color: 0x10182a, metalness: 0.8, roughness: 0.25, emissive: new THREE.Color(d.color), emissiveIntensity: 0.22 })
+    new THREE.MeshStandardMaterial({ color: 0x223852, metalness: 0.8, roughness: 0.25, emissive: new THREE.Color(d.color), emissiveIntensity: 0.374 })
   );
   cone.position.y = d.tall / 2;
   g.add(cone);
@@ -447,7 +450,7 @@ function makeAntenna(d) {
     const ang = (i / 3) * Math.PI * 2;
     const fin = new THREE.Mesh(
       new THREE.BoxGeometry(20, 0.6, 1.2),
-      new THREE.MeshStandardMaterial({ color: 0x18223a, metalness: 0.9, roughness: 0.2, emissive: new THREE.Color(d.color), emissiveIntensity: 0.4 })
+      new THREE.MeshStandardMaterial({ color: 0x304a6a, metalness: 0.9, roughness: 0.2, emissive: new THREE.Color(d.color), emissiveIntensity: 0.680 })
     );
     fin.position.set(Math.cos(ang) * 10, d.tall - 4, Math.sin(ang) * 10);
     fin.rotation.y = ang;
@@ -456,7 +459,7 @@ function makeAntenna(d) {
   // Dish at the very top
   const dish = new THREE.Mesh(
     new THREE.SphereGeometry(7, 18, 18, 0, Math.PI * 2, 0, Math.PI / 2),
-    new THREE.MeshStandardMaterial({ color: 0x12182a, metalness: 0.7, roughness: 0.3, side: THREE.DoubleSide, emissive: 0x5cf2ff, emissiveIntensity: 0.3 })
+    new THREE.MeshStandardMaterial({ color: 0x243a55, metalness: 0.7, roughness: 0.3, side: THREE.DoubleSide, emissive: 0x5cf2ff, emissiveIntensity: 0.510 })
   );
   dish.rotation.x = Math.PI;
   dish.position.y = d.tall + 4;
@@ -477,14 +480,14 @@ function makeOps(d) {
   // Wide stepped base
   const base = new THREE.Mesh(
     new THREE.CylinderGeometry(22, 26, 8, 12),
-    new THREE.MeshStandardMaterial({ color: 0x10182a, metalness: 0.7, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.12 })
+    new THREE.MeshStandardMaterial({ color: 0x223852, metalness: 0.7, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.204 })
   );
   base.position.y = 4;
   g.add(base);
   // Tall observation column
   const col = new THREE.Mesh(
     new THREE.CylinderGeometry(8, 10, d.tall * 0.7, 12),
-    new THREE.MeshStandardMaterial({ color: 0x141e30, metalness: 0.85, roughness: 0.25, emissive: 0x5cf2ff, emissiveIntensity: 0.18 })
+    new THREE.MeshStandardMaterial({ color: 0x2a4060, metalness: 0.85, roughness: 0.25, emissive: 0x5cf2ff, emissiveIntensity: 0.306 })
   );
   col.position.y = 8 + d.tall * 0.35;
   g.add(col);
@@ -501,7 +504,7 @@ function makeOps(d) {
   // Ring deck — observation platform
   const deck = new THREE.Mesh(
     new THREE.CylinderGeometry(20, 20, 3, 24),
-    new THREE.MeshStandardMaterial({ color: 0x18223a, metalness: 0.8, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.25 })
+    new THREE.MeshStandardMaterial({ color: 0x304a6a, metalness: 0.8, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.425 })
   );
   deck.position.y = d.tall * 0.78;
   g.add(deck);
@@ -515,7 +518,7 @@ function makeOps(d) {
   // Radar module on top
   const cap = new THREE.Mesh(
     new THREE.CylinderGeometry(7, 8, 4, 12),
-    new THREE.MeshStandardMaterial({ color: 0x18223a, metalness: 0.8, roughness: 0.3 })
+    new THREE.MeshStandardMaterial({ color: 0x304a6a, metalness: 0.8, roughness: 0.3 })
   );
   cap.position.y = d.tall * 0.78 + 5;
   g.add(cap);
@@ -541,7 +544,7 @@ function makeReactor(d) {
   // Squat cylindrical reactor body
   const body = new THREE.Mesh(
     new THREE.CylinderGeometry(20, 24, d.tall * 0.6, 16),
-    new THREE.MeshStandardMaterial({ color: 0x141e30, metalness: 0.85, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.18 })
+    new THREE.MeshStandardMaterial({ color: 0x2a4060, metalness: 0.85, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.306 })
   );
   body.position.y = d.tall * 0.3;
   g.add(body);
@@ -556,7 +559,7 @@ function makeReactor(d) {
   for (let i = 0; i < 4; i++) {
     const ring = new THREE.Mesh(
       new THREE.TorusGeometry(22, 1.2, 10, 36),
-      new THREE.MeshStandardMaterial({ color: 0x18223a, metalness: 0.9, roughness: 0.2, emissive: new THREE.Color(d.color), emissiveIntensity: 0.3 })
+      new THREE.MeshStandardMaterial({ color: 0x304a6a, metalness: 0.9, roughness: 0.2, emissive: new THREE.Color(d.color), emissiveIntensity: 0.510 })
     );
     ring.rotation.x = Math.PI / 2;
     ring.position.y = 6 + i * (d.tall * 0.55 / 4);
@@ -565,7 +568,7 @@ function makeReactor(d) {
   // Top cone heat sink
   const heatSink = new THREE.Mesh(
     new THREE.ConeGeometry(14, d.tall * 0.4, 12),
-    new THREE.MeshStandardMaterial({ color: 0x10182a, metalness: 0.85, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.2 })
+    new THREE.MeshStandardMaterial({ color: 0x223852, metalness: 0.85, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.340 })
   );
   heatSink.position.y = d.tall * 0.6 + d.tall * 0.2;
   g.add(heatSink);
@@ -596,7 +599,7 @@ function makeStudio(d) {
   // Wide rectangular studio body
   const body = new THREE.Mesh(
     new THREE.BoxGeometry(50, d.tall, 30),
-    new THREE.MeshStandardMaterial({ color: 0x10182a, metalness: 0.8, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.15 })
+    new THREE.MeshStandardMaterial({ color: 0x223852, metalness: 0.8, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.255 })
   );
   body.position.y = d.tall / 2;
   g.add(body);
@@ -629,7 +632,7 @@ function makeStudio(d) {
   for (let i = -1; i <= 1; i++) {
     const pod = new THREE.Mesh(
       new THREE.BoxGeometry(4, 4, 4),
-      new THREE.MeshStandardMaterial({ color: 0x18223a, metalness: 0.9, roughness: 0.25, emissive: new THREE.Color(d.color), emissiveIntensity: 0.4 })
+      new THREE.MeshStandardMaterial({ color: 0x304a6a, metalness: 0.9, roughness: 0.25, emissive: new THREE.Color(d.color), emissiveIntensity: 0.680 })
     );
     pod.position.set(i * 18, d.tall + 2, -10);
     g.add(pod);
@@ -649,14 +652,14 @@ function makeHub(d) {
   // Wide drum base
   const drum = new THREE.Mesh(
     new THREE.CylinderGeometry(26, 28, d.tall * 0.5, 24),
-    new THREE.MeshStandardMaterial({ color: 0x10182a, metalness: 0.8, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.18 })
+    new THREE.MeshStandardMaterial({ color: 0x223852, metalness: 0.8, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.306 })
   );
   drum.position.y = d.tall * 0.25;
   g.add(drum);
   // Glass dome on top
   const dome = new THREE.Mesh(
     new THREE.SphereGeometry(22, 32, 24, 0, Math.PI * 2, 0, Math.PI / 2),
-    new THREE.MeshStandardMaterial({ color: 0x141e30, metalness: 0.7, roughness: 0.2, emissive: new THREE.Color(d.color), emissiveIntensity: 0.25, transparent: true, opacity: 0.85 })
+    new THREE.MeshStandardMaterial({ color: 0x2a4060, metalness: 0.7, roughness: 0.2, emissive: new THREE.Color(d.color), emissiveIntensity: 0.425, transparent: true, opacity: 0.85 })
   );
   dome.position.y = d.tall * 0.5;
   g.add(dome);
@@ -673,7 +676,7 @@ function makeHub(d) {
     const ang = (i / 8) * Math.PI * 2;
     const port = new THREE.Mesh(
       new THREE.BoxGeometry(8, 4, 4),
-      new THREE.MeshStandardMaterial({ color: 0x18223a, metalness: 0.9, roughness: 0.25, emissive: new THREE.Color(d.color), emissiveIntensity: 0.4 })
+      new THREE.MeshStandardMaterial({ color: 0x304a6a, metalness: 0.9, roughness: 0.25, emissive: new THREE.Color(d.color), emissiveIntensity: 0.680 })
     );
     port.position.set(Math.cos(ang) * 28, d.tall * 0.25, Math.sin(ang) * 28);
     port.rotation.y = ang;
@@ -709,7 +712,7 @@ function makePad(d) {
   // Wide circular landing platform
   const plat = new THREE.Mesh(
     new THREE.CylinderGeometry(28, 30, 4, 32),
-    new THREE.MeshStandardMaterial({ color: 0x10182a, metalness: 0.8, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.25 })
+    new THREE.MeshStandardMaterial({ color: 0x223852, metalness: 0.8, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.425 })
   );
   plat.position.y = 2;
   g.add(plat);
@@ -734,7 +737,7 @@ function makePad(d) {
   // Central beacon tower
   const tower = new THREE.Mesh(
     new THREE.CylinderGeometry(4, 6, d.tall, 10),
-    new THREE.MeshStandardMaterial({ color: 0x141e30, metalness: 0.85, roughness: 0.25, emissive: new THREE.Color(d.color), emissiveIntensity: 0.3 })
+    new THREE.MeshStandardMaterial({ color: 0x2a4060, metalness: 0.85, roughness: 0.25, emissive: new THREE.Color(d.color), emissiveIntensity: 0.510 })
   );
   tower.position.y = 4 + d.tall / 2;
   g.add(tower);
@@ -764,7 +767,7 @@ function makePad(d) {
     const ang = (i / 4) * Math.PI * 2 + Math.PI / 4;
     const bol = new THREE.Mesh(
       new THREE.CylinderGeometry(1.2, 1.4, 4, 8),
-      new THREE.MeshStandardMaterial({ color: 0x18223a, metalness: 0.9, roughness: 0.25, emissive: 0x5cf2ff, emissiveIntensity: 0.35 })
+      new THREE.MeshStandardMaterial({ color: 0x304a6a, metalness: 0.9, roughness: 0.25, emissive: 0x5cf2ff, emissiveIntensity: 0.595 })
     );
     bol.position.set(Math.cos(ang) * 26, 6, Math.sin(ang) * 26);
     g.add(bol);
@@ -962,8 +965,8 @@ scene.add(new THREE.Points(stars, new THREE.PointsMaterial({ color: 0x88aaff, si
 function poseAt(id, opts) {
   if (id === "hero") {
     return {
-      pos: new THREE.Vector3(0, 320, 580),
-      look: new THREE.Vector3(0, 60, -200),
+      pos: new THREE.Vector3(0, 200, 460),
+      look: new THREE.Vector3(0, 70, -260),
     };
   }
   const d = DISTRICTS.find(x => x.id === id);
