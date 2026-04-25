@@ -307,12 +307,17 @@ function makeLabelSprite(text, color) {
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
   // World-space scale — larger so labels are at least ~14px equivalent on desktop
   s.scale.set(96, 21, 1);
+  // Stash the rendered text length so the per-frame edge check can estimate
+  // the visible chip width (background panel is full sprite, but the visible
+  // text occupies less — we want to detect when the *panel* would clip).
+  s.userData.textLen = text.length;
   return s;
 }
 
-// Track label sprites so each frame can fade any that would clip the viewport edge.
-// Hard-clipping a label mid-letter at the viewport edge looks broken; fading
-// near the edge looks intentional and keeps the electric road art direction.
+// Track label sprites so each frame can hide any whose projected bounding box
+// would clip the viewport edge. Hard-clipping a label mid-letter at the canvas
+// edge looks broken; opacity fade alone still showed partial letters as the
+// chip reached the rim. Hide entirely when within a safe margin of any edge.
 const labelSprites = [];
 
 DISTRICTS.forEach(d => {
@@ -427,47 +432,56 @@ if (hudToggle && hudNav) {
   hudNav.querySelectorAll("a").forEach(a => a.addEventListener("click", closeNav));
 }
 
-// ---------- LABEL EDGE FADE ----------
-// Project each label sprite to screen space. If its on-screen bounding box
-// would clip the viewport edge, smoothly fade the sprite out before the cut
-// is visible. Prevents mid-letter hard crops at the right (or left) edge.
+// ---------- LABEL EDGE SAFETY ----------
+// A label must NEVER render partially clipped by the canvas viewport. Opacity
+// fade alone leaves a visible partial chip at the rim. Each frame we project
+// the sprite to screen space, estimate its on-screen width from text length
+// (the visible text panel is what readers see, not the sprite background),
+// and hide the sprite entirely if any edge of that box would fall within a
+// safe margin of the viewport edge. Otherwise show fully.
+//
+// The remaining road, energy nodes, pulses, and 3D buildings are unaffected.
 const tmpProj = new THREE.Vector3();
 const tmpView = new THREE.Vector3();
-const EDGE_MARGIN_PX = 24;   // start fading this many pixels inside the edge
-const EDGE_FADE_PX   = 80;   // distance over which fade goes 1 -> 0
-function updateLabelEdgeFade() {
-  const halfW = window.innerWidth * 0.5;
-  const halfH = window.innerHeight * 0.5;
+const EDGE_SAFE_MARGIN_PX = 48;   // hide if any sprite edge is within this many px of viewport edge
+function updateLabelEdgeSafety() {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const halfW = vw * 0.5;
+  const halfH = vh * 0.5;
   for (const s of labelSprites) {
     // View-space Z < 0 is in front of camera in three.js convention.
     tmpView.copy(s.position).applyMatrix4(camera.matrixWorldInverse);
-    if (tmpView.z >= 0) { s.material.opacity = 0; continue; }
+    if (tmpView.z >= 0) { s.visible = false; continue; }
     tmpProj.copy(s.position).project(camera);
-    if (tmpProj.z < -1 || tmpProj.z > 1) { s.material.opacity = 0; continue; }
+    if (tmpProj.z < -1 || tmpProj.z > 1) { s.visible = false; continue; }
     const screenX = tmpProj.x * halfW + halfW;
     const screenY = -tmpProj.y * halfH + halfH;
-    // Approximate sprite half-width in pixels: scale.x is in world units,
-    // and the sprite's apparent screen size scales with the perspective
-    // projection. ndcSpan = scale * projectionMatrix[0] / w (approx). We
-    // approximate via two NDC samples near the sprite anchor.
+    // Convert sprite world-unit scale to pixel size at the sprite's distance.
     const camDist = camera.position.distanceTo(s.position);
-    // Vertical FOV in radians -> screen px per world unit at this distance
-    const pxPerWorld = window.innerHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * Math.max(camDist, 1));
-    const halfWidthPx = (s.scale.x * 0.5) * pxPerWorld;
-    const halfHeightPx = (s.scale.y * 0.5) * pxPerWorld;
-    // Distance from each viewport edge to the nearest sprite edge
-    const leftRoom   = (screenX - halfWidthPx)  - EDGE_MARGIN_PX;
-    const rightRoom  = (window.innerWidth - EDGE_MARGIN_PX) - (screenX + halfWidthPx);
-    const topRoom    = (screenY - halfHeightPx) - EDGE_MARGIN_PX;
-    const bottomRoom = (window.innerHeight - EDGE_MARGIN_PX) - (screenY + halfHeightPx);
-    const minRoom = Math.min(leftRoom, rightRoom, topRoom, bottomRoom);
-    // minRoom >= 0  : fully inside the safe zone -> opacity 1
-    // minRoom <= -EDGE_FADE_PX : would visibly clip -> opacity 0
-    let opacity;
-    if (minRoom >= 0) opacity = 1;
-    else if (minRoom <= -EDGE_FADE_PX) opacity = 0;
-    else opacity = 1 + (minRoom / EDGE_FADE_PX); // linear ramp through fade band
-    s.material.opacity = opacity;
+    const pxPerWorld = vh / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * Math.max(camDist, 1));
+    // Estimate the on-screen width of the visible chip. The sprite background
+    // panel spans the full s.scale.x, but the readable text width is shorter;
+    // we conservatively use the larger of (panel width) and (text-length * px)
+    // so we hide before any letter clips. ~11px per character at 14px font is
+    // generous and matches the sprite's rendered text.
+    const panelHalfWidthPx = (s.scale.x * 0.5) * pxPerWorld;
+    const textHalfWidthPx = (s.userData.textLen || 12) * 11 * 0.5;
+    const halfWidthPx  = Math.max(panelHalfWidthPx, textHalfWidthPx);
+    const halfHeightPx = Math.max((s.scale.y * 0.5) * pxPerWorld, 16);
+    // Hide if any edge of the projected box is within the safe margin of any
+    // viewport edge. This is hard hide — no partial render at any rim.
+    const leftEdge   = screenX - halfWidthPx;
+    const rightEdge  = screenX + halfWidthPx;
+    const topEdge    = screenY - halfHeightPx;
+    const bottomEdge = screenY + halfHeightPx;
+    const clipsEdge =
+      leftEdge   < EDGE_SAFE_MARGIN_PX ||
+      rightEdge  > vw - EDGE_SAFE_MARGIN_PX ||
+      topEdge    < EDGE_SAFE_MARGIN_PX ||
+      bottomEdge > vh - EDGE_SAFE_MARGIN_PX;
+    s.visible = !clipsEdge;
+    s.material.opacity = clipsEdge ? 0 : 1;
   }
 }
 
@@ -498,7 +512,7 @@ function tick() {
   }
 
   updatePackets(dt);
-  updateLabelEdgeFade();
+  updateLabelEdgeSafety();
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
 }
