@@ -11,350 +11,788 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: !lowPower, powerPr
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, lowPower ? 1.5 : 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = lowPower ? 1.08 : 1.05;
+renderer.toneMappingExposure = lowPower ? 1.1 : 1.05;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x04060a);
-scene.fog = new THREE.FogExp2(0x04060a, lowPower ? 0.0010 : 0.0016);
+scene.background = new THREE.Color(0x03050a);
+scene.fog = new THREE.FogExp2(0x03060c, lowPower ? 0.00085 : 0.00115);
 
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.5, 6000);
-camera.position.set(0, 400, 600);
-camera.lookAt(0, 0, 0);
+const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.5, 8000);
+camera.position.set(0, 380, 720);
+camera.lookAt(0, 40, -200);
 
-scene.add(new THREE.AmbientLight(0x334466, lowPower ? 0.55 : 0.5));
-const key = new THREE.DirectionalLight(0xffd0c0, lowPower ? 0.9 : 0.7); key.position.set(300, 400, 200); scene.add(key);
-const rim = new THREE.DirectionalLight(0xff3344, lowPower ? 0.6 : 0.5); rim.position.set(-300, 200, -400); scene.add(rim);
-const cyanLight = new THREE.DirectionalLight(0x4ff3ff, lowPower ? 0.6 : 0.35); cyanLight.position.set(0, 200, 400); scene.add(cyanLight);
+scene.add(new THREE.AmbientLight(0x2a3a5a, lowPower ? 0.55 : 0.5));
+const key = new THREE.DirectionalLight(0xffd0c0, lowPower ? 0.85 : 0.7); key.position.set(300, 500, 300); scene.add(key);
+const rim = new THREE.DirectionalLight(0xff3344, lowPower ? 0.55 : 0.45); rim.position.set(-400, 240, -600); scene.add(rim);
+const cyanLight = new THREE.DirectionalLight(0x4ff3ff, lowPower ? 0.55 : 0.4); cyanLight.position.set(0, 240, -400); scene.add(cyanLight);
 
-// ---------- CIRCUIT BOARD FLOOR ----------
-const BOARD = 1800;
+// ---------- CIRCUIT-BOARD GROUND ----------
+// The ground is a long PCB stretching from the hero (Z=+300) down to past
+// the contact pad (Z<-1800). It reads as a printed circuit board with an
+// etched copper-and-cyan trace highway running down its spine.
+const BOARD_W = 1800;
+const BOARD_L = 2600;
+const BOARD_OFFSET_Z = -700;  // shift board so it covers the full highway
+
 const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(BOARD, BOARD),
-  new THREE.MeshStandardMaterial({ color: 0x040810, roughness: 0.85, metalness: 0.3 })
+  new THREE.PlaneGeometry(BOARD_W, BOARD_L),
+  new THREE.MeshStandardMaterial({ color: 0x040a14, roughness: 0.85, metalness: 0.35 })
 );
 floor.rotation.x = -Math.PI / 2;
+floor.position.z = BOARD_OFFSET_Z;
 scene.add(floor);
-const gridFine = new THREE.GridHelper(BOARD, 180, 0x0e1a2c, 0x070d18);
-gridFine.material.transparent = true; gridFine.material.opacity = 0.35; scene.add(gridFine);
-const gridCoarse = new THREE.GridHelper(BOARD, 22, 0xff2a2a, 0x4a0c0c);
-gridCoarse.material.transparent = true; gridCoarse.material.opacity = 0.42; gridCoarse.position.y = 0.02; scene.add(gridCoarse);
 
-// ---------- ELECTRIFIED ROAD ----------
-// Replace simple traces with a multi-layer "road":
-//   - dark asphalt strip (the road surface)
-//   - twin neon edge lines (cyan/red), the electrified rails
-//   - a glowing center spine (pulses of current)
-//   - dashed lane markers
-//   - energy nodes at corners and endpoints
-const ROAD_HALF_WIDTH = 7;          // road width = 14 world units
-const ROAD_Y = 0.12;                // slightly above floor to avoid z-fighting
-const RAIL_OFFSET = ROAD_HALF_WIDTH; // rails sit at the edges
-const ROAD_EDGE_COLOR = 0x5cf2ff;   // electric cyan rails — the "electrified" structure
-const energyNodes = [];             // pulsing markers at corners/endpoints
+// Etched PCB grid — fine lines that read as the underlying board substrate.
+const gridFine = new THREE.GridHelper(Math.max(BOARD_W, BOARD_L), 240, 0x12243a, 0x081222);
+gridFine.material.transparent = true; gridFine.material.opacity = 0.42;
+gridFine.position.z = BOARD_OFFSET_Z;
+scene.add(gridFine);
+// Coarser brand-red copper grid overlay
+const gridCoarse = new THREE.GridHelper(Math.max(BOARD_W, BOARD_L), 26, 0xff2a2a, 0x4a0c0c);
+gridCoarse.material.transparent = true; gridCoarse.material.opacity = 0.32;
+gridCoarse.position.set(0, 0.02, BOARD_OFFSET_Z); scene.add(gridCoarse);
 
-function addRoadSegment(ax, az, bx, bz, color) {
-  // axis-aligned segment from (ax,az) to (bx,bz) — exactly one of x/z changes
-  const horizontal = Math.abs(bx - ax) > Math.abs(bz - az);
-  const length = horizontal ? Math.abs(bx - ax) : Math.abs(bz - az);
-  const cx = (ax + bx) / 2;
-  const cz = (az + bz) / 2;
+// ---------- THE CIRCUIT HIGHWAY ----------
+// A straight axial trace on Z that the camera will travel down. Broad dark
+// core flanked by cyan + red copper rails, dashed white center spine, and
+// glowing solder pads at each district checkpoint.
+const HIGHWAY_X = 0;
+const HIGHWAY_Z_START =  300;   // behind the hero camera
+const HIGHWAY_Z_END   = -1800;  // past the contact pad
+const HIGHWAY_LENGTH = HIGHWAY_Z_START - HIGHWAY_Z_END;
+const HIGHWAY_HALF_WIDTH = 26;
+const ROAD_Y = 0.15;
 
-  // 1. Asphalt strip
-  const widthX = horizontal ? length : ROAD_HALF_WIDTH * 2;
-  const widthZ = horizontal ? ROAD_HALF_WIDTH * 2 : length;
-  const asphalt = new THREE.Mesh(
-    new THREE.PlaneGeometry(widthX, widthZ),
-    new THREE.MeshStandardMaterial({ color: 0x0a121e, roughness: 0.65, metalness: 0.35 })
+// Road core — wide dark trace (the "trace metal" of the PCB).
+const roadCore = new THREE.Mesh(
+  new THREE.PlaneGeometry(HIGHWAY_HALF_WIDTH * 2, HIGHWAY_LENGTH),
+  new THREE.MeshStandardMaterial({ color: 0x0c1828, roughness: 0.55, metalness: 0.55 })
+);
+roadCore.rotation.x = -Math.PI / 2;
+roadCore.position.set(HIGHWAY_X, ROAD_Y, (HIGHWAY_Z_START + HIGHWAY_Z_END) / 2);
+scene.add(roadCore);
+
+// Inner copper-tone band — the warm tint that reads as PCB copper trace.
+const copperBand = new THREE.Mesh(
+  new THREE.PlaneGeometry(HIGHWAY_HALF_WIDTH * 1.4, HIGHWAY_LENGTH),
+  new THREE.MeshBasicMaterial({ color: 0x6a1a14, transparent: true, opacity: 0.32 })
+);
+copperBand.rotation.x = -Math.PI / 2;
+copperBand.position.set(HIGHWAY_X, ROAD_Y + 0.05, (HIGHWAY_Z_START + HIGHWAY_Z_END) / 2);
+scene.add(copperBand);
+
+// Twin rails — cyan (left) and red copper (right) glowing edges.
+function addRail(xOffset, color, opacity) {
+  const rail = new THREE.Mesh(
+    new THREE.BoxGeometry(1.4, 1.0, HIGHWAY_LENGTH),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity })
   );
-  asphalt.rotation.x = -Math.PI / 2;
-  asphalt.position.set(cx, ROAD_Y, cz);
-  scene.add(asphalt);
+  rail.position.set(HIGHWAY_X + xOffset, ROAD_Y + 0.5, (HIGHWAY_Z_START + HIGHWAY_Z_END) / 2);
+  scene.add(rail);
+}
+addRail(-HIGHWAY_HALF_WIDTH, 0x5cf2ff, 0.95);
+addRail( HIGHWAY_HALF_WIDTH, 0xff3a3a, 0.85);
+// Secondary inner trace lines
+addRail(-HIGHWAY_HALF_WIDTH * 0.55, 0x2a8aa0, 0.55);
+addRail( HIGHWAY_HALF_WIDTH * 0.55, 0x8a1a1a, 0.55);
 
-  // 2. Twin electrified rails — cyan core, brand-red secondary (cross district color)
-  const railColors = [ROAD_EDGE_COLOR, color];
-  for (let r = 0; r < 2; r++) {
-    const rcol = railColors[r];
-    // Use thin emissive boxes for the rails so they catch the eye
-    const rw = horizontal ? length : 0.8;
-    const rd = horizontal ? 0.8 : length;
-    for (const sign of [-1, 1]) {
-      const rail = new THREE.Mesh(
-        new THREE.BoxGeometry(rw, 0.6, rd),
-        new THREE.MeshBasicMaterial({ color: rcol, transparent: true, opacity: r === 0 ? 0.9 : 0.6 })
-      );
-      const ox = horizontal ? 0 : sign * (RAIL_OFFSET - r * 1.2);
-      const oz = horizontal ? sign * (RAIL_OFFSET - r * 1.2) : 0;
-      rail.position.set(cx + ox, ROAD_Y + 0.3 + r * 0.05, cz + oz);
-      scene.add(rail);
-    }
-  }
+// Center current spine — glowing white live wire.
+const spine = new THREE.Mesh(
+  new THREE.BoxGeometry(0.7, 0.4, HIGHWAY_LENGTH),
+  new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 })
+);
+spine.position.set(HIGHWAY_X, ROAD_Y + 0.3, (HIGHWAY_Z_START + HIGHWAY_Z_END) / 2);
+scene.add(spine);
 
-  // 3. Center spine — solid emissive line (white/red mix) — the live wire
-  const spine = new THREE.Mesh(
-    new THREE.BoxGeometry(horizontal ? length : 0.5, 0.4, horizontal ? 0.5 : length),
-    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 })
+// Dashed lane markers down the spine — short emissive copper-red dashes.
+const DASH_SPACING = 22;
+const dashCount = Math.floor(HIGHWAY_LENGTH / DASH_SPACING);
+for (let i = 0; i < dashCount; i++) {
+  const z = HIGHWAY_Z_START - (i + 0.5) * DASH_SPACING;
+  const dash = new THREE.Mesh(
+    new THREE.BoxGeometry(1.6, 0.3, 7),
+    new THREE.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.85 })
   );
-  spine.position.set(cx, ROAD_Y + 0.2, cz);
-  scene.add(spine);
-
-  // 4. Dashed lane markers — short emissive dashes alternating along the spine
-  const dashCount = Math.floor(length / 14);
-  for (let i = 0; i < dashCount; i++) {
-    const t = (i + 0.5) / dashCount;
-    const dx = ax + (bx - ax) * t;
-    const dz = az + (bz - az) * t;
-    const dash = new THREE.Mesh(
-      new THREE.BoxGeometry(horizontal ? 5 : 0.7, 0.3, horizontal ? 0.7 : 5),
-      new THREE.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.85 })
-    );
-    dash.position.set(dx, ROAD_Y + 0.35, dz);
-    scene.add(dash);
-  }
+  dash.position.set(HIGHWAY_X, ROAD_Y + 0.4, z);
+  scene.add(dash);
 }
 
-function addEnergyNode(x, z, color, size = 6, opts = {}) {
-  // A glowing pad with a pulsing ring — placed at corners and endpoints
+// ---------- PCB MICRO-TRACES + SOLDER PADS ----------
+// Perpendicular micro-traces branching off the highway, with small circular
+// solder pads at their ends. Sells the "circuit board" reading from above.
+function addMicroTrace(z, side, length, color = 0x5cf2ff) {
+  const trace = new THREE.Mesh(
+    new THREE.BoxGeometry(length, 0.25, 0.6),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.5 })
+  );
+  const sx = HIGHWAY_X + side * (HIGHWAY_HALF_WIDTH + length / 2);
+  trace.position.set(sx, ROAD_Y + 0.18, z);
+  scene.add(trace);
+  // Solder pad at the tip
   const pad = new THREE.Mesh(
-    new THREE.CircleGeometry(size, 32),
-    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85 })
+    new THREE.CircleGeometry(2.2, 18),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7 })
   );
   pad.rotation.x = -Math.PI / 2;
-  pad.position.set(x, ROAD_Y + 0.4, z);
+  pad.position.set(HIGHWAY_X + side * (HIGHWAY_HALF_WIDTH + length), ROAD_Y + 0.22, z);
   scene.add(pad);
+  // Tiny via dot at the junction
+  const via = new THREE.Mesh(
+    new THREE.CircleGeometry(0.9, 14),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 })
+  );
+  via.rotation.x = -Math.PI / 2;
+  via.position.set(HIGHWAY_X + side * HIGHWAY_HALF_WIDTH, ROAD_Y + 0.2, z);
+  scene.add(via);
+}
+const MICRO_TRACE_COUNT = lowPower ? 36 : 84;
+for (let i = 0; i < MICRO_TRACE_COUNT; i++) {
+  const z = HIGHWAY_Z_START - (i + 0.5) * (HIGHWAY_LENGTH / MICRO_TRACE_COUNT);
+  const side = i % 2 === 0 ? -1 : 1;
+  const len = 18 + Math.random() * 36;
+  const col = i % 5 === 0 ? 0xff5a3a : 0x5cf2ff;
+  addMicroTrace(z, side, len, col);
+}
 
+// Scattered chip-like base plates and tiny resistor blocks on the board.
+const CHIP_COUNT = lowPower ? 14 : 36;
+for (let i = 0; i < CHIP_COUNT; i++) {
+  const sideSign = Math.random() < 0.5 ? -1 : 1;
+  const x = sideSign * (HIGHWAY_HALF_WIDTH + 70 + Math.random() * 380);
+  const z = HIGHWAY_Z_START - Math.random() * HIGHWAY_LENGTH;
+  const w = 8 + Math.random() * 18;
+  const d = 6 + Math.random() * 14;
+  const chip = new THREE.Mesh(
+    new THREE.BoxGeometry(w, 1.2, d),
+    new THREE.MeshStandardMaterial({ color: 0x0e1a2a, roughness: 0.4, metalness: 0.6, emissive: 0x081826, emissiveIntensity: 0.4 })
+  );
+  chip.position.set(x, ROAD_Y + 0.6, z);
+  scene.add(chip);
+  // Tiny LED dot on the chip
+  const led = new THREE.Mesh(
+    new THREE.CircleGeometry(0.6, 12),
+    new THREE.MeshBasicMaterial({ color: Math.random() < 0.5 ? 0x5cf2ff : 0xff3a3a })
+  );
+  led.rotation.x = -Math.PI / 2;
+  led.position.set(x, ROAD_Y + 1.3, z);
+  scene.add(led);
+}
+
+// ---------- BRANCH TRACES + CHECKPOINT PADS ----------
+// Each district sits to one side of the highway. A branch trace runs from
+// the highway shoulder to the building's circular solder pad (the chip pad).
+const energyNodes = [];        // pulsing markers for animation
+const checkpointPads = [];     // for camera waypoints
+
+function addBranchTrace(z, targetX, color) {
+  const side = targetX < 0 ? -1 : 1;
+  const startX = HIGHWAY_X + side * HIGHWAY_HALF_WIDTH;
+  const endX = targetX - side * 60;  // end at edge of building pad
+  const length = Math.abs(endX - startX);
+  const cx = (startX + endX) / 2;
+  // Wide branch road
+  const branch = new THREE.Mesh(
+    new THREE.PlaneGeometry(length, 12),
+    new THREE.MeshStandardMaterial({ color: 0x0a1424, roughness: 0.5, metalness: 0.55 })
+  );
+  branch.rotation.x = -Math.PI / 2;
+  branch.position.set(cx, ROAD_Y + 0.04, z);
+  scene.add(branch);
+  // Twin glowing edge traces
+  for (const sign of [-1, 1]) {
+    const edge = new THREE.Mesh(
+      new THREE.BoxGeometry(length, 0.6, 0.7),
+      new THREE.MeshBasicMaterial({ color: sign < 0 ? 0x5cf2ff : color, transparent: true, opacity: 0.85 })
+    );
+    edge.position.set(cx, ROAD_Y + 0.4, z + sign * 6);
+    scene.add(edge);
+  }
+  // Center white spine on branch
+  const bspine = new THREE.Mesh(
+    new THREE.BoxGeometry(length, 0.3, 0.4),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 })
+  );
+  bspine.position.set(cx, ROAD_Y + 0.3, z);
+  scene.add(bspine);
+  return { startX, endX, side };
+}
+
+function addCircuitPad(x, z, color, radius) {
+  // Circular solder/chip pad the building stands on.
+  const pad = new THREE.Mesh(
+    new THREE.CylinderGeometry(radius, radius + 1.6, 1.6, 48),
+    new THREE.MeshStandardMaterial({ color: 0x0a1424, metalness: 0.7, roughness: 0.35, emissive: new THREE.Color(color), emissiveIntensity: 0.25 })
+  );
+  pad.position.set(x, ROAD_Y + 0.8, z);
+  scene.add(pad);
+  // Outer glowing ring (the solder ring)
   const ring = new THREE.Mesh(
-    new THREE.RingGeometry(size + 1, size + 1.6, 48),
-    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.6, side: THREE.DoubleSide })
+    new THREE.RingGeometry(radius + 0.4, radius + 1.6, 64),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85, side: THREE.DoubleSide })
   );
   ring.rotation.x = -Math.PI / 2;
-  ring.position.set(x, ROAD_Y + 0.5, z);
+  ring.position.set(x, ROAD_Y + 1.7, z);
   scene.add(ring);
-
-  // Vertical energy column — taller, brighter, more "electric uplink" presence.
-  // Hero-prominent nodes get a much taller, wider, brighter beam so the electric
-  // road reads instantly above the fold. Mobile keeps a shorter column to
-  // protect performance and avoid overpowering text.
-  const heroBoost = !!opts.heroBoost;
-  const shaftHeight = heroBoost
-    ? (lowPower ? 180 : 320)
-    : (lowPower ? 90 : 140);
-  const shaftRadius = heroBoost ? 1.6 : 0.9;
-  const shaftOpacity = heroBoost ? 0.46 : 0.32;
-  const shaft = new THREE.Mesh(
-    new THREE.CylinderGeometry(shaftRadius, shaftRadius, shaftHeight, 12, 1, true),
-    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: shaftOpacity, side: THREE.DoubleSide })
+  // Inner copper-red ring for circuit-board feel
+  const inner = new THREE.Mesh(
+    new THREE.RingGeometry(radius - 6, radius - 5.2, 64),
+    new THREE.MeshBasicMaterial({ color: 0xff5a3a, transparent: true, opacity: 0.6, side: THREE.DoubleSide })
   );
-  shaft.position.set(x, shaftHeight / 2, z);
-  scene.add(shaft);
-
-  // Inner white-hot core inside the column for an electrified look
-  const coreH = shaftHeight * 0.9;
-  const coreR = heroBoost ? 0.55 : 0.25;
-  const core = new THREE.Mesh(
-    new THREE.CylinderGeometry(coreR, coreR, coreH, 8, 1, true),
-    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: heroBoost ? 0.78 : 0.55, side: THREE.DoubleSide })
-  );
-  core.position.set(x, coreH / 2, z);
-  scene.add(core);
-
-  // Outer halo cylinder for hero-boosted nodes — soft glow that reads as a
-  // light shaft from a distance without taxing fillrate too hard.
-  let halo = null;
-  if (heroBoost && !lowPower) {
-    halo = new THREE.Mesh(
-      new THREE.CylinderGeometry(4.2, 4.2, shaftHeight, 14, 1, true),
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.10, side: THREE.DoubleSide, depthWrite: false })
+  inner.rotation.x = -Math.PI / 2;
+  inner.position.set(x, ROAD_Y + 1.72, z);
+  scene.add(inner);
+  // Four small via dots around the perimeter — chip-mount feel
+  for (let a = 0; a < 4; a++) {
+    const ang = (a / 4) * Math.PI * 2 + Math.PI / 4;
+    const vx = x + Math.cos(ang) * (radius + 0.8);
+    const vz = z + Math.sin(ang) * (radius + 0.8);
+    const via = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.9, 0.9, 1.2, 12),
+      new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 1, roughness: 0.25, emissive: 0xffffff, emissiveIntensity: 0.2 })
     );
-    halo.position.set(x, shaftHeight / 2, z);
-    scene.add(halo);
+    via.position.set(vx, ROAD_Y + 1.4, vz);
+    scene.add(via);
   }
-
-  energyNodes.push({ ring, shaft, core, halo, baseR: size + 1, baseR2: size + 1.6, phase: Math.random() * Math.PI * 2, heroBoost });
+  energyNodes.push({ ring, basePhase: Math.random() * Math.PI * 2, baseR: radius + 0.4, baseR2: radius + 1.6 });
+  return { pad, ring };
 }
 
-// Build the road network: spire (0,0) -> each district, L-shaped, with corner nodes.
-// `content` and `integration` flank the spire on opposite x sides at modest z,
-// so their endpoint energy columns read above the fold from the hero camera —
-// boost them so a distinct vertical light shaft is visible in the first viewport.
-const HERO_BOOST_IDS = new Set(["content", "integration"]);
-const roadPaths = []; // for packet routing: each entry is array of points
-DISTRICTS.filter(d => d.id !== "spire").forEach(d => {
-  const ax = 0, az = 0;
-  const bx = d.pos[0], bz = d.pos[2];
-  const cornerX = bx, cornerZ = az; // L-shape: go x first, then z
-  // Avoid zero-length segments when district is on an axis
-  if (Math.abs(bx - ax) > 1) addRoadSegment(ax, az, cornerX, cornerZ, d.color);
-  if (Math.abs(bz - az) > 1) addRoadSegment(cornerX, cornerZ, bx, bz, d.color);
-  // Energy nodes at corner and endpoint
-  addEnergyNode(cornerX, cornerZ, d.color, 5);
-  const heroBoost = HERO_BOOST_IDS.has(d.id);
-  addEnergyNode(bx, bz, d.color, heroBoost ? 11 : 9, { heroBoost });
+// ---------- BUILDING BUILDERS ----------
+// Graphite/black bodies with emissive cyan/red/white details. Each has
+// recognizable architectural silhouette so it reads as a building, not a blob.
 
-  roadPaths.push({
-    color: d.color,
-    points: [
-      new THREE.Vector3(ax, ROAD_Y + 0.6, az),
-      new THREE.Vector3(cornerX, ROAD_Y + 0.6, cornerZ),
-      new THREE.Vector3(bx, ROAD_Y + 0.6, bz)
-    ]
-  });
-});
-// Central hub node at origin (the spire) — hero-boosted so the brand-red
-// energy column rises tall and bright behind/around the hero card.
-addEnergyNode(0, 0, 0xff2a2a, 14, { heroBoost: true });
-
-// ---------- DATA PULSES (electric current flowing along the roads) ----------
-// Three packet classes for visible hierarchy: micro pulses (electricity feel),
-// route packets (white-hot), and command packets (large, district-tinted).
-const microGeo = new THREE.SphereGeometry(0.9, 8, 8);
-const routeGeo = new THREE.SphereGeometry(1.6, 12, 12);
-const commandGeo = new THREE.SphereGeometry(2.6, 14, 14);
-const packetMatWhite = new THREE.MeshBasicMaterial({ color: 0xffffff });
-const packetMatElectric = new THREE.MeshBasicMaterial({ color: 0x9ff8ff });
-const packets = [];
-const PACKET_COUNT = lowPower ? 110 : 280;
-for (let i = 0; i < PACKET_COUNT; i++) {
-  const route = roadPaths[i % roadPaths.length];
-  let geo, mat;
-  const cls = i % 7;
-  if (cls === 0) {
-    // Command packet — district-tinted, larger, slower
-    geo = commandGeo;
-    mat = new THREE.MeshBasicMaterial({ color: route.color });
-  } else if (cls === 1 || cls === 2) {
-    // Route packet — white-hot
-    geo = routeGeo;
-    mat = packetMatWhite;
-  } else {
-    // Micro pulse — electric cyan, fast, small
-    geo = microGeo;
-    mat = packetMatElectric;
-  }
-  const p = new THREE.Mesh(geo, mat);
-  const isCmd = cls === 0;
-  p.userData = {
-    route,
-    t: Math.random(),
-    speed: isCmd ? 0.05 + Math.random() * 0.06 : 0.09 + Math.random() * 0.18,
-    isCmd,
-    isMicro: cls >= 3
-  };
-  scene.add(p);
-  packets.push(p);
-}
-function updatePackets(dt) {
-  for (const p of packets) {
-    p.userData.t += dt * p.userData.speed;
-    if (p.userData.t > 1) p.userData.t = 0;
-    const t = p.userData.t;
-    const pts = p.userData.route.points;
-    // Two segments per route: 0..0.5 = pts[0]->pts[1], 0.5..1 = pts[1]->pts[2]
-    let from, to, lt;
-    if (t < 0.5) { from = pts[0]; to = pts[1]; lt = t / 0.5; }
-    else         { from = pts[1]; to = pts[2]; lt = (t - 0.5) / 0.5; }
-    // Command packets fly slightly higher than micro pulses, giving altitude
-    // separation and an antigravity-style sense of layered traffic.
-    const lift = p.userData.isCmd ? 1.6 : (p.userData.isMicro ? 0.4 : 0.7);
-    p.position.set(
-      THREE.MathUtils.lerp(from.x, to.x, lt),
-      ROAD_Y + lift,
-      THREE.MathUtils.lerp(from.z, to.z, lt)
-    );
-  }
-}
-
-// ---------- BUILDINGS ----------
-function makeTower(d) {
-  const g = new THREE.Group(); const count = d.kind === "plaza" ? 6 : d.kind === "chip" ? 4 : 3; const col = new THREE.Color(d.color);
+function addWindowsBand(parent, w, h, d, color, count = 3) {
+  // Thin emissive rectangles wrapping the body — tower window strips.
   for (let i = 0; i < count; i++) {
-    const w = 10 + Math.random() * 10, h = d.tall * (0.5 + Math.random() * 0.8);
-    const box = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), new THREE.MeshStandardMaterial({ color: 0x0a1424, roughness: 0.5, metalness: 0.6, emissive: col, emissiveIntensity: 0.12 }));
-    box.position.set((Math.random() - 0.5) * 60, h / 2, (Math.random() - 0.5) * 60); g.add(box);
-    const cap = new THREE.Mesh(new THREE.BoxGeometry(w * 0.6, 1.2, w * 0.6), new THREE.MeshBasicMaterial({ color: d.color }));
-    cap.position.set(box.position.x, h + 0.6, box.position.z); g.add(cap);
-    const stripes = new THREE.Mesh(new THREE.BoxGeometry(w + 0.05, h * 0.9, 0.2), new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.35 }));
-    stripes.position.set(box.position.x, h / 2, box.position.z + w / 2 + 0.1); g.add(stripes);
+    const y = (i + 0.5) * (h / count);
+    const strip = new THREE.Mesh(
+      new THREE.BoxGeometry(w + 0.05, 0.7, d + 0.05),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85 })
+    );
+    strip.position.y = y - h / 2;
+    parent.add(strip);
+  }
+}
+function vertLightStripes(parent, w, h, d, color) {
+  // Vertical glow strips on building corners — "windows lit at night" feel.
+  const positions = [
+    [ w / 2 + 0.05, 0,  d / 2 + 0.05],
+    [-w / 2 - 0.05, 0,  d / 2 + 0.05],
+    [ w / 2 + 0.05, 0, -d / 2 - 0.05],
+    [-w / 2 - 0.05, 0, -d / 2 - 0.05],
+  ];
+  for (const p of positions) {
+    const s = new THREE.Mesh(
+      new THREE.BoxGeometry(0.4, h * 0.92, 0.4),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85 })
+    );
+    s.position.set(p[0], 0, p[2]);
+    parent.add(s);
+  }
+}
+
+// 01 / Spire — tall command spire with crown, vertical light strips, antenna mast.
+function makeSpire(d) {
+  const g = new THREE.Group();
+  const tall = d.tall;
+  const segments = 6;
+  const segH = tall / segments;
+  const baseW = 50;
+  // Wide foundation block
+  const found = new THREE.Mesh(
+    new THREE.BoxGeometry(baseW + 24, 6, baseW + 24),
+    new THREE.MeshStandardMaterial({ color: 0x0c1424, metalness: 0.7, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.18 })
+  );
+  found.position.y = 3; g.add(found);
+  // Stepped tower body — narrows as it rises
+  for (let i = 0; i < segments; i++) {
+    const w = baseW - i * 6;
+    const sec = new THREE.Mesh(
+      new THREE.BoxGeometry(w, segH, w),
+      new THREE.MeshStandardMaterial({ color: 0x10182a, metalness: 0.8, roughness: 0.25, emissive: new THREE.Color(d.color), emissiveIntensity: 0.12 })
+    );
+    sec.position.y = 6 + i * segH + segH / 2;
+    g.add(sec);
+    // Edge seam glow
+    const seam = new THREE.Mesh(
+      new THREE.BoxGeometry(w + 0.1, 0.5, w + 0.1),
+      new THREE.MeshBasicMaterial({ color: d.color })
+    );
+    seam.position.y = 6 + i * segH + segH;
+    g.add(seam);
+    // Vertical lit strips on each segment
+    vertLightStripes(sec, w, segH, w, 0x5cf2ff);
+    sec.children[sec.children.length - 1]; // (no-op, just clarity)
+  }
+  // Crown — wider glowing ring at top of body
+  const crown = new THREE.Mesh(
+    new THREE.TorusGeometry(20, 1.6, 10, 48),
+    new THREE.MeshBasicMaterial({ color: d.color })
+  );
+  crown.rotation.x = Math.PI / 2;
+  crown.position.y = 6 + tall + 4;
+  g.add(crown);
+  // Antenna mast
+  const mast = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.8, 1.4, 38, 8),
+    new THREE.MeshStandardMaterial({ color: 0x1a2436, metalness: 0.9, roughness: 0.2 })
+  );
+  mast.position.y = 6 + tall + 19;
+  g.add(mast);
+  // Mast tip beacon
+  const tip = new THREE.Mesh(
+    new THREE.SphereGeometry(2.2, 16, 16),
+    new THREE.MeshBasicMaterial({ color: 0xff3a3a })
+  );
+  tip.position.y = 6 + tall + 40;
+  g.add(tip);
+  return g;
+}
+
+// 02 / Foundry — connected fabrication towers with skybridge + pods + energy core.
+function makeFoundry(d) {
+  const g = new THREE.Group();
+  // Twin towers
+  const tower = (x, h) => {
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(18, h, 18),
+      new THREE.MeshStandardMaterial({ color: 0x10182a, metalness: 0.8, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.15 })
+    );
+    body.position.set(x, h / 2, 0);
+    g.add(body);
+    addWindowsBand(body, 18, h, 18, 0x5cf2ff, 4);
+    // Antenna nub
+    const nub = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.6, 0.9, 6, 6),
+      new THREE.MeshStandardMaterial({ color: 0x1a2436, metalness: 0.9, roughness: 0.2 })
+    );
+    nub.position.set(x, h + 3, 0);
+    g.add(nub);
+    return body;
+  };
+  const tA = tower(-22, d.tall);
+  const tB = tower( 22, d.tall * 0.78);
+  // Skybridge between the two towers
+  const bridge = new THREE.Mesh(
+    new THREE.BoxGeometry(44, 4, 8),
+    new THREE.MeshStandardMaterial({ color: 0x141e30, metalness: 0.7, roughness: 0.3, emissive: 0x5cf2ff, emissiveIntensity: 0.4 })
+  );
+  bridge.position.set(0, d.tall * 0.6, 0);
+  g.add(bridge);
+  const bridgeGlow = new THREE.Mesh(
+    new THREE.BoxGeometry(44, 0.5, 8.2),
+    new THREE.MeshBasicMaterial({ color: 0x5cf2ff })
+  );
+  bridgeGlow.position.set(0, d.tall * 0.6 + 2.2, 0);
+  g.add(bridgeGlow);
+  // Modular pods clustered at the base
+  for (let i = 0; i < 4; i++) {
+    const ang = (i / 4) * Math.PI * 2;
+    const px = Math.cos(ang) * 30;
+    const pz = Math.sin(ang) * 22;
+    const pod = new THREE.Mesh(
+      new THREE.BoxGeometry(8, 6, 8),
+      new THREE.MeshStandardMaterial({ color: 0x12182a, metalness: 0.7, roughness: 0.4, emissive: new THREE.Color(d.color), emissiveIntensity: 0.25 })
+    );
+    pod.position.set(px, 3, pz);
+    g.add(pod);
+    const cap = new THREE.Mesh(
+      new THREE.BoxGeometry(8.2, 0.5, 8.2),
+      new THREE.MeshBasicMaterial({ color: d.color })
+    );
+    cap.position.set(px, 6.4, pz);
+    g.add(cap);
+  }
+  // Energy core — glowing sphere between towers at base
+  const core = new THREE.Mesh(
+    new THREE.SphereGeometry(5, 24, 24),
+    new THREE.MeshBasicMaterial({ color: 0x5cf2ff, transparent: true, opacity: 0.95 })
+  );
+  core.position.set(0, 6, 0);
+  g.add(core);
+  return g;
+}
+
+// 03 / Voice Grid — antenna/transmitter array with signal rings, fins, dish.
+function makeAntenna(d) {
+  const g = new THREE.Group();
+  // Tapered tower base
+  const cone = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.2, 14, d.tall, 10),
+    new THREE.MeshStandardMaterial({ color: 0x10182a, metalness: 0.8, roughness: 0.25, emissive: new THREE.Color(d.color), emissiveIntensity: 0.22 })
+  );
+  cone.position.y = d.tall / 2;
+  g.add(cone);
+  // Vertical light strip up the tower
+  const strip = new THREE.Mesh(
+    new THREE.BoxGeometry(0.6, d.tall * 0.85, 0.6),
+    new THREE.MeshBasicMaterial({ color: 0x5cf2ff, transparent: true, opacity: 0.9 })
+  );
+  strip.position.y = d.tall / 2;
+  strip.position.z = 6;
+  g.add(strip);
+  // Signal rings up the tower
+  for (let i = 0; i < 4; i++) {
+    const r = 12 - i * 2;
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(r, 0.32, 8, 48),
+      new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.7 - i * 0.1 })
+    );
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 12 + i * 16;
+    g.add(ring);
+  }
+  // Three radial fins/antennas at top
+  for (let i = 0; i < 3; i++) {
+    const ang = (i / 3) * Math.PI * 2;
+    const fin = new THREE.Mesh(
+      new THREE.BoxGeometry(20, 0.6, 1.2),
+      new THREE.MeshStandardMaterial({ color: 0x18223a, metalness: 0.9, roughness: 0.2, emissive: new THREE.Color(d.color), emissiveIntensity: 0.4 })
+    );
+    fin.position.set(Math.cos(ang) * 10, d.tall - 4, Math.sin(ang) * 10);
+    fin.rotation.y = ang;
+    g.add(fin);
+  }
+  // Dish at the very top
+  const dish = new THREE.Mesh(
+    new THREE.SphereGeometry(7, 18, 18, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: 0x12182a, metalness: 0.7, roughness: 0.3, side: THREE.DoubleSide, emissive: 0x5cf2ff, emissiveIntensity: 0.3 })
+  );
+  dish.rotation.x = Math.PI;
+  dish.position.y = d.tall + 4;
+  g.add(dish);
+  // Beacon
+  const beacon = new THREE.Mesh(
+    new THREE.SphereGeometry(1.6, 14, 14),
+    new THREE.MeshBasicMaterial({ color: 0xff3a3a })
+  );
+  beacon.position.y = d.tall + 12;
+  g.add(beacon);
+  return g;
+}
+
+// 04 / Ops Tower — command/observation tower with ring deck + radar module.
+function makeOps(d) {
+  const g = new THREE.Group();
+  // Wide stepped base
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(22, 26, 8, 12),
+    new THREE.MeshStandardMaterial({ color: 0x10182a, metalness: 0.7, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.12 })
+  );
+  base.position.y = 4;
+  g.add(base);
+  // Tall observation column
+  const col = new THREE.Mesh(
+    new THREE.CylinderGeometry(8, 10, d.tall * 0.7, 12),
+    new THREE.MeshStandardMaterial({ color: 0x141e30, metalness: 0.85, roughness: 0.25, emissive: 0x5cf2ff, emissiveIntensity: 0.18 })
+  );
+  col.position.y = 8 + d.tall * 0.35;
+  g.add(col);
+  // Lit window strips
+  for (let i = 0; i < 5; i++) {
+    const s = new THREE.Mesh(
+      new THREE.TorusGeometry(8.2, 0.25, 6, 36),
+      new THREE.MeshBasicMaterial({ color: 0x5cf2ff, transparent: true, opacity: 0.9 })
+    );
+    s.rotation.x = Math.PI / 2;
+    s.position.y = 14 + i * 12;
+    g.add(s);
+  }
+  // Ring deck — observation platform
+  const deck = new THREE.Mesh(
+    new THREE.CylinderGeometry(20, 20, 3, 24),
+    new THREE.MeshStandardMaterial({ color: 0x18223a, metalness: 0.8, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.25 })
+  );
+  deck.position.y = d.tall * 0.78;
+  g.add(deck);
+  const deckGlow = new THREE.Mesh(
+    new THREE.TorusGeometry(20, 0.5, 8, 48),
+    new THREE.MeshBasicMaterial({ color: d.color })
+  );
+  deckGlow.rotation.x = Math.PI / 2;
+  deckGlow.position.y = d.tall * 0.78 + 1.7;
+  g.add(deckGlow);
+  // Radar module on top
+  const cap = new THREE.Mesh(
+    new THREE.CylinderGeometry(7, 8, 4, 12),
+    new THREE.MeshStandardMaterial({ color: 0x18223a, metalness: 0.8, roughness: 0.3 })
+  );
+  cap.position.y = d.tall * 0.78 + 5;
+  g.add(cap);
+  const radar = new THREE.Mesh(
+    new THREE.BoxGeometry(16, 0.6, 1.4),
+    new THREE.MeshBasicMaterial({ color: 0x5cf2ff })
+  );
+  radar.position.y = d.tall * 0.78 + 8;
+  g.add(radar);
+  // Tip beacon
+  const tip = new THREE.Mesh(
+    new THREE.SphereGeometry(1.4, 14, 14),
+    new THREE.MeshBasicMaterial({ color: 0xff3a3a })
+  );
+  tip.position.y = d.tall * 0.78 + 11;
+  g.add(tip);
+  return g;
+}
+
+// 05 / Revenue Engine — reactor/generator with turbine rings and conduits.
+function makeReactor(d) {
+  const g = new THREE.Group();
+  // Squat cylindrical reactor body
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(20, 24, d.tall * 0.6, 16),
+    new THREE.MeshStandardMaterial({ color: 0x141e30, metalness: 0.85, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.18 })
+  );
+  body.position.y = d.tall * 0.3;
+  g.add(body);
+  // Glowing core slot
+  const slot = new THREE.Mesh(
+    new THREE.CylinderGeometry(10, 10, d.tall * 0.4, 16),
+    new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.85 })
+  );
+  slot.position.y = d.tall * 0.32;
+  g.add(slot);
+  // Stacked turbine rings
+  for (let i = 0; i < 4; i++) {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(22, 1.2, 10, 36),
+      new THREE.MeshStandardMaterial({ color: 0x18223a, metalness: 0.9, roughness: 0.2, emissive: new THREE.Color(d.color), emissiveIntensity: 0.3 })
+    );
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 6 + i * (d.tall * 0.55 / 4);
+    g.add(ring);
+  }
+  // Top cone heat sink
+  const heatSink = new THREE.Mesh(
+    new THREE.ConeGeometry(14, d.tall * 0.4, 12),
+    new THREE.MeshStandardMaterial({ color: 0x10182a, metalness: 0.85, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.2 })
+  );
+  heatSink.position.y = d.tall * 0.6 + d.tall * 0.2;
+  g.add(heatSink);
+  // Lateral conduits radiating from the base
+  for (let i = 0; i < 6; i++) {
+    const ang = (i / 6) * Math.PI * 2;
+    const conduit = new THREE.Mesh(
+      new THREE.BoxGeometry(16, 1.4, 1.4),
+      new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.7 })
+    );
+    conduit.position.set(Math.cos(ang) * 18, 4, Math.sin(ang) * 18);
+    conduit.rotation.y = ang;
+    g.add(conduit);
+  }
+  // Top beacon
+  const beacon = new THREE.Mesh(
+    new THREE.SphereGeometry(1.6, 14, 14),
+    new THREE.MeshBasicMaterial({ color: 0xffffff })
+  );
+  beacon.position.y = d.tall * 0.6 + d.tall * 0.4 + 2;
+  g.add(beacon);
+  return g;
+}
+
+// 06 / Content Forge — studio with holographic facade and light strips.
+function makeStudio(d) {
+  const g = new THREE.Group();
+  // Wide rectangular studio body
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(50, d.tall, 30),
+    new THREE.MeshStandardMaterial({ color: 0x10182a, metalness: 0.8, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.15 })
+  );
+  body.position.y = d.tall / 2;
+  g.add(body);
+  // Holographic facade billboard on the front face
+  const billboard = new THREE.Mesh(
+    new THREE.BoxGeometry(44, d.tall * 0.7, 0.6),
+    new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.85 })
+  );
+  billboard.position.set(0, d.tall / 2, 15.4);
+  g.add(billboard);
+  // Holo grid overlay — thin cyan lines on the billboard
+  for (let i = 0; i < 5; i++) {
+    const line = new THREE.Mesh(
+      new THREE.BoxGeometry(44.2, 0.3, 0.2),
+      new THREE.MeshBasicMaterial({ color: 0x5cf2ff, transparent: true, opacity: 0.85 })
+    );
+    line.position.set(0, d.tall * 0.18 + i * (d.tall * 0.6 / 4), 15.7);
+    g.add(line);
+  }
+  // Side light strips
+  for (const s of [-1, 1]) {
+    const strip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, d.tall * 0.85, 30.1),
+      new THREE.MeshBasicMaterial({ color: 0x5cf2ff, transparent: true, opacity: 0.85 })
+    );
+    strip.position.set(s * 25.1, d.tall / 2, 0);
+    g.add(strip);
+  }
+  // Roof rigging — small antenna pods
+  for (let i = -1; i <= 1; i++) {
+    const pod = new THREE.Mesh(
+      new THREE.BoxGeometry(4, 4, 4),
+      new THREE.MeshStandardMaterial({ color: 0x18223a, metalness: 0.9, roughness: 0.25, emissive: new THREE.Color(d.color), emissiveIntensity: 0.4 })
+    );
+    pod.position.set(i * 18, d.tall + 2, -10);
+    g.add(pod);
+    const ant = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.3, 0.3, 8, 6),
+      new THREE.MeshStandardMaterial({ color: 0x1a2436, metalness: 0.9, roughness: 0.2 })
+    );
+    ant.position.set(i * 18, d.tall + 8, -10);
+    g.add(ant);
   }
   return g;
 }
-function makeAntenna(d) {
+
+// 07 / Integration Hub — central connector with dome, ring, ports, conduits.
+function makeHub(d) {
   const g = new THREE.Group();
-  const cone = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 14, d.tall, 6), new THREE.MeshStandardMaterial({ color: 0x0a1424, emissive: new THREE.Color(d.color), emissiveIntensity: 0.25, metalness: 0.6, roughness: 0.4 }));
-  cone.position.y = d.tall / 2; g.add(cone);
-  for (let i = 0; i < 4; i++) {
-    const r = new THREE.Mesh(new THREE.TorusGeometry(10 + i * 4, 0.25, 8, 48), new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.55 - i * 0.1 }));
-    r.rotation.x = Math.PI / 2; r.position.y = 6 + i * 6; g.add(r);
-  } return g;
-}
-function makePlaza(d) {
-  const g = makeTower(d);
-  const wall = new THREE.Mesh(new THREE.CylinderGeometry(36, 36, 14, 48, 1, true, -Math.PI / 2, Math.PI), new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.18, side: THREE.DoubleSide }));
-  wall.position.set(0, 7, -14); g.add(wall); return g;
-}
-function makeVault(d) {
-  const g = new THREE.Group();
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(22, 24, 14, 8), new THREE.MeshStandardMaterial({ color: 0x141a0b, emissive: new THREE.Color(d.color), emissiveIntensity: 0.25, metalness: 0.7, roughness: 0.4 }));
-  base.position.y = 7; g.add(base);
-  const orb = new THREE.Mesh(new THREE.SphereGeometry(10, 32, 32), new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.35 }));
-  orb.position.y = 22; g.add(orb); return g;
-}
-function makeChip(d) {
-  const g = new THREE.Group();
-  const chip = new THREE.Mesh(new THREE.BoxGeometry(46, 6, 46), new THREE.MeshStandardMaterial({ color: 0x0b1018, metalness: 0.7, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.15 }));
-  chip.position.y = 3; g.add(chip);
-  for (let i = -5; i <= 5; i++) for (const side of [-1, 1]) {
-    const pin = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.4, 3), new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 1, roughness: 0.3 }));
-    pin.position.set(i * 3.6, 3, side * 24); g.add(pin);
-    const pin2 = new THREE.Mesh(new THREE.BoxGeometry(3, 1.4, 1.4), new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 1, roughness: 0.3 }));
-    pin2.position.set(side * 24, 3, i * 3.6); g.add(pin2);
+  // Wide drum base
+  const drum = new THREE.Mesh(
+    new THREE.CylinderGeometry(26, 28, d.tall * 0.5, 24),
+    new THREE.MeshStandardMaterial({ color: 0x10182a, metalness: 0.8, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.18 })
+  );
+  drum.position.y = d.tall * 0.25;
+  g.add(drum);
+  // Glass dome on top
+  const dome = new THREE.Mesh(
+    new THREE.SphereGeometry(22, 32, 24, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: 0x141e30, metalness: 0.7, roughness: 0.2, emissive: new THREE.Color(d.color), emissiveIntensity: 0.25, transparent: true, opacity: 0.85 })
+  );
+  dome.position.y = d.tall * 0.5;
+  g.add(dome);
+  // Equatorial ring
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(28, 1.2, 10, 64),
+    new THREE.MeshBasicMaterial({ color: d.color })
+  );
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = d.tall * 0.5;
+  g.add(ring);
+  // Eight radial ports/conduits around the drum
+  for (let i = 0; i < 8; i++) {
+    const ang = (i / 8) * Math.PI * 2;
+    const port = new THREE.Mesh(
+      new THREE.BoxGeometry(8, 4, 4),
+      new THREE.MeshStandardMaterial({ color: 0x18223a, metalness: 0.9, roughness: 0.25, emissive: new THREE.Color(d.color), emissiveIntensity: 0.4 })
+    );
+    port.position.set(Math.cos(ang) * 28, d.tall * 0.25, Math.sin(ang) * 28);
+    port.rotation.y = ang;
+    g.add(port);
+    // Conduit running outward along the ground
+    const conduit = new THREE.Mesh(
+      new THREE.BoxGeometry(20, 0.6, 1.2),
+      new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? 0x5cf2ff : d.color, transparent: true, opacity: 0.8 })
+    );
+    conduit.position.set(Math.cos(ang) * 38, 1.5, Math.sin(ang) * 38);
+    conduit.rotation.y = ang;
+    g.add(conduit);
   }
-  const logo = new THREE.Mesh(new THREE.BoxGeometry(14, 14, 14), new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.55 }));
-  logo.position.y = 14; g.add(logo); return g;
+  // Top mast
+  const mast = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.6, 1.2, 22, 8),
+    new THREE.MeshStandardMaterial({ color: 0x1a2436, metalness: 0.9, roughness: 0.2 })
+  );
+  mast.position.y = d.tall * 0.5 + 22;
+  g.add(mast);
+  const tip = new THREE.Mesh(
+    new THREE.SphereGeometry(2, 16, 16),
+    new THREE.MeshBasicMaterial({ color: 0x5cf2ff })
+  );
+  tip.position.y = d.tall * 0.5 + 34;
+  g.add(tip);
+  return g;
 }
-function makeBridge(d) {
-  const g = makeTower(d);
-  const arch = new THREE.Mesh(new THREE.TorusGeometry(28, 1.2, 12, 48, Math.PI), new THREE.MeshBasicMaterial({ color: d.color }));
-  arch.rotation.z = Math.PI; arch.position.y = 28; g.add(arch); return g;
-}
+
+// 08 / Contact Pad — landing pad with beacon tower and ring platform.
 function makePad(d) {
   const g = new THREE.Group();
-  const pad = new THREE.Mesh(new THREE.CylinderGeometry(20, 20, 1.4, 32), new THREE.MeshStandardMaterial({ color: 0x0a1424, emissive: new THREE.Color(d.color), emissiveIntensity: 0.3 }));
-  g.add(pad);
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(24, 0.6, 12, 64), new THREE.MeshBasicMaterial({ color: d.color }));
-  ring.rotation.x = Math.PI / 2; ring.position.y = 1.2; g.add(ring);
-  const beam = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 80, 16, 1, true), new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.25, side: THREE.DoubleSide }));
-  beam.position.y = 40; g.add(beam); return g;
-}
-function makeSpire(d) {
-  const g = new THREE.Group();
-  const base = new THREE.Mesh(new THREE.BoxGeometry(80, 4, 80), new THREE.MeshStandardMaterial({ color: 0x0a1424, metalness: 0.6, roughness: 0.4, emissive: new THREE.Color(d.color), emissiveIntensity: 0.1 }));
-  base.position.y = 2; g.add(base);
-  const sections = 7;
-  for (let i = 0; i < sections; i++) {
-    const w = 42 - i * 4, h = 13;
-    const sec = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), new THREE.MeshStandardMaterial({ color: 0x0b1018, metalness: 0.8, roughness: 0.25, emissive: new THREE.Color(d.color), emissiveIntensity: 0.15 }));
-    sec.position.y = 4 + i * h + h / 2; g.add(sec);
-    const seam = new THREE.Mesh(new THREE.BoxGeometry(w + 0.1, 0.5, w + 0.1), new THREE.MeshBasicMaterial({ color: d.color }));
-    seam.position.y = 4 + i * h + h; g.add(seam);
+  // Wide circular landing platform
+  const plat = new THREE.Mesh(
+    new THREE.CylinderGeometry(28, 30, 4, 32),
+    new THREE.MeshStandardMaterial({ color: 0x10182a, metalness: 0.8, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.25 })
+  );
+  plat.position.y = 2;
+  g.add(plat);
+  // Glowing landing ring
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(28, 0.7, 10, 64),
+    new THREE.MeshBasicMaterial({ color: d.color })
+  );
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = 4.4;
+  g.add(ring);
+  // Inner pattern — a cross of light strips on the deck (heliport-style)
+  for (let i = 0; i < 2; i++) {
+    const bar = new THREE.Mesh(
+      new THREE.BoxGeometry(40, 0.3, 2),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 })
+    );
+    bar.position.y = 4.3;
+    bar.rotation.y = (i * Math.PI) / 2;
+    g.add(bar);
   }
-  const tip = new THREE.Mesh(new THREE.ConeGeometry(1.4, 16, 6), new THREE.MeshBasicMaterial({ color: d.color }));
-  tip.position.y = 4 + sections * 13 + 8; g.add(tip); return g;
+  // Central beacon tower
+  const tower = new THREE.Mesh(
+    new THREE.CylinderGeometry(4, 6, d.tall, 10),
+    new THREE.MeshStandardMaterial({ color: 0x141e30, metalness: 0.85, roughness: 0.25, emissive: new THREE.Color(d.color), emissiveIntensity: 0.3 })
+  );
+  tower.position.y = 4 + d.tall / 2;
+  g.add(tower);
+  // Light strip up the tower
+  const strip = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, d.tall * 0.85, 0.5),
+    new THREE.MeshBasicMaterial({ color: 0x5cf2ff, transparent: true, opacity: 0.95 })
+  );
+  strip.position.y = 4 + d.tall / 2;
+  g.add(strip);
+  // Top beacon sphere with halo ring
+  const beacon = new THREE.Mesh(
+    new THREE.SphereGeometry(3, 18, 18),
+    new THREE.MeshBasicMaterial({ color: 0xff3a3a })
+  );
+  beacon.position.y = 4 + d.tall + 3;
+  g.add(beacon);
+  const halo = new THREE.Mesh(
+    new THREE.TorusGeometry(6, 0.4, 8, 36),
+    new THREE.MeshBasicMaterial({ color: 0xff3a3a, transparent: true, opacity: 0.7 })
+  );
+  halo.rotation.x = Math.PI / 2;
+  halo.position.y = 4 + d.tall + 3;
+  g.add(halo);
+  // Four corner mooring bollards on the platform edge
+  for (let i = 0; i < 4; i++) {
+    const ang = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    const bol = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.2, 1.4, 4, 8),
+      new THREE.MeshStandardMaterial({ color: 0x18223a, metalness: 0.9, roughness: 0.25, emissive: 0x5cf2ff, emissiveIntensity: 0.35 })
+    );
+    bol.position.set(Math.cos(ang) * 26, 6, Math.sin(ang) * 26);
+    g.add(bol);
+  }
+  return g;
 }
-const builders = { tower: makeTower, antenna: makeAntenna, plaza: makePlaza, vault: makeVault, chip: makeChip, bridge: makeBridge, pad: makePad };
 
+const builders = {
+  spire: makeSpire,
+  foundry: makeFoundry,
+  antenna: makeAntenna,
+  ops: makeOps,
+  reactor: makeReactor,
+  studio: makeStudio,
+  hub: makeHub,
+  pad: makePad,
+};
+
+// ---------- LABEL SPRITE ----------
 function makeLabelSprite(text, color) {
-  // High-DPI canvas so the chip renders crisply at the larger world scale
   const W = 1024, H = 220;
   const cvs = document.createElement("canvas"); cvs.width = W; cvs.height = H;
   const ctx = cvs.getContext("2d");
-  // Solid panel background for legibility against the 3D scene
   ctx.fillStyle = "rgba(4,8,16,0.92)"; ctx.fillRect(0, 0, W, H);
-  // Brand-color border + inner highlight
   ctx.strokeStyle = "#" + new THREE.Color(color).getHexString();
   ctx.lineWidth = 6; ctx.strokeRect(3, 3, W - 6, H - 6);
   ctx.strokeStyle = "rgba(255,255,255,0.18)"; ctx.lineWidth = 2;
   ctx.strokeRect(10, 10, W - 20, H - 20);
-  // Large, high-contrast text
   ctx.font = "800 96px 'JetBrains Mono', monospace";
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillStyle = "#ffffff";
@@ -362,118 +800,195 @@ function makeLabelSprite(text, color) {
   ctx.fillText(text.toUpperCase(), W / 2, H / 2 + 4);
   const tex = new THREE.CanvasTexture(cvs); tex.anisotropy = 8;
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
-  // World-space scale — larger so labels are at least ~14px equivalent on desktop
   s.scale.set(96, 21, 1);
-  // Stash the rendered text length so the per-frame edge check can estimate
-  // the visible chip width (background panel is full sprite, but the visible
-  // text occupies less — we want to detect when the *panel* would clip).
   s.userData.textLen = text.length;
   return s;
 }
 
-// Track label sprites so each frame can hide any whose projected bounding box
-// would clip the viewport edge. Hard-clipping a label mid-letter at the canvas
-// edge looks broken; opacity fade alone still showed partial letters as the
-// chip reached the rim. Hide entirely when within a safe margin of any edge.
 const labelSprites = [];
-
-// Floating telemetry rings + waypoint halos — the antigravity touch.
-// Each district gets a ring of suspended orbital tori at varying tilts that
-// drift slowly. Reads as "telemetry / orbit / containment field" without
-// blowing the perf budget.
 const telemetryRings = [];
 const waypointMarkers = [];
 
+// ---------- PLACE BUILDINGS, PADS, BRANCH TRACES ----------
 DISTRICTS.forEach(d => {
-  const mesh = d.id === "spire" ? makeSpire(d) : builders[d.kind](d);
-  mesh.position.set(d.pos[0], 0, d.pos[2]); scene.add(mesh);
-  // World-space labels clip at narrow viewport edges; suppress them on phones
-  // and rely on in-page section headings instead.
+  const x = d.pos[0], z = d.pos[2];
+
+  // Branch trace from highway shoulder to building (skip spire, which sits on the highway)
+  if (d.id !== "spire") {
+    addBranchTrace(z, x, d.color);
+  }
+
+  // Solder/chip pad under the building
+  const padRadius = d.id === "spire" ? 60 : 40;
+  addCircuitPad(x, z, d.color, padRadius);
+  checkpointPads.push({ id: d.id, x, z });
+
+  // The building itself
+  const mesh = builders[d.kind](d);
+  mesh.position.set(x, 1.6, z);
+  scene.add(mesh);
+
+  // Floating label sprite (desktop only)
   if (!lowPower) {
     const label = makeLabelSprite(d.name, d.color);
-    // Position label snug above the building so it stays inside the camera frame
-    label.position.set(d.pos[0], d.tall + 26, d.pos[2]);
+    label.position.set(x, d.tall + 28, z);
     scene.add(label);
     labelSprites.push(label);
   }
-  const ring = new THREE.Mesh(new THREE.RingGeometry(18, 19.5, 64), new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.8, side: THREE.DoubleSide }));
-  ring.rotation.x = -Math.PI / 2; ring.position.set(d.pos[0], 0.1, d.pos[2]); scene.add(ring);
 
-  // Suspended telemetry rings — fewer on mobile, more on desktop
+  // Telemetry rings — slow orbital tori above each building
   const ringCount = lowPower ? 2 : 3;
   for (let i = 0; i < ringCount; i++) {
-    const r = 30 + i * 7;
+    const r = padRadius - 10 + i * 7;
     const tilt = (i - 1) * 0.32;
     const tor = new THREE.Mesh(
-      new THREE.TorusGeometry(r, 0.35, 6, 64),
+      new THREE.TorusGeometry(r, 0.35, 6, 56),
       new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.55 - i * 0.08 })
     );
     const liftY = d.tall + 14 + i * 9;
-    tor.position.set(d.pos[0], liftY, d.pos[2]);
+    tor.position.set(x, liftY, z);
     tor.rotation.x = Math.PI / 2 + tilt;
     tor.rotation.z = i * 0.7;
     scene.add(tor);
-    telemetryRings.push({
-      mesh: tor,
-      baseY: liftY,
-      spin: 0.12 + i * 0.05 + (i % 2 ? -0.04 : 0.04),
-      phase: Math.random() * Math.PI * 2
-    });
+    telemetryRings.push({ mesh: tor, baseY: liftY, spin: 0.12 + i * 0.05 + (i % 2 ? -0.04 : 0.04), phase: Math.random() * Math.PI * 2 });
   }
 
-  // Floating waypoint marker — a small suspended diamond above each district
-  // that bobs gently, giving an "antigravity beacon" feel. Skipped for spire
-  // since the spire tip already plays that role.
+  // Waypoint beacon over each non-spire building
   if (d.id !== "spire") {
-    const beaconY = d.tall + 36;
+    const beaconY = d.tall + 38;
     const beacon = new THREE.Mesh(
       new THREE.OctahedronGeometry(2.4, 0),
       new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.95 })
     );
-    beacon.position.set(d.pos[0], beaconY, d.pos[2]);
+    beacon.position.set(x, beaconY, z);
     scene.add(beacon);
-    // Thin tether line from beacon down to district top
     const tether = new THREE.Mesh(
       new THREE.CylinderGeometry(0.08, 0.08, beaconY - d.tall, 4, 1, true),
       new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.35, side: THREE.DoubleSide })
     );
-    tether.position.set(d.pos[0], (beaconY + d.tall) / 2, d.pos[2]);
+    tether.position.set(x, (beaconY + d.tall) / 2, z);
     scene.add(tether);
     waypointMarkers.push({ mesh: beacon, baseY: beaconY, phase: Math.random() * Math.PI * 2 });
   }
 });
 
-// stars
+// ---------- ELECTRIC PACKETS DOWN THE HIGHWAY ----------
+// Pulses that flow north-to-south down the main trace, plus side packets
+// that branch off to each district pad. Reads as live electricity on a PCB.
+const microGeo = new THREE.SphereGeometry(0.9, 8, 8);
+const routeGeo = new THREE.SphereGeometry(1.6, 12, 12);
+const commandGeo = new THREE.SphereGeometry(2.6, 14, 14);
+
+const packets = [];
+
+// Highway packets — travel straight down Z
+const HIGHWAY_PACKETS = lowPower ? 90 : 220;
+for (let i = 0; i < HIGHWAY_PACKETS; i++) {
+  const cls = i % 7;
+  let geo, mat;
+  if (cls === 0) { geo = commandGeo; mat = new THREE.MeshBasicMaterial({ color: 0xff3a3a }); }
+  else if (cls === 1 || cls === 2) { geo = routeGeo; mat = new THREE.MeshBasicMaterial({ color: 0xffffff }); }
+  else { geo = microGeo; mat = new THREE.MeshBasicMaterial({ color: 0x9ff8ff }); }
+  const p = new THREE.Mesh(geo, mat);
+  // Two lanes — left of spine and right of spine, offset slightly
+  const lane = (i % 2 === 0) ? -1 : 1;
+  p.userData = {
+    kind: "highway",
+    lane,
+    speed: cls === 0 ? 60 + Math.random() * 30 : 110 + Math.random() * 80,
+    z: HIGHWAY_Z_START - Math.random() * HIGHWAY_LENGTH,
+    isCmd: cls === 0,
+  };
+  scene.add(p);
+  packets.push(p);
+}
+
+// Branch packets — short loops that travel from highway out to each district pad and back
+const branchRoutes = DISTRICTS.filter(d => d.id !== "spire").map(d => ({
+  z: d.pos[2],
+  startX: 0,
+  endX: d.pos[0] - Math.sign(d.pos[0]) * 50,
+  color: d.color
+}));
+const BRANCH_PACKETS = lowPower ? 24 : 56;
+for (let i = 0; i < BRANCH_PACKETS; i++) {
+  const route = branchRoutes[i % branchRoutes.length];
+  const p = new THREE.Mesh(routeGeo, new THREE.MeshBasicMaterial({ color: route.color }));
+  p.userData = {
+    kind: "branch",
+    route,
+    t: Math.random(),
+    speed: 0.5 + Math.random() * 0.7,
+  };
+  scene.add(p);
+  packets.push(p);
+}
+
+function updatePackets(dt) {
+  for (const p of packets) {
+    if (p.userData.kind === "highway") {
+      p.userData.z -= p.userData.speed * dt;
+      if (p.userData.z < HIGHWAY_Z_END) p.userData.z = HIGHWAY_Z_START;
+      const lift = p.userData.isCmd ? 2.2 : 1.0;
+      p.position.set(p.userData.lane * 1.6, ROAD_Y + lift, p.userData.z);
+    } else {
+      p.userData.t += dt * p.userData.speed;
+      if (p.userData.t > 1) p.userData.t -= 1;
+      const r = p.userData.route;
+      const t = p.userData.t;
+      // Bounce: 0..0.5 outbound, 0.5..1 return
+      const lt = t < 0.5 ? (t / 0.5) : (1 - (t - 0.5) / 0.5);
+      const x = THREE.MathUtils.lerp(r.startX, r.endX, lt);
+      p.position.set(x, ROAD_Y + 1.0, r.z);
+    }
+  }
+}
+
+// ---------- STARS ----------
 const stars = new THREE.BufferGeometry(); const sp = [];
 const STAR_COUNT = lowPower ? 700 : 1800;
-for (let i = 0; i < STAR_COUNT; i++) sp.push((Math.random() - 0.5) * 4500, 50 + Math.random() * 1600, (Math.random() - 0.5) * 4500);
+for (let i = 0; i < STAR_COUNT; i++) sp.push((Math.random() - 0.5) * 5500, 80 + Math.random() * 1800, (Math.random() - 0.5) * 5500);
 stars.setAttribute("position", new THREE.Float32BufferAttribute(sp, 3));
 scene.add(new THREE.Points(stars, new THREE.PointsMaterial({ color: 0x88aaff, size: 1.5, transparent: true, opacity: 0.7 })));
 
-// ---------- CAMERA PATH (scroll-driven flythrough) ----------
-// One keyframe per section (hero + 8 districts). Each frame = { pos, look }.
-function districtById(id) { return DISTRICTS.find(d => d.id === id); }
-// helper: offset from district for a cinematic camera pose
-function poseFor(id, dx, dy, dz, lookY = 20) {
+// ---------- SCROLL CAMERA: TRAVEL DOWN THE CIRCUIT HIGHWAY ----------
+// The viewer rides a maglev camera down the circuit highway from the hero
+// overhead through each checkpoint pad. Z is the dominant axis. Lateral
+// (x) and height (y) are gentle modulations for cinematic interest.
+//
+// Each section maps to a pose: hero is a high overview, then we descend to
+// road-level and ride down the trace, looking slightly forward and at each
+// building as it passes.
+function poseAt(id, opts) {
   if (id === "hero") {
-    return { pos: new THREE.Vector3(0, 380, 720), look: new THREE.Vector3(0, 40, 0) };
+    return {
+      pos: new THREE.Vector3(0, 320, 580),
+      look: new THREE.Vector3(0, 60, -200),
+    };
   }
-  const d = districtById(id);
+  const d = DISTRICTS.find(x => x.id === id);
+  // Camera rides above the highway, slightly behind the building so we see
+  // the building lit from the front, with the road extending past it.
+  const side = d.pos[0] >= 0 ? -1 : 1;  // camera offsets to opposite side
+  const lateral = side * (opts.lateral ?? 70);
+  const height = opts.height ?? 80;
+  const behindZ = opts.behindZ ?? 200;  // camera Z is z + behindZ (further from end)
   return {
-    pos: new THREE.Vector3(d.pos[0] + dx, d.pos[1] + dy, d.pos[2] + dz),
-    look: new THREE.Vector3(d.pos[0], lookY, d.pos[2])
+    pos: new THREE.Vector3(d.pos[0] + lateral, height, d.pos[2] + behindZ),
+    look: new THREE.Vector3(d.pos[0] * 0.4, opts.lookY ?? 40, d.pos[2] - 60),
   };
 }
+
 const KEYS = [
-  poseFor("hero"),                                            // 0 hero — high wide shot
-  poseFor("spire",      90,  70, 160, 42),                    // 1 Spire — orbit left-high
-  poseFor("foundry",   140,  55,  90, 28),                    // 2 Foundry — aerial approach
-  poseFor("voice",    -130,  70,  90, 32),                    // 3 Voice — opposite side low-wide
-  poseFor("ops",        90,  75, 180, 28),                    // 4 Ops — pull back high
-  poseFor("revenue",  -130,  60,  90, 24),                    // 5 Revenue — hero shot
-  poseFor("content",   120,  55,  90, 22),                    // 6 Content — chip side view
-  poseFor("integration",-130, 70,  60, 22),                   // 7 Integration — arch side
-  poseFor("contact",    0,   90, 160, 10)                     // 8 Contact — straight-on pull
+  poseAt("hero"),
+  poseAt("spire",       { lateral: 90,  height: 110, behindZ: 220, lookY: 90 }),
+  poseAt("foundry",     { lateral: 80,  height: 70,  behindZ: 180, lookY: 36 }),
+  poseAt("voice",       { lateral: 90,  height: 90,  behindZ: 180, lookY: 56 }),
+  poseAt("ops",         { lateral: 95,  height: 95,  behindZ: 200, lookY: 64 }),
+  poseAt("revenue",     { lateral: 90,  height: 75,  behindZ: 180, lookY: 40 }),
+  poseAt("content",     { lateral: 95,  height: 70,  behindZ: 180, lookY: 36 }),
+  poseAt("integration", { lateral: 90,  height: 80,  behindZ: 200, lookY: 48 }),
+  poseAt("contact",     { lateral: 0,   height: 100, behindZ: 220, lookY: 22 }),
 ];
 
 const posCurve = new THREE.CatmullRomCurve3(KEYS.map(k => k.pos), false, "catmullrom", 0.25);
@@ -485,7 +1000,7 @@ const progressFill = document.getElementById("progressFill");
 const navLinks = Array.from(document.querySelectorAll(".hud-nav a"));
 const scrollIndicator = document.querySelector(".scroll-indicator");
 
-let scrollProgress = 0;   // 0..1 across entire page
+let scrollProgress = 0;
 let targetProgress = 0;
 function recomputeProgress() {
   const docH = document.documentElement.scrollHeight - window.innerHeight;
@@ -501,7 +1016,6 @@ window.addEventListener("resize", () => {
 });
 recomputeProgress();
 
-// section reveal + active nav
 const io = new IntersectionObserver((entries) => {
   for (const e of entries) {
     if (e.isIntersecting) {
@@ -517,7 +1031,6 @@ sections.forEach(s => io.observe(s));
 const wall = document.getElementById("agentWall");
 if (wall) {
   wall.innerHTML = AGENT_SAMPLE.map(a => `<div class="a"><b>${a[0]}</b><span>${a[1]}</span></div>`).join("");
-  // Mobile: append a "+N more" count summary line outside the scrolling carousel
   const more = document.createElement("div");
   more.className = "agent-wall-more";
   more.innerHTML = `<span class="agent-wall-swipe">Swipe to browse roster</span> Plus <b>${270 - AGENT_SAMPLE.length}+</b> more.`;
@@ -540,34 +1053,20 @@ if (hudToggle && hudNav) {
 }
 
 // ---------- LABEL EDGE + PANEL SAFETY ----------
-// A label must NEVER render partially clipped by the canvas viewport, AND must
-// never visually intersect a foreground content panel (e.g. the hero card or
-// any `.sec-inner`). Two failure modes we're guarding against:
-//   1. Viewport-edge clip: opacity fade alone leaves a partial chip at the rim.
-//   2. Panel overlap: the chip sits behind a content card and the card's edge
-//      slices the chip mid-letter (e.g. "INTEGRATION HU" cut by hero panel).
-// Each frame we project the sprite to screen space, build its on-screen bbox,
-// and hide the sprite entirely if it clips a viewport edge OR overlaps the
-// rect of any visible foreground panel (with a small safety margin).
-//
-// The remaining road, energy nodes, pulses, and 3D buildings are unaffected.
 const tmpProj = new THREE.Vector3();
 const tmpView = new THREE.Vector3();
-const EDGE_SAFE_MARGIN_PX = 48;   // hide if any sprite edge is within this many px of viewport edge
-const PANEL_SAFE_MARGIN_PX = 18;  // hide if sprite bbox comes within this many px of any visible panel
-// Cache the live list of panels — `.sec-inner` covers every section card,
-// including the hero panel that was slicing INTEGRATION HUB.
+const EDGE_SAFE_MARGIN_PX = 48;
+const PANEL_SAFE_MARGIN_PX = 18;
 const panelEls = Array.from(document.querySelectorAll(".sec-inner"));
 function rectsOverlap(a, b) {
   return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
 }
 function updateLabelEdgeSafety() {
+  if (labelSprites.length === 0) return;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const halfW = vw * 0.5;
   const halfH = vh * 0.5;
-  // Collect bounding rects of panels currently on screen. Only on-screen panels
-  // can occlude a label, so off-screen sections are skipped to avoid wasted work.
   const panelRects = [];
   for (const el of panelEls) {
     const r = el.getBoundingClientRect();
@@ -581,21 +1080,14 @@ function updateLabelEdgeSafety() {
     });
   }
   for (const s of labelSprites) {
-    // View-space Z < 0 is in front of camera in three.js convention.
     tmpView.copy(s.position).applyMatrix4(camera.matrixWorldInverse);
     if (tmpView.z >= 0) { s.visible = false; s.material.opacity = 0; continue; }
     tmpProj.copy(s.position).project(camera);
     if (tmpProj.z < -1 || tmpProj.z > 1) { s.visible = false; s.material.opacity = 0; continue; }
     const screenX = tmpProj.x * halfW + halfW;
     const screenY = -tmpProj.y * halfH + halfH;
-    // Convert sprite world-unit scale to pixel size at the sprite's distance.
     const camDist = camera.position.distanceTo(s.position);
     const pxPerWorld = vh / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * Math.max(camDist, 1));
-    // Estimate the on-screen width of the visible chip. The sprite background
-    // panel spans the full s.scale.x, but the readable text width is shorter;
-    // we conservatively use the larger of (panel width) and (text-length * px)
-    // so we hide before any letter clips. ~11px per character at 14px font is
-    // generous and matches the sprite's rendered text.
     const panelHalfWidthPx = (s.scale.x * 0.5) * pxPerWorld;
     const textHalfWidthPx = (s.userData.textLen || 12) * 11 * 0.5;
     const halfWidthPx  = Math.max(panelHalfWidthPx, textHalfWidthPx);
@@ -604,13 +1096,11 @@ function updateLabelEdgeSafety() {
     const rightEdge  = screenX + halfWidthPx;
     const topEdge    = screenY - halfHeightPx;
     const bottomEdge = screenY + halfHeightPx;
-    // Rule 1: hide if any edge is within safe margin of viewport edge.
     const clipsEdge =
       leftEdge   < EDGE_SAFE_MARGIN_PX ||
       rightEdge  > vw - EDGE_SAFE_MARGIN_PX ||
       topEdge    < EDGE_SAFE_MARGIN_PX ||
       bottomEdge > vh - EDGE_SAFE_MARGIN_PX;
-    // Rule 2: hide if the projected bbox overlaps any visible foreground panel.
     let overlapsPanel = false;
     if (!clipsEdge && panelRects.length > 0) {
       const labelRect = { left: leftEdge, right: rightEdge, top: topEdge, bottom: bottomEdge };
@@ -631,42 +1121,29 @@ let elapsed = 0;
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.05);
   elapsed += dt;
-  // smooth scroll progress
   scrollProgress += (targetProgress - scrollProgress) * 0.08;
-  // camera follows full path across 0..1
   posCurve.getPointAt(scrollProgress, tmpPos);
   lookCurve.getPointAt(scrollProgress, tmpLook);
   camera.position.copy(tmpPos);
   camera.lookAt(tmpLook);
 
-  // progress rail
   progressFill.style.height = (scrollProgress * 100).toFixed(1) + "%";
 
-  // Pulsing energy nodes — gentle scale + opacity breathing, plus column flicker.
-  // Hero-boosted columns breathe brighter so the electric uplink reads above the
-  // fold from the hero camera position.
+  // Pulsing pad rings — circuit pads "breathing" with current.
   for (const n of energyNodes) {
-    const pulse = 0.5 + 0.5 * Math.sin(elapsed * 2.4 + n.phase);
-    const s = 1 + pulse * 0.18;
+    const pulse = 0.5 + 0.5 * Math.sin(elapsed * 2.4 + n.basePhase);
+    const s = 1 + pulse * 0.10;
     n.ring.scale.set(s, s, 1);
-    n.ring.material.opacity = 0.35 + pulse * 0.45;
-    if (n.heroBoost) {
-      if (n.shaft) n.shaft.material.opacity = 0.32 + pulse * 0.28;
-      if (n.core)  n.core.material.opacity  = 0.55 + pulse * 0.35;
-      if (n.halo)  n.halo.material.opacity  = 0.07 + pulse * 0.10;
-    } else {
-      if (n.shaft) n.shaft.material.opacity = 0.18 + pulse * 0.22;
-      if (n.core)  n.core.material.opacity  = 0.35 + pulse * 0.35;
-    }
+    n.ring.material.opacity = 0.55 + pulse * 0.4;
   }
 
-  // Telemetry rings — slow rotation + slight bob for antigravity feel
+  // Telemetry rings — slow rotation + slight bob.
   for (const t of telemetryRings) {
     t.mesh.rotation.z += dt * t.spin;
     t.mesh.position.y = t.baseY + Math.sin(elapsed * 0.9 + t.phase) * 1.6;
   }
 
-  // Waypoint beacons — float and softly spin
+  // Waypoint beacons — float and softly spin.
   for (const w of waypointMarkers) {
     w.mesh.position.y = w.baseY + Math.sin(elapsed * 1.4 + w.phase) * 2.2;
     w.mesh.rotation.y += dt * 0.9;
