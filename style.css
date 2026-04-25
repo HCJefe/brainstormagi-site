@@ -316,8 +316,8 @@ body::before{
 
 /* RESPONSIVE — MOBILE (phones, <=640px) */
 @media (max-width:640px){
-  /* Stronger backdrop dim on mobile so cards remain crisp over the road */
-  canvas#scene{opacity:.62}
+  /* Keep the 3D road visible on phones — feels electric, not dimmed out */
+  canvas#scene{opacity:.86}
 
   /* HUD top: brand left, hamburger right; CTA moves into menu */
   .hud-top{
@@ -327,7 +327,16 @@ body::before{
     gap:10px;flex-wrap:nowrap;align-items:center
   }
   .hud-brand{font-size:13px;letter-spacing:.18em}
-  .hud-toggle{display:flex}
+  .hud-toggle{
+    display:flex;
+    background:rgba(4,8,16,.78);
+    border:1px solid rgba(92,242,255,.45);
+    box-shadow:
+      0 0 0 1px rgba(92,242,255,.10) inset,
+      0 0 14px rgba(92,242,255,.35),
+      0 0 28px rgba(255,42,42,.18);
+  }
+  .hud-toggle span{background:var(--electric);box-shadow:0 0 6px rgba(92,242,255,.7)}
 
   .hud-nav{
     display:none;
@@ -365,37 +374,85 @@ body::before{
     min-height:48px;font-size:12px;
   }
 
+  /* Mobile HUD reads like a live data feed */
   .hud-metrics{
     top:calc(62px + var(--safe-top));
     left:max(12px, var(--safe-left));
     right:max(12px, var(--safe-right));
     display:grid;
     grid-template-columns:auto 1fr 1fr;
-    column-gap:10px;row-gap:3px;
-    font-size:10px;letter-spacing:.04em;
-    padding:8px 12px;
+    column-gap:10px;row-gap:4px;
+    font-size:10px;letter-spacing:.06em;
+    padding:9px 13px;
     max-width:none;width:auto;
     align-items:center;
+    background:rgba(4,8,16,.78);
+    border:1px solid rgba(92,242,255,.45);
+    box-shadow:
+      0 0 0 1px rgba(92,242,255,.10) inset,
+      0 0 18px rgba(92,242,255,.30),
+      0 0 36px rgba(255,42,42,.10);
   }
   .hud-metrics .pulse{grid-row:1 / span 2;align-self:center}
   .hud-metrics .sep{display:none}
-  .hud-metrics > span:not(.pulse){white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .hud-metrics > span:not(.pulse){
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;
+    border-bottom:1px solid rgba(92,242,255,.18);
+    padding-bottom:1px;
+  }
+  .hud-metrics b{color:#fff;text-shadow:0 0 8px rgba(92,242,255,.45)}
 
   .scroll-indicator{bottom:calc(16px + var(--safe-bottom));font-size:9px;letter-spacing:.25em}
   .scroll-arrow{height:26px}
 
   .sec{padding:140px 16px 56px;min-height:auto}
   .sec:first-of-type{padding-top:148px}
+  /* Crisp panels with cyan border + red/cyan glow — restore HUD feel on mobile */
   .sec-inner{
     padding:24px 18px;
     max-width:100%;
-    border-radius:0;
-    background:linear-gradient(180deg,rgba(6,10,20,.92),rgba(4,8,16,.86));
+    border-radius:6px;
+    border:1px solid rgba(92,242,255,.22);
+    background:linear-gradient(180deg,rgba(6,10,20,.78),rgba(4,8,16,.70));
+    box-shadow:
+      0 18px 50px rgba(0,0,0,.55),
+      0 0 0 1px rgba(255,42,42,.14) inset,
+      0 0 36px rgba(92,242,255,.10),
+      0 0 28px rgba(255,42,42,.08);
+    overflow:hidden;
   }
-  .hero .sec-inner{padding:28px 18px}
+  /* Subtle scanline data texture inside cards — visible but does not dim text */
+  .sec-inner > *{position:relative;z-index:1}
+  .sec-inner::before{
+    /* keep the existing electric edge rail but make it brighter on mobile */
+    width:2px;
+    box-shadow:0 0 14px rgba(255,42,42,.85),0 0 22px rgba(255,42,42,.45);
+  }
+  .sec-inner > .chip ~ *,
+  .sec-inner h2,
+  .sec-inner p,
+  .sec-inner .metrics,
+  .sec-inner .agent-wall{position:relative;z-index:2}
+
+  .hero .sec-inner{
+    padding:28px 18px;
+    border:1px solid rgba(92,242,255,.30);
+    box-shadow:
+      0 20px 60px rgba(0,0,0,.6),
+      0 0 0 1px rgba(255,42,42,.18) inset,
+      0 0 50px rgba(255,42,42,.14),
+      0 0 40px rgba(92,242,255,.14);
+  }
+  .hero .sec-inner::before{
+    width:auto;height:2px;
+    box-shadow:0 0 16px rgba(255,42,42,.85),0 0 26px rgba(92,242,255,.55);
+  }
 
   .chip{font-size:9px;letter-spacing:.28em;padding:4px 8px;margin-bottom:12px}
-  .sec h2{font-size:32px;line-height:1.05;margin-bottom:10px;letter-spacing:-.015em}
+  .sec h2{
+    font-size:34px;line-height:1.05;margin-bottom:10px;letter-spacing:-.015em;
+    text-shadow:0 0 18px rgba(92,242,255,.18),0 2px 0 rgba(0,0,0,.5);
+  }
   .sec .lede{font-size:16px;line-height:1.4}
   .sec p{font-size:14px;line-height:1.55}
 
@@ -404,35 +461,67 @@ body::before{
     grid-template-columns:repeat(2, 1fr);
     gap:8px;margin-top:16px;
   }
-  .m{padding:10px 12px;min-width:0}
-  .m b{font-size:15px}
-  .m span{font-size:9px;letter-spacing:.08em}
+  /* Electric metric cards — HUD edge plus glow, not generic callout */
+  .m{
+    padding:11px 12px;min-width:0;
+    border:1px solid rgba(92,242,255,.20);
+    background:linear-gradient(180deg,rgba(11,20,36,.78),rgba(8,14,26,.85));
+    box-shadow:
+      0 0 0 1px rgba(255,42,42,.08) inset,
+      0 0 14px rgba(92,242,255,.10);
+  }
+  .m::before{
+    width:2px;
+    box-shadow:0 0 10px rgba(255,42,42,.7),0 0 16px rgba(255,42,42,.35);
+  }
+  .m b{
+    font-size:15px;
+    text-shadow:0 0 10px rgba(92,242,255,.20);
+  }
+  .m span{font-size:9px;letter-spacing:.08em;color:rgba(207,212,222,.92)}
 
   .hero{padding:136px 16px 40px}
-  .hero-mark{font-size:12px;letter-spacing:.2em;margin-bottom:12px}
-  .hero-title{font-size:44px;line-height:1;margin-bottom:14px;letter-spacing:-.018em}
+  .hero-mark{
+    font-size:12px;letter-spacing:.2em;margin-bottom:12px;
+  }
+  .hero-mark span{
+    text-shadow:0 0 14px var(--red-glow),0 0 24px rgba(255,42,42,.65),0 0 4px rgba(255,42,42,.95);
+  }
+  /* Hero title: powerful but legible, crisp not blurry */
+  .hero-title{
+    font-size:clamp(42px,12vw,64px);line-height:1;margin-bottom:14px;letter-spacing:-.018em;
+    text-shadow:0 2px 12px rgba(0,0,0,.7),0 0 22px rgba(255,42,42,.18);
+  }
   .hero-sub{font-size:15px;line-height:1.45;margin-bottom:24px;max-width:none}
 
+  /* Hero stats — cyan border live data feed, electric labels */
   .hero-stats{
     display:grid;
     grid-template-columns:repeat(2, 1fr);
     gap:0;
     max-width:none;
     margin:0;padding:0;
-    border:1px solid rgba(92,242,255,.14);
-    background:rgba(4,8,16,.6);
+    border:1px solid rgba(92,242,255,.35);
+    background:rgba(4,8,16,.62);
+    box-shadow:
+      0 0 0 1px rgba(92,242,255,.08) inset,
+      0 0 22px rgba(92,242,255,.18);
   }
   .hero-stats div{
     text-align:center;
     padding:12px 8px;
     border:none;
-    border-right:1px solid rgba(255,255,255,.06);
-    border-bottom:1px solid rgba(255,255,255,.06);
+    border-right:1px solid rgba(92,242,255,.14);
+    border-bottom:1px solid rgba(92,242,255,.14);
   }
   .hero-stats div:nth-child(2n){border-right:none}
   .hero-stats div:nth-last-child(-n+2){border-bottom:none}
-  .hero-stats b{font-size:22px}
-  .hero-stats span{font-size:9px;letter-spacing:.16em}
+  .hero-stats b{font-size:22px;text-shadow:0 0 14px rgba(92,242,255,.30)}
+  .hero-stats span{
+    font-size:10px;letter-spacing:.18em;
+    color:var(--electric);opacity:.95;
+    text-shadow:0 0 8px rgba(92,242,255,.45);
+  }
 
   .agent-wall{
     display:flex;
