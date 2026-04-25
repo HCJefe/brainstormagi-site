@@ -310,6 +310,11 @@ function makeLabelSprite(text, color) {
   return s;
 }
 
+// Track label sprites so each frame can fade any that would clip the viewport edge.
+// Hard-clipping a label mid-letter at the viewport edge looks broken; fading
+// near the edge looks intentional and keeps the electric road art direction.
+const labelSprites = [];
+
 DISTRICTS.forEach(d => {
   const mesh = d.id === "spire" ? makeSpire(d) : builders[d.kind](d);
   mesh.position.set(d.pos[0], 0, d.pos[2]); scene.add(mesh);
@@ -320,6 +325,7 @@ DISTRICTS.forEach(d => {
     // Position label snug above the building so it stays inside the camera frame
     label.position.set(d.pos[0], d.tall + 26, d.pos[2]);
     scene.add(label);
+    labelSprites.push(label);
   }
   const ring = new THREE.Mesh(new THREE.RingGeometry(18, 19.5, 64), new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.8, side: THREE.DoubleSide }));
   ring.rotation.x = -Math.PI / 2; ring.position.set(d.pos[0], 0.1, d.pos[2]); scene.add(ring);
@@ -421,6 +427,50 @@ if (hudToggle && hudNav) {
   hudNav.querySelectorAll("a").forEach(a => a.addEventListener("click", closeNav));
 }
 
+// ---------- LABEL EDGE FADE ----------
+// Project each label sprite to screen space. If its on-screen bounding box
+// would clip the viewport edge, smoothly fade the sprite out before the cut
+// is visible. Prevents mid-letter hard crops at the right (or left) edge.
+const tmpProj = new THREE.Vector3();
+const tmpView = new THREE.Vector3();
+const EDGE_MARGIN_PX = 24;   // start fading this many pixels inside the edge
+const EDGE_FADE_PX   = 80;   // distance over which fade goes 1 -> 0
+function updateLabelEdgeFade() {
+  const halfW = window.innerWidth * 0.5;
+  const halfH = window.innerHeight * 0.5;
+  for (const s of labelSprites) {
+    // View-space Z < 0 is in front of camera in three.js convention.
+    tmpView.copy(s.position).applyMatrix4(camera.matrixWorldInverse);
+    if (tmpView.z >= 0) { s.material.opacity = 0; continue; }
+    tmpProj.copy(s.position).project(camera);
+    if (tmpProj.z < -1 || tmpProj.z > 1) { s.material.opacity = 0; continue; }
+    const screenX = tmpProj.x * halfW + halfW;
+    const screenY = -tmpProj.y * halfH + halfH;
+    // Approximate sprite half-width in pixels: scale.x is in world units,
+    // and the sprite's apparent screen size scales with the perspective
+    // projection. ndcSpan = scale * projectionMatrix[0] / w (approx). We
+    // approximate via two NDC samples near the sprite anchor.
+    const camDist = camera.position.distanceTo(s.position);
+    // Vertical FOV in radians -> screen px per world unit at this distance
+    const pxPerWorld = window.innerHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * Math.max(camDist, 1));
+    const halfWidthPx = (s.scale.x * 0.5) * pxPerWorld;
+    const halfHeightPx = (s.scale.y * 0.5) * pxPerWorld;
+    // Distance from each viewport edge to the nearest sprite edge
+    const leftRoom   = (screenX - halfWidthPx)  - EDGE_MARGIN_PX;
+    const rightRoom  = (window.innerWidth - EDGE_MARGIN_PX) - (screenX + halfWidthPx);
+    const topRoom    = (screenY - halfHeightPx) - EDGE_MARGIN_PX;
+    const bottomRoom = (window.innerHeight - EDGE_MARGIN_PX) - (screenY + halfHeightPx);
+    const minRoom = Math.min(leftRoom, rightRoom, topRoom, bottomRoom);
+    // minRoom >= 0  : fully inside the safe zone -> opacity 1
+    // minRoom <= -EDGE_FADE_PX : would visibly clip -> opacity 0
+    let opacity;
+    if (minRoom >= 0) opacity = 1;
+    else if (minRoom <= -EDGE_FADE_PX) opacity = 0;
+    else opacity = 1 + (minRoom / EDGE_FADE_PX); // linear ramp through fade band
+    s.material.opacity = opacity;
+  }
+}
+
 // ---------- LOOP ----------
 const clock = new THREE.Clock();
 const tmpPos = new THREE.Vector3(), tmpLook = new THREE.Vector3();
@@ -448,6 +498,7 @@ function tick() {
   }
 
   updatePackets(dt);
+  updateLabelEdgeFade();
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
 }
