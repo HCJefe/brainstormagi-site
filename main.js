@@ -130,15 +130,25 @@ function addEnergyNode(x, z, color, size = 6) {
   ring.position.set(x, ROAD_Y + 0.5, z);
   scene.add(ring);
 
-  // Vertical light shaft at the node — adds a "data uplink" feel
+  // Vertical energy column — taller, brighter, more "electric uplink" presence
+  const shaftHeight = lowPower ? 90 : 140;
   const shaft = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.7, 0.7, 36, 8, 1, true),
-    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.22, side: THREE.DoubleSide })
+    new THREE.CylinderGeometry(0.9, 0.9, shaftHeight, 10, 1, true),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.32, side: THREE.DoubleSide })
   );
-  shaft.position.set(x, 18, z);
+  shaft.position.set(x, shaftHeight / 2, z);
   scene.add(shaft);
 
-  energyNodes.push({ ring, baseR: size + 1, baseR2: size + 1.6, phase: Math.random() * Math.PI * 2 });
+  // Inner white-hot core inside the column for an electrified look
+  const coreH = shaftHeight * 0.85;
+  const core = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.25, 0.25, coreH, 6, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, side: THREE.DoubleSide })
+  );
+  core.position.set(x, coreH / 2, z);
+  scene.add(core);
+
+  energyNodes.push({ ring, shaft, core, baseR: size + 1, baseR2: size + 1.6, phase: Math.random() * Math.PI * 2 });
 }
 
 // Build the road network: spire (0,0) -> each district, L-shaped, with corner nodes
@@ -167,23 +177,40 @@ DISTRICTS.filter(d => d.id !== "spire").forEach(d => {
 addEnergyNode(0, 0, 0xff2a2a, 12);
 
 // ---------- DATA PULSES (electric current flowing along the roads) ----------
-// Brighter, larger packets that visually read as electric current
-const packetGeo = new THREE.SphereGeometry(1.4, 10, 10);
+// Three packet classes for visible hierarchy: micro pulses (electricity feel),
+// route packets (white-hot), and command packets (large, district-tinted).
+const microGeo = new THREE.SphereGeometry(0.9, 8, 8);
+const routeGeo = new THREE.SphereGeometry(1.6, 12, 12);
+const commandGeo = new THREE.SphereGeometry(2.6, 14, 14);
 const packetMatWhite = new THREE.MeshBasicMaterial({ color: 0xffffff });
+const packetMatElectric = new THREE.MeshBasicMaterial({ color: 0x9ff8ff });
 const packets = [];
-const PACKET_COUNT = lowPower ? 90 : 240;
+const PACKET_COUNT = lowPower ? 110 : 280;
 for (let i = 0; i < PACKET_COUNT; i++) {
   const route = roadPaths[i % roadPaths.length];
-  // Mix white-hot and tinted packets so the current reads as electricity, not just lights
-  const tinted = i % 3 === 0;
-  const mat = tinted
-    ? new THREE.MeshBasicMaterial({ color: route.color })
-    : packetMatWhite;
-  const p = new THREE.Mesh(packetGeo, mat);
+  let geo, mat;
+  const cls = i % 7;
+  if (cls === 0) {
+    // Command packet — district-tinted, larger, slower
+    geo = commandGeo;
+    mat = new THREE.MeshBasicMaterial({ color: route.color });
+  } else if (cls === 1 || cls === 2) {
+    // Route packet — white-hot
+    geo = routeGeo;
+    mat = packetMatWhite;
+  } else {
+    // Micro pulse — electric cyan, fast, small
+    geo = microGeo;
+    mat = packetMatElectric;
+  }
+  const p = new THREE.Mesh(geo, mat);
+  const isCmd = cls === 0;
   p.userData = {
     route,
     t: Math.random(),
-    speed: 0.07 + Math.random() * 0.13
+    speed: isCmd ? 0.05 + Math.random() * 0.06 : 0.09 + Math.random() * 0.18,
+    isCmd,
+    isMicro: cls >= 3
   };
   scene.add(p);
   packets.push(p);
@@ -198,9 +225,12 @@ function updatePackets(dt) {
     let from, to, lt;
     if (t < 0.5) { from = pts[0]; to = pts[1]; lt = t / 0.5; }
     else         { from = pts[1]; to = pts[2]; lt = (t - 0.5) / 0.5; }
+    // Command packets fly slightly higher than micro pulses, giving altitude
+    // separation and an antigravity-style sense of layered traffic.
+    const lift = p.userData.isCmd ? 1.6 : (p.userData.isMicro ? 0.4 : 0.7);
     p.position.set(
       THREE.MathUtils.lerp(from.x, to.x, lt),
-      ROAD_Y + 0.7,
+      ROAD_Y + lift,
       THREE.MathUtils.lerp(from.z, to.z, lt)
     );
   }
@@ -320,6 +350,13 @@ function makeLabelSprite(text, color) {
 // chip reached the rim. Hide entirely when within a safe margin of any edge.
 const labelSprites = [];
 
+// Floating telemetry rings + waypoint halos — the antigravity touch.
+// Each district gets a ring of suspended orbital tori at varying tilts that
+// drift slowly. Reads as "telemetry / orbit / containment field" without
+// blowing the perf budget.
+const telemetryRings = [];
+const waypointMarkers = [];
+
 DISTRICTS.forEach(d => {
   const mesh = d.id === "spire" ? makeSpire(d) : builders[d.kind](d);
   mesh.position.set(d.pos[0], 0, d.pos[2]); scene.add(mesh);
@@ -334,6 +371,49 @@ DISTRICTS.forEach(d => {
   }
   const ring = new THREE.Mesh(new THREE.RingGeometry(18, 19.5, 64), new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.8, side: THREE.DoubleSide }));
   ring.rotation.x = -Math.PI / 2; ring.position.set(d.pos[0], 0.1, d.pos[2]); scene.add(ring);
+
+  // Suspended telemetry rings — fewer on mobile, more on desktop
+  const ringCount = lowPower ? 2 : 3;
+  for (let i = 0; i < ringCount; i++) {
+    const r = 30 + i * 7;
+    const tilt = (i - 1) * 0.32;
+    const tor = new THREE.Mesh(
+      new THREE.TorusGeometry(r, 0.35, 6, 64),
+      new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.55 - i * 0.08 })
+    );
+    const liftY = d.tall + 14 + i * 9;
+    tor.position.set(d.pos[0], liftY, d.pos[2]);
+    tor.rotation.x = Math.PI / 2 + tilt;
+    tor.rotation.z = i * 0.7;
+    scene.add(tor);
+    telemetryRings.push({
+      mesh: tor,
+      baseY: liftY,
+      spin: 0.12 + i * 0.05 + (i % 2 ? -0.04 : 0.04),
+      phase: Math.random() * Math.PI * 2
+    });
+  }
+
+  // Floating waypoint marker — a small suspended diamond above each district
+  // that bobs gently, giving an "antigravity beacon" feel. Skipped for spire
+  // since the spire tip already plays that role.
+  if (d.id !== "spire") {
+    const beaconY = d.tall + 36;
+    const beacon = new THREE.Mesh(
+      new THREE.OctahedronGeometry(2.4, 0),
+      new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.95 })
+    );
+    beacon.position.set(d.pos[0], beaconY, d.pos[2]);
+    scene.add(beacon);
+    // Thin tether line from beacon down to district top
+    const tether = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.08, 0.08, beaconY - d.tall, 4, 1, true),
+      new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.35, side: THREE.DoubleSide })
+    );
+    tether.position.set(d.pos[0], (beaconY + d.tall) / 2, d.pos[2]);
+    scene.add(tether);
+    waypointMarkers.push({ mesh: beacon, baseY: beaconY, phase: Math.random() * Math.PI * 2 });
+  }
 });
 
 // stars
@@ -535,12 +615,27 @@ function tick() {
   // progress rail
   progressFill.style.height = (scrollProgress * 100).toFixed(1) + "%";
 
-  // Pulsing energy nodes — gentle scale + opacity breathing
+  // Pulsing energy nodes — gentle scale + opacity breathing, plus column flicker
   for (const n of energyNodes) {
     const pulse = 0.5 + 0.5 * Math.sin(elapsed * 2.4 + n.phase);
     const s = 1 + pulse * 0.18;
     n.ring.scale.set(s, s, 1);
     n.ring.material.opacity = 0.35 + pulse * 0.45;
+    if (n.shaft) n.shaft.material.opacity = 0.18 + pulse * 0.22;
+    if (n.core)  n.core.material.opacity  = 0.35 + pulse * 0.35;
+  }
+
+  // Telemetry rings — slow rotation + slight bob for antigravity feel
+  for (const t of telemetryRings) {
+    t.mesh.rotation.z += dt * t.spin;
+    t.mesh.position.y = t.baseY + Math.sin(elapsed * 0.9 + t.phase) * 1.6;
+  }
+
+  // Waypoint beacons — float and softly spin
+  for (const w of waypointMarkers) {
+    w.mesh.position.y = w.baseY + Math.sin(elapsed * 1.4 + w.phase) * 2.2;
+    w.mesh.rotation.y += dt * 0.9;
+    w.mesh.rotation.x += dt * 0.4;
   }
 
   updatePackets(dt);

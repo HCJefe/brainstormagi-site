@@ -27,17 +27,27 @@ body{min-width:100%;width:100%;overflow-x:hidden}
 canvas#scene{
   position:fixed;inset:0;width:100vw;height:100vh;display:block;z-index:0;
   background:
-    radial-gradient(ellipse at 50% 38%,rgba(255,42,42,.10) 0%,transparent 45%),
-    radial-gradient(ellipse at 50% 62%,#13203a 0%,#070d1c 50%,#02040a 100%)
+    radial-gradient(ellipse at 50% 30%,rgba(92,242,255,.08) 0%,transparent 40%),
+    radial-gradient(ellipse at 50% 50%,rgba(255,42,42,.12) 0%,transparent 50%),
+    radial-gradient(ellipse at 50% 65%,#13203a 0%,#070d1c 50%,#02040a 100%)
 }
 
-/* Subtle scanline + vignette over the whole page so text reads cleanly */
+/* Scanline + vignette + faint micro-grid over the whole page */
 body::before{
   content:"";position:fixed;inset:0;pointer-events:none;z-index:1;
   background:
-    radial-gradient(ellipse at 50% 50%,transparent 60%,rgba(0,0,0,.55) 100%),
-    repeating-linear-gradient(0deg,rgba(255,255,255,.012) 0 1px,transparent 1px 3px);
+    radial-gradient(ellipse at 50% 50%,transparent 55%,rgba(0,0,0,.62) 100%),
+    repeating-linear-gradient(0deg,rgba(255,255,255,.014) 0 1px,transparent 1px 3px),
+    linear-gradient(0deg,rgba(92,242,255,.014) 1px,transparent 1px) 0 0/40px 40px,
+    linear-gradient(90deg,rgba(92,242,255,.014) 1px,transparent 1px) 0 0/40px 40px;
   mix-blend-mode:normal;
+}
+/* Top + bottom electric rails — the page looks anchored in a control surface */
+body::after{
+  content:"";position:fixed;left:0;right:0;top:0;height:1px;pointer-events:none;z-index:2;
+  background:linear-gradient(90deg,transparent,var(--electric) 20%,var(--red) 50%,var(--electric) 80%,transparent);
+  box-shadow:0 0 14px rgba(92,242,255,.55),0 0 22px rgba(255,42,42,.30);
+  opacity:.85;
 }
 
 /* HUD */
@@ -79,14 +89,25 @@ body::before{
   position:absolute;top:calc(62px + var(--safe-top));left:24px;
   display:flex;align-items:center;gap:8px;
   font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.12em;color:#cfd4de;
-  background:var(--panel);
+  background:
+    linear-gradient(0deg,rgba(92,242,255,.025) 1px,transparent 1px) 0 0/14px 14px,
+    var(--panel);
   border:1px solid var(--line-cyan);
   padding:7px 14px;backdrop-filter:blur(10px);
   max-width:calc(100vw - 48px);
   box-shadow:
-    0 0 0 1px rgba(92,242,255,.06) inset,
-    0 0 24px rgba(92,242,255,.08);
+    0 0 0 1px rgba(92,242,255,.10) inset,
+    0 0 28px rgba(92,242,255,.12),
+    0 0 14px rgba(255,42,42,.06);
 }
+/* Live tick caret on the HUD metrics */
+.hud-metrics::after{
+  content:"_";color:var(--electric);
+  margin-left:4px;
+  animation:caret 1.1s steps(2,end) infinite;
+  text-shadow:0 0 8px rgba(92,242,255,.7);
+}
+@keyframes caret{0%,49%{opacity:1}50%,100%{opacity:0}}
 .hud-metrics .sep{color:var(--electric);opacity:.55}
 .hud-metrics b{color:#fff}
 .pulse{
@@ -131,33 +152,90 @@ body::before{
   max-width:580px;
   width:100%;
   background:
-    linear-gradient(180deg,rgba(8,14,26,.92),rgba(6,10,20,.86));
-  border:1px solid rgba(255,255,255,.06);
+    /* micro-grid technical texture */
+    linear-gradient(0deg,rgba(92,242,255,.025) 1px,transparent 1px) 0 0/24px 24px,
+    linear-gradient(90deg,rgba(92,242,255,.025) 1px,transparent 1px) 0 0/24px 24px,
+    /* faint scanlines */
+    repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 3px),
+    /* base panel */
+    linear-gradient(180deg,rgba(8,14,26,.94),rgba(6,10,20,.88));
+  border:1px solid rgba(92,242,255,.14);
   padding:38px 42px;
   backdrop-filter:blur(14px);
   -webkit-backdrop-filter:blur(14px);
   box-shadow:
     0 30px 80px rgba(0,0,0,.55),
-    0 0 0 1px rgba(255,42,42,.08) inset,
-    0 0 60px rgba(255,42,42,.06);
+    0 0 0 1px rgba(255,42,42,.10) inset,
+    0 0 60px rgba(255,42,42,.07),
+    0 0 32px rgba(92,242,255,.06);
+  transition:transform .35s ease, box-shadow .35s ease;
 }
-/* Electric edge accents on sec-inner */
+.sec.active .sec-inner{
+  transform:translateY(-2px);
+  box-shadow:
+    0 38px 90px rgba(0,0,0,.6),
+    0 0 0 1px rgba(255,42,42,.14) inset,
+    0 0 80px rgba(255,42,42,.10),
+    0 0 48px rgba(92,242,255,.10);
+}
+/* Electric edge rail */
 .sec-inner::before{
   content:"";position:absolute;left:-1px;top:14px;bottom:14px;width:2px;
   background:linear-gradient(180deg,transparent,var(--red) 20%,var(--red) 80%,transparent);
   box-shadow:0 0 10px rgba(255,42,42,.6);
 }
+/* Top cyan rail */
 .sec-inner::after{
   content:"";position:absolute;left:18px;right:18px;top:-1px;height:1px;
   background:linear-gradient(90deg,transparent,var(--electric),transparent);
   box-shadow:0 0 8px rgba(92,242,255,.6);
-  opacity:.7;
+  opacity:.85;
 }
 .sec-inner.right::before{left:auto;right:-1px}
 .sec-inner.left{margin-right:auto}
 .sec-inner.right{margin-left:auto}
 .sec-inner.center{margin:0 auto;text-align:center;max-width:760px}
 .sec-inner.center::before{left:50%;transform:translateX(-50%);top:-1px;bottom:auto;width:120px;height:2px;background:linear-gradient(90deg,transparent,var(--red),transparent)}
+
+/* Corner brackets — control surface affordance. Pure CSS, no extra DOM. */
+.sec-inner > .chip::after{
+  content:"";position:absolute;left:-12px;top:-12px;width:16px;height:16px;
+  border-left:2px solid var(--electric);border-top:2px solid var(--electric);
+  box-shadow:-2px -2px 6px rgba(92,242,255,.45);
+  pointer-events:none;
+}
+.sec-inner .chip{position:relative}
+.sec-inner h2::before{
+  content:"";position:absolute;right:-12px;top:-12px;width:16px;height:16px;
+  border-right:2px solid var(--electric);border-top:2px solid var(--electric);
+  box-shadow:2px -2px 6px rgba(92,242,255,.45);
+  pointer-events:none;
+}
+.sec-inner h2{position:relative}
+.sec-inner::before,.sec-inner::after{pointer-events:none}
+/* Bottom corner brackets via a wrapping pseudo on metrics container */
+.sec-inner .metrics::before,
+.sec-inner .metrics::after{
+  content:"";position:absolute;width:14px;height:14px;
+  border-color:var(--red);
+  box-shadow:0 2px 6px rgba(255,42,42,.45);
+  pointer-events:none;
+}
+.sec-inner .metrics{position:relative}
+.sec-inner .metrics::before{
+  left:-12px;bottom:-22px;
+  border-left:2px solid var(--red);border-bottom:2px solid var(--red);
+}
+.sec-inner .metrics::after{
+  right:-12px;bottom:-22px;
+  border-right:2px solid var(--red);border-bottom:2px solid var(--red);
+}
+
+/* Telemetry caption stamp at top-right of every section panel */
+.sec-inner > .chip{
+  position:relative;
+  z-index:2;
+}
 
 .chip{
   display:inline-flex;align-items:center;gap:8px;
@@ -184,19 +262,32 @@ body::before{
 .metrics{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
 .m{
   position:relative;
-  background:linear-gradient(180deg,rgba(11,20,36,.75),rgba(8,14,26,.85));
-  border:1px solid rgba(255,255,255,.06);
-  padding:11px 14px;font-family:"JetBrains Mono",monospace;
+  background:
+    linear-gradient(0deg,rgba(92,242,255,.04) 1px,transparent 1px) 0 0/12px 12px,
+    linear-gradient(180deg,rgba(11,20,36,.78),rgba(8,14,26,.92));
+  border:1px solid rgba(92,242,255,.16);
+  padding:11px 14px 11px 16px;font-family:"JetBrains Mono",monospace;
   min-width:0;
   overflow:hidden;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.04),
+    inset 0 0 0 1px rgba(255,42,42,.05),
+    0 0 14px rgba(92,242,255,.05);
 }
 .m::before{
   content:"";position:absolute;left:0;top:0;bottom:0;width:2px;
   background:var(--red);
-  box-shadow:0 0 8px rgba(255,42,42,.6);
+  box-shadow:0 0 10px rgba(255,42,42,.65),0 0 18px rgba(255,42,42,.30);
 }
-.m b{display:block;font-size:18px;color:#fff;letter-spacing:.02em;line-height:1.1}
-.m span{font-size:10.5px;color:rgba(255,255,255,0.78);letter-spacing:.14em;text-transform:uppercase;display:block;margin-top:3px}
+/* Tiny live dot in the corner — reads as a live telemetry channel */
+.m::after{
+  content:"";position:absolute;right:8px;top:8px;width:5px;height:5px;border-radius:50%;
+  background:var(--electric);
+  box-shadow:0 0 6px var(--electric),0 0 12px rgba(92,242,255,.45);
+  animation:pulse 2.2s ease-in-out infinite;
+}
+.m b{display:block;font-size:18px;color:#fff;letter-spacing:.02em;line-height:1.1;font-variant-numeric:tabular-nums}
+.m span{font-size:10.5px;color:rgba(255,255,255,0.82);letter-spacing:.14em;text-transform:uppercase;display:block;margin-top:3px}
 
 /* HERO */
 .hero{min-height:100vh}
@@ -238,23 +329,42 @@ body::before{
 }
 .hero-sub{font-size:18px;color:rgba(255,255,255,0.92);max-width:620px;margin:0 auto 32px;line-height:1.55}
 .hero-stats{
+  position:relative;
   display:flex;justify-content:center;flex-wrap:wrap;gap:6px;
-  border:1px solid rgba(92,242,255,.12);
-  background:rgba(4,8,16,.6);
+  border:1px solid rgba(92,242,255,.22);
+  background:
+    linear-gradient(0deg,rgba(92,242,255,.03) 1px,transparent 1px) 0 0/16px 16px,
+    rgba(4,8,16,.66);
   padding:18px 22px;
+  box-shadow:
+    inset 0 1px 0 rgba(92,242,255,.10),
+    0 0 28px rgba(92,242,255,.10);
+}
+.hero-stats::before{
+  content:"";position:absolute;left:14px;right:14px;top:-1px;height:1px;
+  background:linear-gradient(90deg,transparent,var(--electric),transparent);
+  box-shadow:0 0 8px rgba(92,242,255,.7);
+}
+.hero-stats::after{
+  content:"LIVE TELEMETRY";
+  position:absolute;left:50%;bottom:-9px;transform:translateX(-50%);
+  font-family:"JetBrains Mono",monospace;font-size:8.5px;letter-spacing:.42em;
+  padding:2px 10px;background:var(--bg);
+  color:var(--electric);
+  border:1px solid rgba(92,242,255,.25);
 }
 .hero-stats div{
   text-align:center;flex:1;min-width:110px;
   position:relative;padding:4px 14px;
 }
-.hero-stats div + div{border-left:1px solid rgba(255,255,255,.06)}
+.hero-stats div + div{border-left:1px solid rgba(92,242,255,.10)}
 .hero-stats b{
   display:block;font-size:30px;color:#fff;
   font-family:"Space Grotesk",sans-serif;font-weight:800;letter-spacing:0;
   font-variant-numeric:tabular-nums;
-  text-shadow:0 0 16px rgba(92,242,255,.18);
+  text-shadow:0 0 16px rgba(92,242,255,.20);
 }
-.hero-stats span{display:block;font-size:10px;color:var(--electric);letter-spacing:.25em;text-transform:uppercase;margin-top:4px;opacity:.85}
+.hero-stats span{display:block;font-size:10px;color:var(--electric);letter-spacing:.25em;text-transform:uppercase;margin-top:4px;opacity:.92}
 
 /* AGENT WALL */
 /* Match sibling section width — keep Foundry panel visually aligned with the rest */
@@ -386,21 +496,25 @@ body::before{
     padding:9px 13px;
     max-width:none;width:auto;
     align-items:center;
-    background:rgba(4,8,16,.78);
+    background:
+      linear-gradient(0deg,rgba(92,242,255,.04) 1px,transparent 1px) 0 0/12px 12px,
+      rgba(4,8,16,.82);
     border:1px solid rgba(92,242,255,.45);
     box-shadow:
-      0 0 0 1px rgba(92,242,255,.10) inset,
-      0 0 18px rgba(92,242,255,.30),
-      0 0 36px rgba(255,42,42,.10);
+      0 0 0 1px rgba(92,242,255,.12) inset,
+      0 0 22px rgba(92,242,255,.34),
+      0 0 40px rgba(255,42,42,.12);
   }
+  /* Hide the desktop caret on mobile — would land in the grid and look broken */
+  .hud-metrics::after{display:none}
   .hud-metrics .pulse{grid-row:1 / span 2;align-self:center}
   .hud-metrics .sep{display:none}
   .hud-metrics > span:not(.pulse){
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;
-    border-bottom:1px solid rgba(92,242,255,.18);
+    border-bottom:1px solid rgba(92,242,255,.22);
     padding-bottom:1px;
   }
-  .hud-metrics b{color:#fff;text-shadow:0 0 8px rgba(92,242,255,.45)}
+  .hud-metrics b{color:#fff;text-shadow:0 0 8px rgba(92,242,255,.55)}
 
   .scroll-indicator{bottom:calc(16px + var(--safe-bottom));font-size:9px;letter-spacing:.25em}
   .scroll-arrow{height:26px}
@@ -412,15 +526,26 @@ body::before{
     padding:24px 18px;
     max-width:100%;
     border-radius:6px;
-    border:1px solid rgba(92,242,255,.22);
-    background:linear-gradient(180deg,rgba(6,10,20,.78),rgba(4,8,16,.70));
+    border:1px solid rgba(92,242,255,.28);
+    background:
+      linear-gradient(0deg,rgba(92,242,255,.025) 1px,transparent 1px) 0 0/18px 18px,
+      linear-gradient(90deg,rgba(92,242,255,.025) 1px,transparent 1px) 0 0/18px 18px,
+      repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 3px),
+      linear-gradient(180deg,rgba(6,10,20,.80),rgba(4,8,16,.74));
     box-shadow:
       0 18px 50px rgba(0,0,0,.55),
-      0 0 0 1px rgba(255,42,42,.14) inset,
-      0 0 36px rgba(92,242,255,.10),
-      0 0 28px rgba(255,42,42,.08);
+      0 0 0 1px rgba(255,42,42,.16) inset,
+      0 0 40px rgba(92,242,255,.14),
+      0 0 30px rgba(255,42,42,.10);
     overflow:hidden;
   }
+  /* Hide the desktop corner brackets on mobile — they would clip outside the
+     panel since mobile uses overflow:hidden. The cyan border + glow already
+     reads as a control surface. */
+  .sec-inner > .chip::after,
+  .sec-inner h2::before,
+  .sec-inner .metrics::before,
+  .sec-inner .metrics::after{display:none}
   /* Subtle scanline data texture inside cards — visible but does not dim text */
   .sec-inner > *{position:relative;z-index:1}
   .sec-inner::before{
