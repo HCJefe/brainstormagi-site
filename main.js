@@ -8,23 +8,23 @@ const lowPower = isMobile || isCoarsePointer;
 
 const canvas = document.getElementById("scene");
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: !lowPower, powerPreference: lowPower ? "low-power" : "high-performance" });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, lowPower ? 1.25 : 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, lowPower ? 1.5 : 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = lowPower ? 0.85 : 1.05;
+renderer.toneMappingExposure = lowPower ? 1.08 : 1.05;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x04060a);
-scene.fog = new THREE.FogExp2(0x04060a, 0.0016);
+scene.fog = new THREE.FogExp2(0x04060a, lowPower ? 0.0010 : 0.0016);
 
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.5, 6000);
 camera.position.set(0, 400, 600);
 camera.lookAt(0, 0, 0);
 
-scene.add(new THREE.AmbientLight(0x334466, 0.5));
-const key = new THREE.DirectionalLight(0xffd0c0, 0.7); key.position.set(300, 400, 200); scene.add(key);
-const rim = new THREE.DirectionalLight(0xff3344, 0.5); rim.position.set(-300, 200, -400); scene.add(rim);
-const cyanLight = new THREE.DirectionalLight(0x4ff3ff, 0.35); cyanLight.position.set(0, 200, 400); scene.add(cyanLight);
+scene.add(new THREE.AmbientLight(0x334466, lowPower ? 0.55 : 0.5));
+const key = new THREE.DirectionalLight(0xffd0c0, lowPower ? 0.9 : 0.7); key.position.set(300, 400, 200); scene.add(key);
+const rim = new THREE.DirectionalLight(0xff3344, lowPower ? 0.6 : 0.5); rim.position.set(-300, 200, -400); scene.add(rim);
+const cyanLight = new THREE.DirectionalLight(0x4ff3ff, lowPower ? 0.6 : 0.35); cyanLight.position.set(0, 200, 400); scene.add(cyanLight);
 
 // ---------- CIRCUIT BOARD FLOOR ----------
 const BOARD = 1800;
