@@ -155,7 +155,50 @@ body::after{
   /* Default: visible. The reveal transition is opt-in via .sec.armed so a
      missing IntersectionObserver, JS error, or slow JS load can never leave
      the page as empty dark space. JS marks .armed before observing. */
-  opacity:1;transform:none;transition:opacity .8s ease,transform .8s ease
+  opacity:1;transform:none;transition:opacity .8s ease,transform .8s ease;
+  overflow:hidden;
+}
+
+/* PERSISTENT SECTION-LEVEL ANTIGRAVITY BACKGROUND
+   Every .sec gets its own circuit-city checkpoint visual behind the panel.
+   This layer is independent of WebGL, so even if the Three.js camera/fog
+   misses geometry, the page still reads as a 3D circuit-board highway with
+   nearby futuristic structures. Sits below .sec-inner but above the base
+   void/canvas so it is always visible around the panel. */
+.sec-bg{
+  position:absolute;inset:0;
+  pointer-events:none;
+  z-index:0;
+  overflow:hidden;
+  /* Fade top so HUD and previous section blend cleanly into this one */
+  -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 6%,#000 94%,transparent 100%);
+          mask-image:linear-gradient(180deg,transparent 0,#000 6%,#000 94%,transparent 100%);
+}
+.sec-bg svg{
+  width:100%;height:100%;display:block;
+  filter:drop-shadow(0 0 16px rgba(92,242,255,.14));
+}
+.sec-bg .sb-spine line{animation:hcSpine 1.8s ease-in-out infinite}
+.sec-bg .sb-spine line:nth-child(2){animation-delay:.18s}
+.sec-bg .sb-spine line:nth-child(3){animation-delay:.36s}
+.sec-bg .sb-spine line:nth-child(4){animation-delay:.54s}
+.sec-bg .sb-spine line:nth-child(5){animation-delay:.72s}
+.sec-bg .sb-pulse{
+  transform-origin:center;transform-box:fill-box;
+  animation:hcPulse 2.8s ease-out infinite;
+}
+.sec-bg .sb-pulse-2{animation-delay:.7s}
+.sec-bg .sb-pulse-3{animation-delay:1.4s}
+.sec-bg .sb-beacon{animation:sbBeacon 2.2s ease-in-out infinite}
+@keyframes sbBeacon{0%,100%{opacity:.45}50%{opacity:1}}
+/* Hero already has .hero-circuit and does not need .sec-inner sitting above
+   .sec-bg — but keep it consistent */
+.hero .sec-bg{display:none}
+.sec-inner{position:relative;z-index:2}
+@media (prefers-reduced-motion:reduce){
+  .sec-bg .sb-spine line,
+  .sec-bg .sb-pulse,
+  .sec-bg .sb-beacon{animation:none}
 }
 .sec.armed{opacity:0;transform:translateY(40px)}
 .sec.armed.active,
@@ -641,6 +684,10 @@ body::after{
   .sec-inner h2::before,
   .sec-inner .metrics::before,
   .sec-inner .metrics::after{display:none}
+  /* Persistent section bg stays visible on mobile but lower intensity */
+  .sec-bg{opacity:.78}
+  .sec-bg svg{filter:none}
+
   /* Subtle scanline data texture inside cards — visible but does not dim text */
   .sec-inner > *{position:relative;z-index:1}
   .sec-inner::before{
