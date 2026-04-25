@@ -112,7 +112,7 @@ function addRoadSegment(ax, az, bx, bz, color) {
   }
 }
 
-function addEnergyNode(x, z, color, size = 6) {
+function addEnergyNode(x, z, color, size = 6, opts = {}) {
   // A glowing pad with a pulsing ring — placed at corners and endpoints
   const pad = new THREE.Mesh(
     new THREE.CircleGeometry(size, 32),
@@ -130,28 +130,53 @@ function addEnergyNode(x, z, color, size = 6) {
   ring.position.set(x, ROAD_Y + 0.5, z);
   scene.add(ring);
 
-  // Vertical energy column — taller, brighter, more "electric uplink" presence
-  const shaftHeight = lowPower ? 90 : 140;
+  // Vertical energy column — taller, brighter, more "electric uplink" presence.
+  // Hero-prominent nodes get a much taller, wider, brighter beam so the electric
+  // road reads instantly above the fold. Mobile keeps a shorter column to
+  // protect performance and avoid overpowering text.
+  const heroBoost = !!opts.heroBoost;
+  const shaftHeight = heroBoost
+    ? (lowPower ? 180 : 320)
+    : (lowPower ? 90 : 140);
+  const shaftRadius = heroBoost ? 1.6 : 0.9;
+  const shaftOpacity = heroBoost ? 0.46 : 0.32;
   const shaft = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.9, 0.9, shaftHeight, 10, 1, true),
-    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.32, side: THREE.DoubleSide })
+    new THREE.CylinderGeometry(shaftRadius, shaftRadius, shaftHeight, 12, 1, true),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: shaftOpacity, side: THREE.DoubleSide })
   );
   shaft.position.set(x, shaftHeight / 2, z);
   scene.add(shaft);
 
   // Inner white-hot core inside the column for an electrified look
-  const coreH = shaftHeight * 0.85;
+  const coreH = shaftHeight * 0.9;
+  const coreR = heroBoost ? 0.55 : 0.25;
   const core = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.25, 0.25, coreH, 6, 1, true),
-    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, side: THREE.DoubleSide })
+    new THREE.CylinderGeometry(coreR, coreR, coreH, 8, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: heroBoost ? 0.78 : 0.55, side: THREE.DoubleSide })
   );
   core.position.set(x, coreH / 2, z);
   scene.add(core);
 
-  energyNodes.push({ ring, shaft, core, baseR: size + 1, baseR2: size + 1.6, phase: Math.random() * Math.PI * 2 });
+  // Outer halo cylinder for hero-boosted nodes — soft glow that reads as a
+  // light shaft from a distance without taxing fillrate too hard.
+  let halo = null;
+  if (heroBoost && !lowPower) {
+    halo = new THREE.Mesh(
+      new THREE.CylinderGeometry(4.2, 4.2, shaftHeight, 14, 1, true),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.10, side: THREE.DoubleSide, depthWrite: false })
+    );
+    halo.position.set(x, shaftHeight / 2, z);
+    scene.add(halo);
+  }
+
+  energyNodes.push({ ring, shaft, core, halo, baseR: size + 1, baseR2: size + 1.6, phase: Math.random() * Math.PI * 2, heroBoost });
 }
 
-// Build the road network: spire (0,0) -> each district, L-shaped, with corner nodes
+// Build the road network: spire (0,0) -> each district, L-shaped, with corner nodes.
+// `content` and `integration` flank the spire on opposite x sides at modest z,
+// so their endpoint energy columns read above the fold from the hero camera —
+// boost them so a distinct vertical light shaft is visible in the first viewport.
+const HERO_BOOST_IDS = new Set(["content", "integration"]);
 const roadPaths = []; // for packet routing: each entry is array of points
 DISTRICTS.filter(d => d.id !== "spire").forEach(d => {
   const ax = 0, az = 0;
@@ -162,7 +187,8 @@ DISTRICTS.filter(d => d.id !== "spire").forEach(d => {
   if (Math.abs(bz - az) > 1) addRoadSegment(cornerX, cornerZ, bx, bz, d.color);
   // Energy nodes at corner and endpoint
   addEnergyNode(cornerX, cornerZ, d.color, 5);
-  addEnergyNode(bx, bz, d.color, 9);
+  const heroBoost = HERO_BOOST_IDS.has(d.id);
+  addEnergyNode(bx, bz, d.color, heroBoost ? 11 : 9, { heroBoost });
 
   roadPaths.push({
     color: d.color,
@@ -173,8 +199,9 @@ DISTRICTS.filter(d => d.id !== "spire").forEach(d => {
     ]
   });
 });
-// Central hub node at origin (the spire)
-addEnergyNode(0, 0, 0xff2a2a, 12);
+// Central hub node at origin (the spire) — hero-boosted so the brand-red
+// energy column rises tall and bright behind/around the hero card.
+addEnergyNode(0, 0, 0xff2a2a, 14, { heroBoost: true });
 
 // ---------- DATA PULSES (electric current flowing along the roads) ----------
 // Three packet classes for visible hierarchy: micro pulses (electricity feel),
@@ -615,14 +642,22 @@ function tick() {
   // progress rail
   progressFill.style.height = (scrollProgress * 100).toFixed(1) + "%";
 
-  // Pulsing energy nodes — gentle scale + opacity breathing, plus column flicker
+  // Pulsing energy nodes — gentle scale + opacity breathing, plus column flicker.
+  // Hero-boosted columns breathe brighter so the electric uplink reads above the
+  // fold from the hero camera position.
   for (const n of energyNodes) {
     const pulse = 0.5 + 0.5 * Math.sin(elapsed * 2.4 + n.phase);
     const s = 1 + pulse * 0.18;
     n.ring.scale.set(s, s, 1);
     n.ring.material.opacity = 0.35 + pulse * 0.45;
-    if (n.shaft) n.shaft.material.opacity = 0.18 + pulse * 0.22;
-    if (n.core)  n.core.material.opacity  = 0.35 + pulse * 0.35;
+    if (n.heroBoost) {
+      if (n.shaft) n.shaft.material.opacity = 0.32 + pulse * 0.28;
+      if (n.core)  n.core.material.opacity  = 0.55 + pulse * 0.35;
+      if (n.halo)  n.halo.material.opacity  = 0.07 + pulse * 0.10;
+    } else {
+      if (n.shaft) n.shaft.material.opacity = 0.18 + pulse * 0.22;
+      if (n.core)  n.core.material.opacity  = 0.35 + pulse * 0.35;
+    }
   }
 
   // Telemetry rings — slow rotation + slight bob for antigravity feel

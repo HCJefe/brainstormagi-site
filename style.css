@@ -87,23 +87,27 @@ body::after{
 
 .hud-metrics{
   position:absolute;top:calc(62px + var(--safe-top));left:24px;
-  display:flex;align-items:center;gap:8px;
+  display:inline-flex;align-items:center;gap:8px;
   font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.12em;color:#cfd4de;
   background:
     linear-gradient(0deg,rgba(92,242,255,.025) 1px,transparent 1px) 0 0/14px 14px,
     var(--panel);
   border:1px solid var(--line-cyan);
-  padding:7px 14px;backdrop-filter:blur(10px);
+  padding:7px 22px 7px 14px;backdrop-filter:blur(10px);
   max-width:calc(100vw - 48px);
+  white-space:nowrap;
+  overflow:visible;
   box-shadow:
     0 0 0 1px rgba(92,242,255,.10) inset,
     0 0 28px rgba(92,242,255,.12),
     0 0 14px rgba(255,42,42,.06);
 }
-/* Live tick caret on the HUD metrics */
+/* Live tick caret on the HUD metrics — sits inside right padding so its glow
+   never bleeds past the panel and never gets clipped at the right edge. */
 .hud-metrics::after{
   content:"_";color:var(--electric);
-  margin-left:4px;
+  margin-left:6px;padding-right:2px;
+  flex-shrink:0;
   animation:caret 1.1s steps(2,end) infinite;
   text-shadow:0 0 8px rgba(92,242,255,.7);
 }
@@ -521,10 +525,17 @@ body::after{
 
   .sec{padding:140px 16px 56px;min-height:auto}
   .sec:first-of-type{padding-top:148px}
-  /* Crisp panels with cyan border + red/cyan glow — restore HUD feel on mobile */
-  .sec-inner{
+  /* Crisp panels with cyan border + red/cyan glow — restore HUD feel on mobile.
+     Explicit width caps so .sec-inner can never exceed viewport minus gutters
+     even if a desktop max-width slips through the cascade. */
+  .sec-inner,
+  .sec-inner.left,
+  .sec-inner.right,
+  .sec-inner.center{
     padding:24px 18px;
-    max-width:100%;
+    width:100%;
+    max-width:calc(100vw - 32px);
+    margin-left:auto;margin-right:auto;
     border-radius:6px;
     border:1px solid rgba(92,242,255,.28);
     background:
@@ -669,14 +680,18 @@ body::after{
   .agent-wall::-webkit-scrollbar{height:4px}
   .agent-wall::-webkit-scrollbar-thumb{background:rgba(92,242,255,.4)}
   .agent-wall .a{
-    flex:0 0 150px;
+    flex:0 0 168px;
     padding:14px 12px;
     font-size:11px;
     scroll-snap-align:start;
     text-align:left;
+    white-space:normal;
+    overflow-wrap:anywhere;
+    word-break:break-word;
+    min-height:74px;
   }
-  .agent-wall .a b{font-size:13px;margin-bottom:4px}
-  .agent-wall .a span{font-size:10px}
+  .agent-wall .a b{font-size:13px;margin-bottom:4px;line-height:1.2;white-space:normal}
+  .agent-wall .a span{font-size:10px;line-height:1.3;white-space:normal}
   .agent-wall-more{
     display:block;
     margin-top:10px;
