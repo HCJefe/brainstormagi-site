@@ -8,34 +8,38 @@
   --muted:#8994a8;
   --panel:rgba(8,12,20,.72);
   --line:rgba(255,42,42,.28);
+  --safe-top:env(safe-area-inset-top, 0px);
+  --safe-bottom:env(safe-area-inset-bottom, 0px);
+  --safe-left:env(safe-area-inset-left, 0px);
+  --safe-right:env(safe-area-inset-right, 0px);
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:"Space Grotesk",system-ui,sans-serif;scroll-behavior:smooth}
-body{overflow-x:hidden}
+body{min-width:100%;width:100%}
 
 canvas#scene{position:fixed;inset:0;width:100vw;height:100vh;display:block;z-index:0;background:radial-gradient(ellipse at 50% 60%,#0b1220 0%,#04060a 70%)}
 
 /* HUD */
 .hud{position:fixed;inset:0;pointer-events:none;z-index:20}
-.hud-top,.hud-metrics,.hud-nav,.hud-btn,.scroll-indicator,.hud-brand,.progress-rail{pointer-events:auto}
-.hud-top{position:absolute;top:16px;left:24px;right:24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
-.hud-brand{font-family:"JetBrains Mono",monospace;font-weight:800;letter-spacing:.22em;font-size:16px}
+.hud-top,.hud-metrics,.hud-nav,.hud-btn,.scroll-indicator,.hud-brand,.progress-rail,.hud-toggle{pointer-events:auto}
+.hud-top{position:absolute;top:calc(16px + var(--safe-top));left:24px;right:24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.hud-brand{font-family:"JetBrains Mono",monospace;font-weight:800;letter-spacing:.22em;font-size:16px;white-space:nowrap}
 .hud-brand span{color:var(--red)}
 .hud-nav{display:flex;gap:18px;font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.2em;align-items:center}
 .hud-nav > .hud-btn.primary{display:none}
 .hud-nav a{color:#cfd4de;text-decoration:none;padding:6px 2px;border-bottom:1px solid transparent;transition:.2s;text-transform:uppercase}
 .hud-nav a:hover,.hud-nav a.active{color:#fff;border-color:var(--red)}
-.hud-btn{background:transparent;color:#fff;border:1px solid var(--line);padding:9px 16px;font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.2em;text-decoration:none}
+.hud-btn{background:transparent;color:#fff;border:1px solid var(--line);padding:9px 16px;font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.2em;text-decoration:none;white-space:nowrap}
 .hud-btn.primary{background:var(--red);border-color:var(--red);box-shadow:0 0 18px rgba(255,42,42,.35)}
 .hud-btn:hover{box-shadow:0 0 22px rgba(255,42,42,.5)}
 
-.hud-metrics{position:absolute;top:62px;left:24px;display:flex;align-items:center;gap:8px;font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.12em;color:#cfd4de;background:var(--panel);border:1px solid var(--line);padding:7px 14px;backdrop-filter:blur(8px)}
+.hud-metrics{position:absolute;top:calc(62px + var(--safe-top));left:24px;display:flex;align-items:center;gap:8px;font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.12em;color:#cfd4de;background:var(--panel);border:1px solid var(--line);padding:7px 14px;backdrop-filter:blur(8px);max-width:calc(100vw - 48px)}
 .hud-metrics .sep{color:var(--red);opacity:.7}
 .hud-metrics b{color:#fff}
-.pulse{width:7px;height:7px;border-radius:50%;background:var(--red);box-shadow:0 0 10px var(--red-glow);animation:pulse 1.4s ease-in-out infinite}
+.pulse{width:7px;height:7px;border-radius:50%;background:var(--red);box-shadow:0 0 10px var(--red-glow);animation:pulse 1.4s ease-in-out infinite;flex-shrink:0}
 @keyframes pulse{50%{opacity:.3}}
 
-.scroll-indicator{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:10px;font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.3em;color:var(--muted);transition:opacity .4s}
+.scroll-indicator{position:absolute;bottom:calc(28px + var(--safe-bottom));left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:10px;font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.3em;color:var(--muted);transition:opacity .4s}
 .scroll-indicator.gone{opacity:0;pointer-events:none}
 .scroll-arrow{width:1px;height:42px;background:linear-gradient(180deg,transparent,var(--red));position:relative;overflow:hidden}
 .scroll-arrow::after{content:"";position:absolute;left:-3px;top:0;width:7px;height:7px;border-right:1px solid var(--red);border-bottom:1px solid var(--red);transform:rotate(45deg);animation:drip 1.8s ease-in-out infinite}
@@ -79,14 +83,15 @@ canvas#scene{position:fixed;inset:0;width:100vw;height:100vh;display:block;z-ind
 .agent-wall .a{background:rgba(11,20,36,.7);border:1px solid var(--line);padding:9px;font-size:10px;letter-spacing:.08em;text-align:center}
 .agent-wall .a b{display:block;color:#fff;font-size:11px;margin-bottom:2px}
 .agent-wall .a span{color:var(--muted)}
+.agent-wall-more{display:none}
 
 /* CONTACT */
-.cta.big{display:inline-block;margin:24px 0 10px;background:var(--red);color:#fff;padding:18px 34px;font-family:"JetBrains Mono",monospace;letter-spacing:.25em;font-size:14px;text-decoration:none;box-shadow:0 0 30px rgba(255,42,42,.4)}
+.cta.big{display:inline-block;margin:24px 0 10px;background:var(--red);color:#fff;padding:18px 34px;font-family:"JetBrains Mono",monospace;letter-spacing:.25em;font-size:14px;text-decoration:none;box-shadow:0 0 30px rgba(255,42,42,.4);min-height:44px}
 .cta.big:hover{box-shadow:0 0 50px rgba(255,42,42,.7)}
-.footer-line{margin-top:36px;font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.3em;color:var(--muted)}
+.footer-line{margin-top:36px;font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.3em;color:var(--muted);padding-bottom:var(--safe-bottom)}
 
 /* MOBILE NAV TOGGLE (hidden on desktop) */
-.hud-toggle{display:none;background:transparent;border:1px solid var(--line);width:40px;height:40px;padding:0;cursor:pointer;align-items:center;justify-content:center;flex-direction:column;gap:4px;pointer-events:auto}
+.hud-toggle{display:none;background:rgba(8,12,20,.72);border:1px solid var(--line);width:44px;height:44px;padding:0;cursor:pointer;align-items:center;justify-content:center;flex-direction:column;gap:4px;backdrop-filter:blur(8px)}
 .hud-toggle span{display:block;width:18px;height:2px;background:#fff;transition:transform .25s,opacity .2s}
 .hud-toggle[aria-expanded="true"] span:nth-child(1){transform:translateY(6px) rotate(45deg)}
 .hud-toggle[aria-expanded="true"] span:nth-child(2){opacity:0}
@@ -101,22 +106,34 @@ canvas#scene{position:fixed;inset:0;width:100vw;height:100vh;display:block;z-ind
 
 /* RESPONSIVE — MOBILE (phones, <=640px) */
 @media (max-width:640px){
+  /* Reduce visual noise of fixed canvas on phones — softer backdrop, lower priority */
+  canvas#scene{opacity:.55}
+
   /* HUD top: brand left, hamburger right; CTA moves into menu */
-  .hud-top{top:12px;left:14px;right:14px;gap:10px;flex-wrap:nowrap}
+  .hud-top{
+    top:calc(10px + var(--safe-top));
+    left:max(12px, var(--safe-left));
+    right:max(12px, var(--safe-right));
+    gap:10px;flex-wrap:nowrap;align-items:center
+  }
   .hud-brand{font-size:13px;letter-spacing:.18em}
   .hud-toggle{display:flex}
 
   /* Nav becomes a slide-down panel triggered by toggle */
   .hud-nav{
     display:none;
-    position:fixed;top:60px;left:14px;right:14px;
-    background:var(--panel);
+    position:fixed;
+    top:calc(64px + var(--safe-top));
+    left:max(12px, var(--safe-left));
+    right:max(12px, var(--safe-right));
+    background:rgba(6,10,18,.94);
     border:1px solid var(--line);
-    backdrop-filter:blur(12px);
+    backdrop-filter:blur(14px);
     flex-direction:column;gap:0;
-    padding:8px 0;
-    max-height:calc(100vh - 80px);overflow-y:auto;
-    box-shadow:0 20px 60px rgba(0,0,0,.5);
+    padding:6px 0 10px;
+    max-height:calc(100vh - 100px - var(--safe-top));overflow-y:auto;
+    box-shadow:0 20px 60px rgba(0,0,0,.6);
+    z-index:30;
   }
   .hud-nav.open{display:flex}
   .hud-nav a{
@@ -132,81 +149,157 @@ canvas#scene{position:fixed;inset:0;width:100vw;height:100vh;display:block;z-ind
   }
   .hud-nav a:last-child{border-bottom:none}
 
-  /* Primary CTA hidden in top bar — appears in nav panel instead */
+  /* Primary CTA hidden in top bar — appears in nav panel instead, full-width */
   .hud-top > .hud-btn.primary{display:none}
   .hud-nav > .hud-btn.primary{
-    display:block;margin:10px 16px 6px;text-align:center;padding:14px;
+    display:block;margin:10px 16px 4px;text-align:center;padding:16px;
     border-left:none;background:var(--red);
+    min-height:48px;font-size:12px;
   }
 
-  /* Metrics — compact, allow horizontal scroll if needed */
+  /* Metrics — pulse + 2x2 grid that never overflows */
   .hud-metrics{
-    top:58px;left:14px;right:14px;
-    font-size:9px;letter-spacing:.08em;
-    padding:6px 10px;gap:6px;
-    overflow-x:auto;white-space:nowrap;
-    -webkit-overflow-scrolling:touch;
-    scrollbar-width:none;
+    top:calc(62px + var(--safe-top));
+    left:max(12px, var(--safe-left));
+    right:max(12px, var(--safe-right));
+    display:grid;
+    grid-template-columns:auto 1fr 1fr;
+    column-gap:10px;row-gap:3px;
+    font-size:10px;letter-spacing:.04em;
+    padding:8px 12px;
+    max-width:none;width:auto;
+    align-items:center;
   }
-  .hud-metrics::-webkit-scrollbar{display:none}
+  .hud-metrics .pulse{grid-row:1 / span 2;align-self:center}
+  .hud-metrics .sep{display:none}
+  .hud-metrics > span:not(.pulse){white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 
   /* Scroll hint smaller and lower */
-  .scroll-indicator{bottom:18px;font-size:9px;letter-spacing:.25em}
-  .scroll-arrow{height:30px}
+  .scroll-indicator{bottom:calc(16px + var(--safe-bottom));font-size:9px;letter-spacing:.25em}
+  .scroll-arrow{height:26px}
 
-  /* Sections — leave room for HUD top bar (~44px) + metrics (~32px) + buffer */
-  .sec{padding:108px 18px 56px;min-height:auto}
-  .sec-inner{padding:22px 18px;max-width:100%;border-radius:0}
+  /* Sections — leave room for HUD top bar (~44px) + metrics grid (~50px) + buffer */
+  .sec{padding:140px 18px 56px;min-height:auto}
+  .sec:first-of-type{padding-top:148px}
+  .sec-inner{
+    padding:22px 18px;
+    max-width:100%;
+    border-radius:0;
+    background:linear-gradient(180deg,rgba(8,12,20,.88),rgba(8,12,20,.78));
+  }
 
-  .chip{font-size:9px;letter-spacing:.28em;padding:4px 8px;margin-bottom:14px}
-  .sec h2{font-size:34px;line-height:1.05;margin-bottom:10px}
+  .chip{font-size:9px;letter-spacing:.28em;padding:4px 8px;margin-bottom:12px}
+  .sec h2{font-size:30px;line-height:1.05;margin-bottom:10px;letter-spacing:-.015em}
   .sec .lede{font-size:16px;line-height:1.4}
   .sec p{font-size:14px;line-height:1.55}
 
-  /* Metric tiles wrap nicely on narrow screens */
-  .metrics{gap:8px;margin-top:16px}
-  .m{padding:8px 10px;flex:1 1 calc(50% - 8px);min-width:0}
+  /* Metric tiles — 2-column stable grid */
+  .metrics{
+    display:grid;
+    grid-template-columns:repeat(2, 1fr);
+    gap:8px;margin-top:16px;
+  }
+  .m{padding:10px 12px;min-width:0}
   .m b{font-size:15px}
   .m span{font-size:9px;letter-spacing:.08em}
 
-  /* HERO */
-  .hero{padding-top:120px;padding-bottom:60px}
-  .hero-mark{font-size:13px;letter-spacing:.2em;margin-bottom:14px}
-  .hero-title{font-size:44px;line-height:1;margin-bottom:14px;letter-spacing:-.015em}
-  .hero-sub{font-size:15px;line-height:1.45;margin-bottom:24px}
-  .hero-stats{gap:14px 18px;justify-content:space-around}
-  .hero-stats div{flex:1 1 38%;min-width:0}
-  .hero-stats b{font-size:22px}
-  .hero-stats span{font-size:9px;letter-spacing:.18em}
+  /* HERO — title sized for phones, hero fits within first viewport */
+  .hero{padding:136px 18px 40px}
+  .hero-mark{font-size:12px;letter-spacing:.2em;margin-bottom:12px}
+  .hero-title{font-size:42px;line-height:1;margin-bottom:14px;letter-spacing:-.018em}
+  .hero-sub{font-size:15px;line-height:1.45;margin-bottom:24px;max-width:none}
 
-  /* Agent wall — 2 columns, taller cards, clearer scroll */
-  .agent-wall{
-    grid-template-columns:repeat(2,1fr);
-    gap:6px;max-height:260px;
+  /* Hero stats — clean 2-column grid (not flex-wrap) */
+  .hero-stats{
+    display:grid;
+    grid-template-columns:repeat(2, 1fr);
+    gap:14px 12px;
+    max-width:340px;
+    margin:0 auto;
   }
-  .agent-wall .a{padding:10px 8px;font-size:9px}
-  .agent-wall .a b{font-size:10px}
+  .hero-stats div{
+    text-align:center;
+    background:rgba(11,20,36,.55);
+    border:1px solid var(--line);
+    padding:10px 8px;
+  }
+  .hero-stats b{font-size:22px}
+  .hero-stats span{font-size:9px;letter-spacing:.16em}
 
-  /* CTA button — fit narrow screens, keep 44px tap target */
+  /* Agent wall — horizontal scroll carousel of larger cards (no inner vertical scroll) */
+  .agent-wall{
+    display:flex;
+    grid-template-columns:none;
+    overflow-x:auto;
+    overflow-y:hidden;
+    max-height:none;
+    gap:8px;
+    padding:2px 2px 12px;
+    margin:18px -18px 0;
+    padding-left:18px;
+    padding-right:18px;
+    scroll-snap-type:x mandatory;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:thin;
+  }
+  .agent-wall::-webkit-scrollbar{height:4px}
+  .agent-wall::-webkit-scrollbar-thumb{background:rgba(255,42,42,.3)}
+  .agent-wall .a{
+    flex:0 0 140px;
+    padding:14px 12px;
+    font-size:11px;
+    scroll-snap-align:start;
+    text-align:left;
+  }
+  .agent-wall .a b{font-size:13px;margin-bottom:4px}
+  .agent-wall .a span{font-size:10px}
+  .agent-wall-more{
+    display:block;
+    margin-top:10px;
+    font-family:"JetBrains Mono",monospace;
+    font-size:10px;letter-spacing:.2em;
+    color:var(--muted);text-transform:uppercase;
+  }
+  .agent-wall-more b{color:var(--red)}
+
+  /* CTA — full-width, 48px tap target, never overflow at 375px */
   .cta.big{
     display:block;width:100%;
-    padding:16px 12px;font-size:12px;letter-spacing:.18em;
+    padding:16px 10px;
+    font-size:13px;letter-spacing:.14em;
     word-break:break-word;
+    overflow-wrap:anywhere;
     margin:20px 0 8px;
+    min-height:48px;
+    line-height:1.3;
   }
-  .footer-line{margin-top:28px;font-size:9px;letter-spacing:.22em}
+  .footer-line{margin-top:24px;font-size:9px;letter-spacing:.22em}
 }
 
-/* Extra-small phones (iPhone SE, ~360px) */
+/* Extra-small phones (iPhone SE, ~360-380px) */
 @media (max-width:380px){
   .hero-title{font-size:38px}
-  .sec h2{font-size:30px}
-  .hud-brand{font-size:12px}
-  .cta.big{font-size:11px;letter-spacing:.14em}
+  .sec h2{font-size:26px}
+  .hud-brand{font-size:11px;letter-spacing:.14em}
+  .cta.big{font-size:12px;letter-spacing:.1em;padding:16px 8px}
+  .hud-metrics{font-size:9px;padding:7px 10px}
+  .hero-stats{max-width:300px;gap:10px 8px}
+  .hero-stats b{font-size:20px}
+  .hero{padding-top:130px}
 }
 
 /* Short viewports — hero shouldn't push stats off-screen */
 @media (max-height:680px) and (max-width:640px){
   .scroll-indicator{display:none}
-  .hero{padding-top:100px}
+  .hero{padding-top:120px;padding-bottom:30px}
+  .hero-title{font-size:36px}
+  .hero-mark{margin-bottom:8px}
+  .hero-sub{margin-bottom:18px;font-size:14px}
+}
+
+/* Reduce motion preference: dampen pulses */
+@media (prefers-reduced-motion:reduce){
+  .pulse,.scroll-arrow::after{animation:none}
+  .sec{transition:none;opacity:1;transform:none}
+  html,body{scroll-behavior:auto}
 }

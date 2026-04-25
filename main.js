@@ -2,12 +2,16 @@ import * as THREE from "three";
 import { DISTRICTS, AGENT_SAMPLE } from "./districts.js";
 
 // ---------- SCENE ----------
+const isMobile = window.matchMedia("(max-width: 640px)").matches;
+const isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
+const lowPower = isMobile || isCoarsePointer;
+
 const canvas = document.getElementById("scene");
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: !lowPower, powerPreference: lowPower ? "low-power" : "high-performance" });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, lowPower ? 1.25 : 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = lowPower ? 0.85 : 1.05;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x04060a);
@@ -58,7 +62,8 @@ DISTRICTS.forEach(d => addPad(d.pos[0], d.pos[2], 9, d.color));
 const packetGeo = new THREE.SphereGeometry(0.8, 8, 8);
 const packetMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
 const packets = [];
-for (let i = 0; i < 220; i++) {
+const PACKET_COUNT = lowPower ? 80 : 220;
+for (let i = 0; i < PACKET_COUNT; i++) {
   const d = DISTRICTS[1 + (i % (DISTRICTS.length - 1))];
   const p = new THREE.Mesh(packetGeo, packetMat);
   p.userData = { target: d, t: Math.random(), speed: 0.08 + Math.random() * 0.1 };
@@ -171,15 +176,20 @@ function makeLabelSprite(text, color) {
 DISTRICTS.forEach(d => {
   const mesh = d.id === "spire" ? makeSpire(d) : builders[d.kind](d);
   mesh.position.set(d.pos[0], 0, d.pos[2]); scene.add(mesh);
-  const label = makeLabelSprite(d.name, d.color);
-  label.position.set(d.pos[0], d.tall + 18, d.pos[2]); scene.add(label);
+  // World-space labels clip at narrow viewport edges; suppress them on phones
+  // and rely on in-page section headings instead.
+  if (!lowPower) {
+    const label = makeLabelSprite(d.name, d.color);
+    label.position.set(d.pos[0], d.tall + 18, d.pos[2]); scene.add(label);
+  }
   const ring = new THREE.Mesh(new THREE.RingGeometry(18, 19.5, 64), new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.8, side: THREE.DoubleSide }));
   ring.rotation.x = -Math.PI / 2; ring.position.set(d.pos[0], 0.1, d.pos[2]); scene.add(ring);
 });
 
 // stars
 const stars = new THREE.BufferGeometry(); const sp = [];
-for (let i = 0; i < 1800; i++) sp.push((Math.random() - 0.5) * 4500, 50 + Math.random() * 1600, (Math.random() - 0.5) * 4500);
+const STAR_COUNT = lowPower ? 700 : 1800;
+for (let i = 0; i < STAR_COUNT; i++) sp.push((Math.random() - 0.5) * 4500, 50 + Math.random() * 1600, (Math.random() - 0.5) * 4500);
 stars.setAttribute("position", new THREE.Float32BufferAttribute(sp, 3));
 scene.add(new THREE.Points(stars, new THREE.PointsMaterial({ color: 0x88aaff, size: 1.5, transparent: true, opacity: 0.7 })));
 
@@ -250,6 +260,11 @@ sections.forEach(s => io.observe(s));
 const wall = document.getElementById("agentWall");
 if (wall) {
   wall.innerHTML = AGENT_SAMPLE.map(a => `<div class="a"><b>${a[0]}</b><span>${a[1]}</span></div>`).join("");
+  // Mobile: append a "+N more" count summary line outside the scrolling carousel
+  const more = document.createElement("div");
+  more.className = "agent-wall-more";
+  more.innerHTML = `Plus <b>${270 - AGENT_SAMPLE.length}+</b> more across the roster`;
+  wall.parentNode.insertBefore(more, wall.nextSibling);
 }
 
 // ---------- MOBILE NAV TOGGLE ----------
