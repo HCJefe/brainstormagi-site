@@ -8,15 +8,16 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Space+Grotesk:wght@400;500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./style.css?v=20260425-twisting-3d-restore-1" />
+<link rel="stylesheet" href="./style.css?v=20260425-curved-electric-route-1" />
 </head>
 <body>
-  <!-- Primary 3D circuit-board flight: Three.js scene rendered by main.js.
-       The camera rides a Catmull-Rom spline that banks and twists from
-       building to building. Persists across every section. -->
+  <!-- Primary scene: first-party Canvas2D pseudo-3D circuit-board flight.
+       Bezier-spline road that visibly twists and banks between section
+       specific structures. No remote dependencies. Persists across every
+       section. -->
   <canvas id="scene"></canvas>
-  <!-- Defensive Canvas2D fallback. Only paints if the WebGL engine fails
-       to acquire a context or start a frame. Hidden in normal operation. -->
+  <!-- Defensive procedural fallback. Only paints if the primary engine
+       cannot acquire a 2D context. Hidden in normal operation. -->
   <canvas id="scene-fallback" aria-hidden="true"></canvas>
 
   <!-- FIXED HUD -->
@@ -208,23 +209,14 @@
       update();
     })();
   </script>
-  <!-- Three.js as ES module. The 3D scene drives the entire flight. -->
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-    }
-  }
-  </script>
-  <!-- Defensive Canvas2D fallback. Only paints if WebGL fails. Loaded
-       first as a classic script so it is always available to the watchdog. -->
-  <script src="./fallback.js?v=20260425-twisting-3d-restore-1"></script>
-  <!-- Primary 3D engine: rides a Catmull-Rom camera through 8 districts
-       and twists/banks around each space-age structure. -->
-  <script type="module" src="./main.js?v=20260425-twisting-3d-restore-1"></script>
+  <!-- Defensive procedural fallback. Only paints if the primary engine
+       cannot acquire a 2D context. Loaded first so it is always available
+       to the watchdog. -->
+  <script src="./fallback.js?v=20260425-curved-electric-route-1"></script>
+  <!-- Primary engine: first-party Canvas2D curved electric route. -->
+  <script src="./main.js?v=20260425-curved-electric-route-1"></script>
   <script>
-    // Watchdog: if the 3D engine has not painted a frame within 2.5s
-    // (CDN unreachable, importmap unsupported, WebGL context lost, etc.)
+    // Watchdog: if the primary engine has not painted a frame within 2.5s,
     // light up the defensive fallback so the route is never empty.
     (function(){
       function check(){
@@ -235,13 +227,13 @@
         if (typeof window.__brainstormStartFallback === "function") {
           try { window.__brainstormStartFallback(); } catch(_) {}
         }
-        try { console.warn("[brainstorm] 3D engine did not paint within 2500ms; activating fallback"); } catch(_) {}
+        try { console.warn("[brainstorm] primary engine did not paint within 2500ms; activating fallback"); } catch(_) {}
       }
       setTimeout(check, 2500);
     })();
     window.addEventListener("error", function(e){
-      if (e && e.target && e.target.tagName === "SCRIPT" && /main\.js|three\.module/.test(e.target.src || "")) {
-        document.documentElement.dataset.sceneEngine = "module-error";
+      if (e && e.target && e.target.tagName === "SCRIPT" && /main\.js/.test(e.target.src || "")) {
+        document.documentElement.dataset.sceneEngine = "script-error";
         document.documentElement.classList.add("no-webgl");
         if (typeof window.__brainstormStartFallback === "function") {
           try { window.__brainstormStartFallback(); } catch(_) {}
