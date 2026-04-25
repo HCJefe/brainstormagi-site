@@ -8,11 +8,15 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Space+Grotesk:wght@400;500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./style.css?v=20260425-3d-road-restore-2" />
+<link rel="stylesheet" href="./style.css?v=20260425-webgl-runtime-1" />
 </head>
 <body>
   <!-- 3D CANVAS STAYS FIXED -->
   <canvas id="scene"></canvas>
+  <!-- Procedural Canvas2D fallback canvas. Painted by fallback.js only when
+       html.no-webgl is set (WebGL probe failed, renderer threw, context lost,
+       or Three module failed to load). Persists across all sections. -->
+  <canvas id="scene-fallback" aria-hidden="true"></canvas>
 
   <!-- FIXED HUD -->
   <div class="hud">
@@ -382,6 +386,45 @@
       update();
     })();
   </script>
-  <script type="module" src="./main.js?v=20260425-3d-road-restore-2"></script>
+  <!-- Procedural Canvas2D fallback. Loads as a classic script so it runs
+       even when the importmap or unpkg CDN is blocked / fails. It does not
+       paint until activated, which happens automatically if the WebGL
+       module never reports a rendered frame. -->
+  <script src="./fallback.js?v=20260425-webgl-runtime-1"></script>
+  <script type="module" src="./main.js?v=20260425-webgl-runtime-1"></script>
+  <script>
+    // Watchdog: if the WebGL module hasn't painted a single frame within
+    // 2.5s of page load, treat the WebGL path as failed and switch to the
+    // procedural Canvas2D fallback so the road journey is never blank.
+    (function(){
+      function check(){
+        var status = document.documentElement.dataset.webglStatus;
+        var frames = window.__brainstormRenderFrames || 0;
+        if (frames > 0 || status === "running") return;
+        if (status === "failed" || status === "unavailable" || status === "context-lost" || status === "module-error") return;
+        document.documentElement.dataset.webglStatus = "module-timeout";
+        document.documentElement.classList.add("no-webgl");
+        if (typeof window.__brainstormStartFallback === "function") {
+          try { window.__brainstormStartFallback(); } catch(_) {}
+        }
+        try { console.warn("[brainstorm] WebGL module did not paint within 2500ms; activating fallback"); } catch(_) {}
+      }
+      setTimeout(check, 2500);
+    })();
+    // If the importmap-resolved Three module fails to load at all, the
+    // module script will fire an `error` event on the script element. We
+    // can't add the listener after it's already started, but most CDN/
+    // importmap failures surface here as an unhandled rejection or as
+    // a script load error; either way we converge via the watchdog above.
+    window.addEventListener("error", function(e){
+      if (e && e.target && e.target.tagName === "SCRIPT" && /main\.js/.test(e.target.src || "")) {
+        document.documentElement.dataset.webglStatus = "module-error";
+        document.documentElement.classList.add("no-webgl");
+        if (typeof window.__brainstormStartFallback === "function") {
+          try { window.__brainstormStartFallback(); } catch(_) {}
+        }
+      }
+    }, true);
+  </script>
 </body>
 </html>

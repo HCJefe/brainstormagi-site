@@ -7,19 +7,68 @@ const isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
 const lowPower = isMobile || isCoarsePointer;
 
 const canvas = document.getElementById("scene");
-let renderer;
-try {
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: !lowPower, powerPreference: lowPower ? "low-power" : "high-performance" });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, lowPower ? 1.5 : 2));
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = lowPower ? 1.6 : 1.5;
-} catch (err) {
-  // No WebGL — let the SVG hero fallback take over the visual.
-  document.documentElement.classList.add("no-webgl");
-  console.warn("WebGL unavailable, falling back to SVG hero scene", err);
-  throw err;
+window.__brainstormRenderFrames = 0;
+
+function setWebGLStatus(status) {
+  document.documentElement.dataset.webglStatus = status;
 }
+
+function activateNoWebGL(reason) {
+  document.documentElement.classList.add("no-webgl");
+  setWebGLStatus(reason || "unavailable");
+  if (typeof window.__brainstormStartFallback === "function") {
+    try { window.__brainstormStartFallback(); } catch (_) {}
+  }
+}
+
+// Probe a real WebGL context BEFORE asking Three to construct the renderer.
+// If the probe fails we fall back gracefully (no rethrow) so the rest of
+// the page JS keeps working and the procedural Canvas2D fallback can run.
+setWebGLStatus("probing");
+const glAttrs = {
+  alpha: true,
+  antialias: !lowPower,
+  powerPreference: lowPower ? "low-power" : "high-performance",
+  preserveDrawingBuffer: false,
+  failIfMajorPerformanceCaveat: false,
+};
+let gl = null;
+try {
+  gl = canvas.getContext("webgl2", glAttrs) || canvas.getContext("webgl", glAttrs) || canvas.getContext("experimental-webgl", glAttrs);
+} catch (probeErr) {
+  console.warn("WebGL context probe threw:", probeErr);
+}
+
+let renderer = null;
+if (gl) {
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas, context: gl, antialias: !lowPower, powerPreference: lowPower ? "low-power" : "high-performance" });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, lowPower ? 1.5 : 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = lowPower ? 1.6 : 1.5;
+    setWebGLStatus("starting");
+    console.info("[brainstorm] WebGL renderer created");
+  } catch (err) {
+    console.warn("[brainstorm] WebGL renderer construction failed", err);
+    renderer = null;
+  }
+}
+
+if (!renderer) {
+  activateNoWebGL("failed");
+  // Stop module execution gracefully. The Canvas2D fallback (loaded
+  // separately) takes over the persistent backdrop.
+  throw new Error("WebGL unavailable; using procedural fallback");
+}
+
+// Recover from rare context-loss events instead of leaving a black canvas.
+canvas.addEventListener("webglcontextlost", (e) => {
+  e.preventDefault();
+  console.warn("[brainstorm] WebGL context lost");
+  setWebGLStatus("context-lost");
+  activateNoWebGL("context-lost");
+}, false);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x06101e);
@@ -1407,6 +1456,11 @@ function tick() {
   updatePackets(dt);
   updateLabelEdgeSafety();
   renderer.render(scene, camera);
+  window.__brainstormRenderFrames++;
+  if (window.__brainstormRenderFrames === 1) {
+    setWebGLStatus("running");
+    console.info("[brainstorm] First WebGL frame painted");
+  }
   requestAnimationFrame(tick);
 }
 tick();

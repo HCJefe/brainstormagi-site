@@ -21,16 +21,30 @@
   --safe-right:env(safe-area-inset-right, 0px);
 }
 *{box-sizing:border-box}
-html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:"Space Grotesk",system-ui,sans-serif;scroll-behavior:smooth;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-body{min-width:100%;width:100%;overflow-x:hidden}
+html,body{margin:0;padding:0;color:var(--text);font-family:"Space Grotesk",system-ui,sans-serif;scroll-behavior:smooth;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+/* The dark gradient lives on the body so a failed WebGL canvas can never be
+   disguised as a "dark scene". The canvas itself is fully transparent —
+   either Three.js paints it or the procedural Canvas2D fallback paints it. */
+body{
+  min-width:100%;width:100%;overflow-x:hidden;
+  background:
+    radial-gradient(ellipse at 50% 30%,rgba(92,242,255,.08) 0%,transparent 40%),
+    radial-gradient(ellipse at 50% 65%,#0b1830 0%,#070d1c 55%,#02040a 100%),
+    var(--bg);
+}
 
 canvas#scene{
   position:fixed;inset:0;width:100vw;height:100vh;display:block;z-index:0;
-  background:
-    radial-gradient(ellipse at 50% 30%,rgba(92,242,255,.08) 0%,transparent 40%),
-    radial-gradient(ellipse at 50% 50%,rgba(255,42,42,.12) 0%,transparent 50%),
-    radial-gradient(ellipse at 50% 65%,#13203a 0%,#070d1c 50%,#02040a 100%)
+  background:transparent;
 }
+/* Procedural Canvas2D fallback layer — sits in the same fixed slot as the
+   WebGL canvas. Hidden by default; .no-webgl on <html> turns it on. */
+canvas#scene-fallback{
+  position:fixed;inset:0;width:100vw;height:100vh;display:none;z-index:0;
+  background:transparent;pointer-events:none;
+}
+html.no-webgl canvas#scene{display:none}
+html.no-webgl canvas#scene-fallback{display:block}
 
 /* Scanline + very soft vignette over the whole page. Kept extremely
    light so the persistent 3D circuit-board WebGL scene reads through
@@ -321,21 +335,21 @@ body::after{
   padding-bottom:60px;
 }
 
-/* Hero SVG circuit fallback. Acts as a NO-WEBGL safety net only — when
-   WebGL renders, the canvas is the dominant visual, so this layer is
-   nearly invisible (very low opacity, masked away from the centre). It
-   exists so the page never reads as empty dark space if Three.js fails
-   to load, but it must NEVER mask the real 3D scene. */
+/* Hero SVG circuit fallback. NO-WEBGL safety net only. While WebGL is
+   running, this layer is essentially invisible so it cannot trick QA
+   into thinking the real 3D scene is rendering when it isn't. It only
+   becomes the dominant hero visual under html.no-webgl. */
 .hero-circuit{
   position:absolute;left:0;right:0;bottom:0;
   height:46%;
   pointer-events:none;
   z-index:0;
   overflow:hidden;
-  opacity:.18;
+  opacity:0;
   mix-blend-mode:screen;
   -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 60%,#000 100%);
           mask-image:linear-gradient(180deg,transparent 0,#000 60%,#000 100%);
+  transition:opacity .3s ease-out;
 }
 .hero-circuit-svg{
   width:100%;height:100%;
