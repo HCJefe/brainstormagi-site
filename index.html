@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Space+Grotesk:wght@400;500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./style.css?v=20260425-circuit-city-7" />
+<link rel="stylesheet" href="./style.css?v=20260425-3d-road-restore-1" />
 </head>
 <body>
   <!-- 3D CANVAS STAYS FIXED -->
@@ -242,7 +242,6 @@
 
     <!-- 1. THE SPIRE -->
     <section class="sec" id="spire" data-cam="spire">
-      <div class="sec-bg" data-bg="spire" aria-hidden="true"></div>
       <div class="sec-inner left">
         <div class="chip">01 / HQ</div>
         <h2>The Spire</h2>
@@ -258,7 +257,6 @@
 
     <!-- 2. AGENT FOUNDRY -->
     <section class="sec" id="foundry" data-cam="foundry">
-      <div class="sec-bg" data-bg="foundry" aria-hidden="true"></div>
       <div class="sec-inner right">
         <div class="chip">02 / Agents</div>
         <h2>Agent Foundry</h2>
@@ -275,7 +273,6 @@
 
     <!-- 3. VOICE GRID -->
     <section class="sec" id="voice" data-cam="voice">
-      <div class="sec-bg" data-bg="voice" aria-hidden="true"></div>
       <div class="sec-inner left">
         <div class="chip">03 / Voice</div>
         <h2>Voice Grid</h2>
@@ -291,7 +288,6 @@
 
     <!-- 4. OPS TOWER -->
     <section class="sec" id="ops" data-cam="ops">
-      <div class="sec-bg" data-bg="ops" aria-hidden="true"></div>
       <div class="sec-inner right">
         <div class="chip">04 / Operations</div>
         <h2>Ops Tower</h2>
@@ -307,7 +303,6 @@
 
     <!-- 5. REVENUE ENGINE -->
     <section class="sec" id="revenue" data-cam="revenue">
-      <div class="sec-bg" data-bg="revenue" aria-hidden="true"></div>
       <div class="sec-inner left">
         <div class="chip">05 / Revenue</div>
         <h2>Revenue Engine</h2>
@@ -323,7 +318,6 @@
 
     <!-- 6. CONTENT FORGE -->
     <section class="sec" id="content" data-cam="content">
-      <div class="sec-bg" data-bg="content" aria-hidden="true"></div>
       <div class="sec-inner right">
         <div class="chip">06 / Content</div>
         <h2>Content Forge</h2>
@@ -339,7 +333,6 @@
 
     <!-- 7. INTEGRATION HUB -->
     <section class="sec" id="integration" data-cam="integration">
-      <div class="sec-bg" data-bg="integration" aria-hidden="true"></div>
       <div class="sec-inner left">
         <div class="chip">07 / Integration</div>
         <h2>Integration Hub</h2>
@@ -356,7 +349,6 @@
 
     <!-- 8. CONTACT -->
     <section class="sec" id="contact" data-cam="contact">
-      <div class="sec-bg" data-bg="contact" aria-hidden="true"></div>
       <div class="sec-inner center">
         <div class="chip">08 / Contact</div>
         <h2>Start a Project</h2>
@@ -375,11 +367,6 @@
     }
   }
   </script>
-  <!-- Persistent section-level Antigravity backgrounds. Runs synchronously
-       (not a module, no defer) so the SVG checkpoint scenes are populated
-       before the user can scroll past hero, and stay visible even if WebGL
-       or main.js fails. Each .sec-bg element gets a per-section variant. -->
-  <script src="./section-bg.js?v=20260425-circuit-city-7"></script>
   <script>
     // Hero-only scroll indicator. Independent of main.js so the cue fades
     // even if the WebGL module fails to load.
@@ -395,6 +382,6 @@
       update();
     })();
   </script>
-  <script type="module" src="./main.js?v=20260425-circuit-city-7"></script>
+  <script type="module" src="./main.js?v=20260425-3d-road-restore-1"></script>
 </body>
 </html>

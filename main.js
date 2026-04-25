@@ -15,17 +15,18 @@ renderer.toneMappingExposure = lowPower ? 1.35 : 1.3;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0a1430);
-// Much lighter fog so far buildings and the road remain visible from every
-// section pose. With the previous density (0.00038) the scene faded to black
-// past the hero so every section read as empty dark space. We keep just
-// enough atmospheric haze to give depth without erasing the journey.
-scene.fog = new THREE.FogExp2(0x0a1430, lowPower ? 0.00010 : 0.00014);
+// Very light atmospheric haze. We deliberately keep fog density low so the
+// road and buildings stay visible at every section camera pose; rails,
+// pads, traces, and packets are flagged fog:false so the electric circuit
+// highway always reads as a live trace, never as empty dark space.
+scene.fog = new THREE.FogExp2(0x0a1430, lowPower ? 0.00006 : 0.00009);
 
-const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.5, 8000);
-// Hero camera sits lower and closer so the circuit highway enters the
-// foreground and the Spire silhouette plus Foundry tower read above the fold.
-camera.position.set(28, 110, 360);
-camera.lookAt(0, 38, -280);
+const camera = new THREE.PerspectiveCamera(64, window.innerWidth / window.innerHeight, 0.5, 8000);
+// Hero camera sits at maglev-cab height looking down the electrified
+// circuit highway. Low altitude, slightly off-axis, so the road traces
+// charge into the foreground and the Spire crown rises above the horizon.
+camera.position.set(18, 44, 320);
+camera.lookAt(0, 26, -300);
 
 scene.add(new THREE.AmbientLight(0x6276a0, lowPower ? 1.4 : 1.3));
 const key = new THREE.DirectionalLight(0xffe0d0, lowPower ? 1.6 : 1.45); key.position.set(300, 500, 300); scene.add(key);
@@ -1107,41 +1108,42 @@ scene.add(new THREE.Points(stars, new THREE.PointsMaterial({ color: 0x88aaff, si
 // building as it passes.
 function poseAt(id, opts) {
   if (id === "hero") {
-    // Lower, slightly off-axis hero pose so the circuit highway enters the
-    // foreground below the hero card and at least one space-age structure
-    // (Spire + Foundry) is visible above the fold.
+    // Maglev-cab hero pose: low, near road center, looking straight down the
+    // electrified circuit highway. Spire crown rises above the horizon and
+    // the rails charge into the foreground.
     return {
-      pos: new THREE.Vector3(28, 110, 360),
-      look: new THREE.Vector3(0, 38, -280),
+      pos: new THREE.Vector3(18, 44, 320),
+      look: new THREE.Vector3(0, 26, -300),
     };
   }
   const d = DISTRICTS.find(x => x.id === id);
-  // Camera rides the circuit highway at low altitude, just behind each
-  // checkpoint, so the road, the building, and the next building down the
-  // road are all in frame. Lower look targets keep the road in view rather
-  // than aiming above the building tops at empty sky.
-  const side = d.pos[0] >= 0 ? -1 : 1;  // camera offsets to opposite side
-  const lateral = side * (opts.lateral ?? 60);
-  const height = opts.height ?? 55;
-  const behindZ = opts.behindZ ?? 180;  // camera Z is z + behindZ (further from end)
+  // Camera rides the circuit highway at cab height. Lateral offset is to
+  // the OPPOSITE side of the building so we frame the building over the
+  // far rail and the road extends into the next checkpoint. Height stays
+  // low (28-46) so the rails and lane dashes always read as live traces.
+  const side = d.pos[0] >= 0 ? -1 : 1;
+  const lateral = side * (opts.lateral ?? 28);
+  const height = opts.height ?? 36;
+  const behindZ = opts.behindZ ?? 210;
   return {
-    pos: new THREE.Vector3(d.pos[0] + lateral, height, d.pos[2] + behindZ),
-    // Look slightly past the building, at road-level, so the highway extends
-    // into the distance and the building reads in front of the camera.
-    look: new THREE.Vector3(d.pos[0] * 0.3, opts.lookY ?? 22, d.pos[2] - 140),
+    pos: new THREE.Vector3(d.pos[0] * 0.18 + lateral, height, d.pos[2] + behindZ),
+    // Look forward toward the next checkpoint so the highway reads as a
+    // continuous trace; bias the look slightly toward the current building
+    // so it sits in frame instead of off to one shoulder.
+    look: new THREE.Vector3(d.pos[0] * 0.45, opts.lookY ?? 24, d.pos[2] - 140),
   };
 }
 
 const KEYS = [
   poseAt("hero"),
-  poseAt("spire",       { lateral: 70,  height: 80,  behindZ: 220, lookY: 50 }),
-  poseAt("foundry",     { lateral: 65,  height: 50,  behindZ: 170, lookY: 22 }),
-  poseAt("voice",       { lateral: 75,  height: 65,  behindZ: 170, lookY: 32 }),
-  poseAt("ops",         { lateral: 78,  height: 60,  behindZ: 180, lookY: 30 }),
-  poseAt("revenue",     { lateral: 72,  height: 50,  behindZ: 170, lookY: 24 }),
-  poseAt("content",     { lateral: 78,  height: 50,  behindZ: 170, lookY: 22 }),
-  poseAt("integration", { lateral: 75,  height: 55,  behindZ: 190, lookY: 28 }),
-  poseAt("contact",     { lateral: 0,   height: 70,  behindZ: 200, lookY: 14 }),
+  poseAt("spire",       { lateral: 32,  height: 48,  behindZ: 240, lookY: 60 }),
+  poseAt("foundry",     { lateral: 26,  height: 36,  behindZ: 200, lookY: 30 }),
+  poseAt("voice",       { lateral: 30,  height: 42,  behindZ: 210, lookY: 44 }),
+  poseAt("ops",         { lateral: 30,  height: 40,  behindZ: 210, lookY: 42 }),
+  poseAt("revenue",     { lateral: 28,  height: 36,  behindZ: 200, lookY: 32 }),
+  poseAt("content",     { lateral: 30,  height: 36,  behindZ: 200, lookY: 28 }),
+  poseAt("integration", { lateral: 30,  height: 40,  behindZ: 220, lookY: 36 }),
+  poseAt("contact",     { lateral: 18,  height: 40,  behindZ: 230, lookY: 18 }),
 ];
 
 const posCurve = new THREE.CatmullRomCurve3(KEYS.map(k => k.pos), false, "catmullrom", 0.25);
