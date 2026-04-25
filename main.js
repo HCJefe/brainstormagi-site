@@ -286,15 +286,28 @@ function makeSpire(d) {
 const builders = { tower: makeTower, antenna: makeAntenna, plaza: makePlaza, vault: makeVault, chip: makeChip, bridge: makeBridge, pad: makePad };
 
 function makeLabelSprite(text, color) {
-  const cvs = document.createElement("canvas"); cvs.width = 512; cvs.height = 128;
+  // High-DPI canvas so the chip renders crisply at the larger world scale
+  const W = 1024, H = 220;
+  const cvs = document.createElement("canvas"); cvs.width = W; cvs.height = H;
   const ctx = cvs.getContext("2d");
-  ctx.fillStyle = "rgba(6,10,18,0.7)"; ctx.fillRect(0, 0, 512, 128);
-  ctx.strokeStyle = "#" + new THREE.Color(color).getHexString(); ctx.lineWidth = 4; ctx.strokeRect(2, 2, 508, 124);
-  ctx.font = "800 48px 'JetBrains Mono', monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.fillStyle = "#ffffff"; ctx.fillText(text.toUpperCase(), 256, 64);
-  const tex = new THREE.CanvasTexture(cvs); tex.anisotropy = 4;
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
-  s.scale.set(52, 13, 1); return s;
+  // Solid panel background for legibility against the 3D scene
+  ctx.fillStyle = "rgba(4,8,16,0.92)"; ctx.fillRect(0, 0, W, H);
+  // Brand-color border + inner highlight
+  ctx.strokeStyle = "#" + new THREE.Color(color).getHexString();
+  ctx.lineWidth = 6; ctx.strokeRect(3, 3, W - 6, H - 6);
+  ctx.strokeStyle = "rgba(255,255,255,0.18)"; ctx.lineWidth = 2;
+  ctx.strokeRect(10, 10, W - 20, H - 20);
+  // Large, high-contrast text
+  ctx.font = "800 96px 'JetBrains Mono', monospace";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillStyle = "#ffffff";
+  ctx.shadowColor = "rgba(0,0,0,0.85)"; ctx.shadowBlur = 12;
+  ctx.fillText(text.toUpperCase(), W / 2, H / 2 + 4);
+  const tex = new THREE.CanvasTexture(cvs); tex.anisotropy = 8;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+  // World-space scale — larger so labels are at least ~14px equivalent on desktop
+  s.scale.set(96, 21, 1);
+  return s;
 }
 
 DISTRICTS.forEach(d => {
@@ -304,7 +317,9 @@ DISTRICTS.forEach(d => {
   // and rely on in-page section headings instead.
   if (!lowPower) {
     const label = makeLabelSprite(d.name, d.color);
-    label.position.set(d.pos[0], d.tall + 18, d.pos[2]); scene.add(label);
+    // Position label snug above the building so it stays inside the camera frame
+    label.position.set(d.pos[0], d.tall + 26, d.pos[2]);
+    scene.add(label);
   }
   const ring = new THREE.Mesh(new THREE.RingGeometry(18, 19.5, 64), new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.8, side: THREE.DoubleSide }));
   ring.rotation.x = -Math.PI / 2; ring.position.set(d.pos[0], 0.1, d.pos[2]); scene.add(ring);
@@ -387,7 +402,7 @@ if (wall) {
   // Mobile: append a "+N more" count summary line outside the scrolling carousel
   const more = document.createElement("div");
   more.className = "agent-wall-more";
-  more.innerHTML = `Plus <b>${270 - AGENT_SAMPLE.length}+</b> more across the roster`;
+  more.innerHTML = `<span class="agent-wall-swipe">Swipe to browse roster</span> Plus <b>${270 - AGENT_SAMPLE.length}+</b> more.`;
   wall.parentNode.insertBefore(more, wall.nextSibling);
 }
 
