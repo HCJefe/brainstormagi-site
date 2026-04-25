@@ -18,8 +18,10 @@ scene.background = new THREE.Color(0x05091a);
 scene.fog = new THREE.FogExp2(0x070d1c, lowPower ? 0.00028 : 0.00038);
 
 const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.5, 8000);
-camera.position.set(0, 220, 480);
-camera.lookAt(0, 50, -260);
+// Hero camera sits lower and closer so the circuit highway enters the
+// foreground and the Spire silhouette plus Foundry tower read above the fold.
+camera.position.set(28, 110, 360);
+camera.lookAt(0, 38, -280);
 
 scene.add(new THREE.AmbientLight(0x4a5a7a, lowPower ? 1.1 : 1.0));
 const key = new THREE.DirectionalLight(0xffe0d0, lowPower ? 1.45 : 1.3); key.position.set(300, 500, 300); scene.add(key);
@@ -875,6 +877,143 @@ DISTRICTS.forEach(d => {
   }
 });
 
+// ---------- HERO FOREGROUND CIRCUITRY ----------
+// Hero-only PCB elements close to the camera (z = 120..290) so the first
+// viewport always reads as a circuit board, not as plain dark space, no
+// matter where the camera waypoint lands. These are large, fog-immune, and
+// bright enough to be visible around the hero content card.
+function addHeroForeground() {
+  // Big bright solder pad on the right shoulder — frames the card without
+  // overlapping it. Sits just inside the visible right edge at hero zoom.
+  const heroPadR = new THREE.Mesh(
+    new THREE.CircleGeometry(34, 48),
+    new THREE.MeshBasicMaterial({ color: 0xff5a3a, transparent: true, opacity: 0.85, fog: false })
+  );
+  heroPadR.rotation.x = -Math.PI / 2;
+  heroPadR.position.set(180, ROAD_Y + 0.3, 200);
+  scene.add(heroPadR);
+  const heroPadRRing = new THREE.Mesh(
+    new THREE.RingGeometry(36, 39, 64),
+    new THREE.MeshBasicMaterial({ color: 0x5cf2ff, transparent: true, opacity: 0.95, side: THREE.DoubleSide, fog: false })
+  );
+  heroPadRRing.rotation.x = -Math.PI / 2;
+  heroPadRRing.position.set(180, ROAD_Y + 0.4, 200);
+  scene.add(heroPadRRing);
+
+  // Big cyan solder pad on the left shoulder
+  const heroPadL = new THREE.Mesh(
+    new THREE.CircleGeometry(28, 48),
+    new THREE.MeshBasicMaterial({ color: 0x5cf2ff, transparent: true, opacity: 0.85, fog: false })
+  );
+  heroPadL.rotation.x = -Math.PI / 2;
+  heroPadL.position.set(-180, ROAD_Y + 0.3, 240);
+  scene.add(heroPadL);
+  const heroPadLRing = new THREE.Mesh(
+    new THREE.RingGeometry(30, 33, 64),
+    new THREE.MeshBasicMaterial({ color: 0xff5a3a, transparent: true, opacity: 0.9, side: THREE.DoubleSide, fog: false })
+  );
+  heroPadLRing.rotation.x = -Math.PI / 2;
+  heroPadLRing.position.set(-180, ROAD_Y + 0.4, 240);
+  scene.add(heroPadLRing);
+
+  // Hero foreground branch traces from highway shoulders out to the pads.
+  const heroTraceR = new THREE.Mesh(
+    new THREE.BoxGeometry(124, 0.4, 1.6),
+    new THREE.MeshBasicMaterial({ color: 0x5cf2ff, transparent: true, opacity: 0.95, fog: false })
+  );
+  heroTraceR.position.set(HIGHWAY_HALF_WIDTH + 62, ROAD_Y + 0.45, 200);
+  scene.add(heroTraceR);
+  const heroTraceL = new THREE.Mesh(
+    new THREE.BoxGeometry(124, 0.4, 1.6),
+    new THREE.MeshBasicMaterial({ color: 0xff5a3a, transparent: true, opacity: 0.95, fog: false })
+  );
+  heroTraceL.position.set(-HIGHWAY_HALF_WIDTH - 62, ROAD_Y + 0.45, 240);
+  scene.add(heroTraceL);
+
+  // Bright lane-marker pads on the highway in hero view (closer + larger
+  // than the regular dashes) so the road clearly reads as a live trace.
+  for (let i = 0; i < 5; i++) {
+    const z = 280 - i * 28;
+    const dash = new THREE.Mesh(
+      new THREE.BoxGeometry(2.6, 0.5, 12),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, fog: false })
+    );
+    dash.position.set(0, ROAD_Y + 0.55, z);
+    scene.add(dash);
+  }
+
+  // Hero-near energy column — short bright structure on the right, behind
+  // the right pad, so a "building" reads beside the card without competing
+  // with the Spire on the horizon.
+  const colHeight = 86;
+  const heroCol = new THREE.Mesh(
+    new THREE.BoxGeometry(14, colHeight, 14),
+    new THREE.MeshStandardMaterial({ color: 0x223852, metalness: 0.85, roughness: 0.25, emissive: 0xff3a3a, emissiveIntensity: 0.55 })
+  );
+  heroCol.position.set(180, colHeight / 2 + 1, 200);
+  scene.add(heroCol);
+  // Vertical cyan light strip up the front face
+  const heroColStrip = new THREE.Mesh(
+    new THREE.BoxGeometry(0.6, colHeight * 0.92, 0.6),
+    new THREE.MeshBasicMaterial({ color: 0x5cf2ff, transparent: true, opacity: 0.95, fog: false })
+  );
+  heroColStrip.position.set(180, colHeight / 2 + 1, 207.2);
+  scene.add(heroColStrip);
+  // Window bands wrapping the column
+  for (let i = 0; i < 4; i++) {
+    const y = (i + 0.5) * (colHeight / 4);
+    const band = new THREE.Mesh(
+      new THREE.BoxGeometry(14.2, 0.6, 14.2),
+      new THREE.MeshBasicMaterial({ color: 0x5cf2ff, transparent: true, opacity: 0.85, fog: false })
+    );
+    band.position.set(180, y, 200);
+    scene.add(band);
+  }
+  // Top beacon
+  const heroColTip = new THREE.Mesh(
+    new THREE.SphereGeometry(2.2, 16, 16),
+    new THREE.MeshBasicMaterial({ color: 0xff3a3a, fog: false })
+  );
+  heroColTip.position.set(180, colHeight + 5, 200);
+  scene.add(heroColTip);
+
+  // Slimmer cyan pylon on the left
+  const pylonH = 64;
+  const heroPylon = new THREE.Mesh(
+    new THREE.CylinderGeometry(3.2, 5, pylonH, 12),
+    new THREE.MeshStandardMaterial({ color: 0x223852, metalness: 0.85, roughness: 0.3, emissive: 0x5cf2ff, emissiveIntensity: 0.55 })
+  );
+  heroPylon.position.set(-180, pylonH / 2 + 1, 240);
+  scene.add(heroPylon);
+  const heroPylonStrip = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, pylonH * 0.85, 0.5),
+    new THREE.MeshBasicMaterial({ color: 0x5cf2ff, transparent: true, opacity: 0.95, fog: false })
+  );
+  heroPylonStrip.position.set(-180, pylonH / 2 + 1, 246);
+  scene.add(heroPylonStrip);
+  const heroPylonTip = new THREE.Mesh(
+    new THREE.SphereGeometry(1.6, 14, 14),
+    new THREE.MeshBasicMaterial({ color: 0x5cf2ff, fog: false })
+  );
+  heroPylonTip.position.set(-180, pylonH + 4, 240);
+  scene.add(heroPylonTip);
+
+  // Scattered hero-near solder dots on either side of the road for PCB read.
+  for (let i = 0; i < 10; i++) {
+    const sideSign = i % 2 === 0 ? -1 : 1;
+    const x = sideSign * (HIGHWAY_HALF_WIDTH + 14 + Math.random() * 70);
+    const z = 130 + Math.random() * 160;
+    const via = new THREE.Mesh(
+      new THREE.CircleGeometry(1.6, 14),
+      new THREE.MeshBasicMaterial({ color: i % 3 === 0 ? 0xff5a3a : 0x5cf2ff, transparent: true, opacity: 0.95, fog: false })
+    );
+    via.rotation.x = -Math.PI / 2;
+    via.position.set(x, ROAD_Y + 0.32, z);
+    scene.add(via);
+  }
+}
+addHeroForeground();
+
 // ---------- ELECTRIC PACKETS DOWN THE HIGHWAY ----------
 // Pulses that flow north-to-south down the main trace, plus side packets
 // that branch off to each district pad. Reads as live electricity on a PCB.
@@ -964,9 +1103,12 @@ scene.add(new THREE.Points(stars, new THREE.PointsMaterial({ color: 0x88aaff, si
 // building as it passes.
 function poseAt(id, opts) {
   if (id === "hero") {
+    // Lower, slightly off-axis hero pose so the circuit highway enters the
+    // foreground below the hero card and at least one space-age structure
+    // (Spire + Foundry) is visible above the fold.
     return {
-      pos: new THREE.Vector3(0, 200, 460),
-      look: new THREE.Vector3(0, 70, -260),
+      pos: new THREE.Vector3(28, 110, 360),
+      look: new THREE.Vector3(0, 38, -280),
     };
   }
   const d = DISTRICTS.find(x => x.id === id);
@@ -1048,11 +1190,23 @@ if (hudToggle && hudNav) {
     hudNav.classList.remove("open");
     hudToggle.setAttribute("aria-expanded", "false");
   };
-  hudToggle.addEventListener("click", () => {
-    const open = hudNav.classList.toggle("open");
-    hudToggle.setAttribute("aria-expanded", open ? "true" : "false");
+  const openNav = () => {
+    hudNav.classList.add("open");
+    hudToggle.setAttribute("aria-expanded", "true");
+  };
+  hudToggle.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (hudNav.classList.contains("open")) closeNav(); else openNav();
   });
   hudNav.querySelectorAll("a").forEach(a => a.addEventListener("click", closeNav));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && hudNav.classList.contains("open")) closeNav();
+  });
+  document.addEventListener("click", (e) => {
+    if (!hudNav.classList.contains("open")) return;
+    if (hudNav.contains(e.target) || hudToggle.contains(e.target)) return;
+    closeNav();
+  });
 }
 
 // ---------- LABEL EDGE + PANEL SAFETY ----------
