@@ -7,32 +7,41 @@ const isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
 const lowPower = isMobile || isCoarsePointer;
 
 const canvas = document.getElementById("scene");
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: !lowPower, powerPreference: lowPower ? "low-power" : "high-performance" });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, lowPower ? 1.5 : 2));
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = lowPower ? 1.35 : 1.3;
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: !lowPower, powerPreference: lowPower ? "low-power" : "high-performance" });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, lowPower ? 1.5 : 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = lowPower ? 1.6 : 1.5;
+} catch (err) {
+  // No WebGL — let the SVG hero fallback take over the visual.
+  document.documentElement.classList.add("no-webgl");
+  console.warn("WebGL unavailable, falling back to SVG hero scene", err);
+  throw err;
+}
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0a1430);
-// Very light atmospheric haze. We deliberately keep fog density low so the
-// road and buildings stay visible at every section camera pose; rails,
-// pads, traces, and packets are flagged fog:false so the electric circuit
-// highway always reads as a live trace, never as empty dark space.
-scene.fog = new THREE.FogExp2(0x0a1430, lowPower ? 0.00006 : 0.00009);
+scene.background = new THREE.Color(0x06101e);
+// Very light atmospheric haze so the camera reads buildings, road, and
+// stars at every section pose. Rails, pads, traces, beacons, packets are
+// flagged fog:false so the electric circuit highway always reads as a
+// live trace, never as empty dark space.
+scene.fog = new THREE.FogExp2(0x06101e, lowPower ? 0.00018 : 0.00022);
 
-const camera = new THREE.PerspectiveCamera(64, window.innerWidth / window.innerHeight, 0.5, 8000);
-// Hero camera sits at maglev-cab height looking down the electrified
-// circuit highway. Low altitude, slightly off-axis, so the road traces
-// charge into the foreground and the Spire crown rises above the horizon.
-camera.position.set(18, 44, 320);
-camera.lookAt(0, 26, -300);
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.5, 8000);
+// Hero camera is a cinematic aerial pull-back so the entire electric
+// circuit-highway corridor and the Spire are framed in shot from the
+// first paint. Tilted slightly down toward the highway so the rails
+// charge into the foreground.
+camera.position.set(0, 320, 620);
+camera.lookAt(0, 40, -120);
 
-scene.add(new THREE.AmbientLight(0x6276a0, lowPower ? 1.4 : 1.3));
-const key = new THREE.DirectionalLight(0xffe0d0, lowPower ? 1.6 : 1.45); key.position.set(300, 500, 300); scene.add(key);
-const rim = new THREE.DirectionalLight(0xff5566, lowPower ? 1.15 : 1.0); rim.position.set(-400, 240, -600); scene.add(rim);
-const cyanLight = new THREE.DirectionalLight(0x6ff5ff, lowPower ? 1.2 : 1.05); cyanLight.position.set(0, 240, -400); scene.add(cyanLight);
-const fillLight = new THREE.DirectionalLight(0xaad0ff, 0.7); fillLight.position.set(120, 300, 200); scene.add(fillLight);
+scene.add(new THREE.AmbientLight(0x7a90c0, lowPower ? 1.7 : 1.6));
+const key = new THREE.DirectionalLight(0xffe0d0, lowPower ? 1.9 : 1.7); key.position.set(300, 500, 300); scene.add(key);
+const rim = new THREE.DirectionalLight(0xff5566, lowPower ? 1.4 : 1.2); rim.position.set(-400, 240, -600); scene.add(rim);
+const cyanLight = new THREE.DirectionalLight(0x6ff5ff, lowPower ? 1.45 : 1.25); cyanLight.position.set(0, 240, -400); scene.add(cyanLight);
+const fillLight = new THREE.DirectionalLight(0xaad0ff, 0.95); fillLight.position.set(120, 300, 200); scene.add(fillLight);
 
 // ---------- CIRCUIT-BOARD GROUND ----------
 // The ground is a long PCB stretching from the hero (Z=+300) down to past
@@ -44,7 +53,7 @@ const BOARD_OFFSET_Z = -700;  // shift board so it covers the full highway
 
 const floor = new THREE.Mesh(
   new THREE.PlaneGeometry(BOARD_W, BOARD_L),
-  new THREE.MeshStandardMaterial({ color: 0x162a48, roughness: 0.7, metalness: 0.45, emissive: 0x162844, emissiveIntensity: 1.200 })
+  new THREE.MeshStandardMaterial({ color: 0x1c3460, roughness: 0.55, metalness: 0.55, emissive: 0x1a2c52, emissiveIntensity: 1.55 })
 );
 floor.rotation.x = -Math.PI / 2;
 floor.position.z = BOARD_OFFSET_Z;
@@ -70,7 +79,7 @@ const HIGHWAY_X = 0;
 const HIGHWAY_Z_START =  300;   // behind the hero camera
 const HIGHWAY_Z_END   = -1800;  // past the contact pad
 const HIGHWAY_LENGTH = HIGHWAY_Z_START - HIGHWAY_Z_END;
-const HIGHWAY_HALF_WIDTH = 26;
+const HIGHWAY_HALF_WIDTH = 38;
 const ROAD_Y = 0.15;
 
 // Road core — wide dark trace (the "trace metal" of the PCB).
@@ -91,20 +100,21 @@ copperBand.rotation.x = -Math.PI / 2;
 copperBand.position.set(HIGHWAY_X, ROAD_Y + 0.05, (HIGHWAY_Z_START + HIGHWAY_Z_END) / 2);
 scene.add(copperBand);
 
-// Twin rails — cyan (left) and red copper (right) glowing edges.
-function addRail(xOffset, color, opacity) {
+// Twin rails — cyan (left) and red copper (right) glowing edges. Boxes are
+// taller and wider so the electric road reads from any cinematic pose.
+function addRail(xOffset, color, opacity, width = 2.6, height = 1.8) {
   const rail = new THREE.Mesh(
-    new THREE.BoxGeometry(1.6, 1.2, HIGHWAY_LENGTH),
+    new THREE.BoxGeometry(width, height, HIGHWAY_LENGTH),
     new THREE.MeshBasicMaterial({ color, transparent: true, opacity, fog: false })
   );
-  rail.position.set(HIGHWAY_X + xOffset, ROAD_Y + 0.5, (HIGHWAY_Z_START + HIGHWAY_Z_END) / 2);
+  rail.position.set(HIGHWAY_X + xOffset, ROAD_Y + 0.7, (HIGHWAY_Z_START + HIGHWAY_Z_END) / 2);
   scene.add(rail);
 }
-addRail(-HIGHWAY_HALF_WIDTH, 0x8cf8ff, 1.0);
-addRail( HIGHWAY_HALF_WIDTH, 0xff5a5a, 0.95);
+addRail(-HIGHWAY_HALF_WIDTH, 0x8cf8ff, 1.0, 3.0, 2.0);
+addRail( HIGHWAY_HALF_WIDTH, 0xff5a5a, 0.98, 3.0, 2.0);
 // Secondary inner trace lines
-addRail(-HIGHWAY_HALF_WIDTH * 0.55, 0x4abad0, 0.85);
-addRail( HIGHWAY_HALF_WIDTH * 0.55, 0xc83838, 0.85);
+addRail(-HIGHWAY_HALF_WIDTH * 0.55, 0x4abad0, 0.9, 1.6, 1.2);
+addRail( HIGHWAY_HALF_WIDTH * 0.55, 0xc83838, 0.9, 1.6, 1.2);
 
 // Center current spine — glowing white live wire.
 const spine = new THREE.Mesh(
@@ -114,16 +124,17 @@ const spine = new THREE.Mesh(
 spine.position.set(HIGHWAY_X, ROAD_Y + 0.3, (HIGHWAY_Z_START + HIGHWAY_Z_END) / 2);
 scene.add(spine);
 
-// Dashed lane markers down the spine — short emissive copper-red dashes.
-const DASH_SPACING = 22;
+// Dashed lane markers down the spine — bright emissive dashes that read
+// like live current pulses on the trace from any aerial pose.
+const DASH_SPACING = 18;
 const dashCount = Math.floor(HIGHWAY_LENGTH / DASH_SPACING);
 for (let i = 0; i < dashCount; i++) {
   const z = HIGHWAY_Z_START - (i + 0.5) * DASH_SPACING;
   const dash = new THREE.Mesh(
-    new THREE.BoxGeometry(1.8, 0.4, 8),
-    new THREE.MeshBasicMaterial({ color: 0xff5a3a, transparent: true, opacity: 1.0, fog: false })
+    new THREE.BoxGeometry(3.2, 0.5, 11),
+    new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? 0xff5a3a : 0xffffff, transparent: true, opacity: 1.0, fog: false })
   );
-  dash.position.set(HIGHWAY_X, ROAD_Y + 0.4, z);
+  dash.position.set(HIGHWAY_X, ROAD_Y + 0.6, z);
   scene.add(dash);
 }
 
@@ -882,6 +893,63 @@ DISTRICTS.forEach(d => {
   }
 });
 
+// ---------- ROADSIDE LAMP PYLONS ----------
+// Tall glowing lamp pylons spaced along the highway shoulders so the
+// camera always frames at least one structure plus the road on every
+// section pose. Alternating sides + alternating cyan/red lamps so the
+// path always reads as an electrified corridor, not empty space.
+function addLampPylon(x, z, color) {
+  const g = new THREE.Group();
+  const H = 70;
+  const post = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.4, 2.4, H, 8),
+    new THREE.MeshStandardMaterial({ color: 0x1a2436, metalness: 0.9, roughness: 0.25, emissive: color, emissiveIntensity: 0.45 })
+  );
+  post.position.y = H / 2;
+  g.add(post);
+  // Vertical lit strip up the post
+  const strip = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, H * 0.86, 0.5),
+    new THREE.MeshBasicMaterial({ color: 0x5cf2ff, transparent: true, opacity: 0.9, fog: false })
+  );
+  strip.position.set(0, H / 2, 1.6);
+  g.add(strip);
+  // Crown lamp
+  const crown = new THREE.Mesh(
+    new THREE.BoxGeometry(8, 1.6, 8),
+    new THREE.MeshStandardMaterial({ color: 0x223852, metalness: 0.9, roughness: 0.25, emissive: color, emissiveIntensity: 1.4 })
+  );
+  crown.position.y = H + 0.8;
+  g.add(crown);
+  // Glowing halo above the crown
+  const halo = new THREE.Mesh(
+    new THREE.SphereGeometry(2.6, 14, 14),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, fog: false })
+  );
+  halo.position.y = H + 3.2;
+  g.add(halo);
+  // Faint downward light cone (transparent box flanged out)
+  const cone = new THREE.Mesh(
+    new THREE.ConeGeometry(10, 30, 12, 1, true),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.18, fog: false, side: THREE.DoubleSide })
+  );
+  cone.position.y = H - 14;
+  cone.rotation.x = Math.PI;
+  g.add(cone);
+  g.position.set(x, 0, z);
+  scene.add(g);
+}
+const LAMP_SPACING = 110;
+const LAMP_SHOULDER = HIGHWAY_HALF_WIDTH + 20;
+for (let z = HIGHWAY_Z_START - 80; z > HIGHWAY_Z_END + 80; z -= LAMP_SPACING) {
+  // Skip lamps that would land directly on a district pad
+  const tooClose = DISTRICTS.some(d => Math.abs(d.pos[2] - z) < 80 && Math.abs(d.pos[0]) < 80);
+  if (tooClose) continue;
+  const side = Math.floor((HIGHWAY_Z_START - z) / LAMP_SPACING) % 2 === 0 ? -1 : 1;
+  const lampColor = side < 0 ? 0x5cf2ff : 0xff5a3a;
+  addLampPylon(side * LAMP_SHOULDER, z, lampColor);
+}
+
 // ---------- HERO FOREGROUND CIRCUITRY ----------
 // Hero-only PCB elements close to the camera (z = 120..290) so the first
 // viewport always reads as a circuit board, not as plain dark space, no
@@ -1098,52 +1166,49 @@ for (let i = 0; i < STAR_COUNT; i++) sp.push((Math.random() - 0.5) * 5500, 80 + 
 stars.setAttribute("position", new THREE.Float32BufferAttribute(sp, 3));
 scene.add(new THREE.Points(stars, new THREE.PointsMaterial({ color: 0x88aaff, size: 1.5, transparent: true, opacity: 0.7 })));
 
-// ---------- SCROLL CAMERA: TRAVEL DOWN THE CIRCUIT HIGHWAY ----------
-// The viewer rides a maglev camera down the circuit highway from the hero
-// overhead through each checkpoint pad. Z is the dominant axis. Lateral
-// (x) and height (y) are gentle modulations for cinematic interest.
-//
-// Each section maps to a pose: hero is a high overview, then we descend to
-// road-level and ride down the trace, looking slightly forward and at each
-// building as it passes.
-function poseAt(id, opts) {
+// ---------- SCROLL CAMERA: CINEMATIC AERIAL TRAVEL ----------
+// The viewer is carried in a cinematic aerial drone shot from the hero's
+// wide pull-back through each checkpoint. Each pose frames the current
+// building beside the electric circuit highway, with the road and the
+// next checkpoint visible in the distance. Heights stay 90-180 so the
+// road, rails, packets, AND the building always read on screen, never
+// blank dark space.
+function poseAt(id, opts = {}) {
   if (id === "hero") {
-    // Maglev-cab hero pose: low, near road center, looking straight down the
-    // electrified circuit highway. Spire crown rises above the horizon and
-    // the rails charge into the foreground.
     return {
-      pos: new THREE.Vector3(18, 44, 320),
-      look: new THREE.Vector3(0, 26, -300),
+      pos: new THREE.Vector3(0, 320, 620),
+      look: new THREE.Vector3(0, 40, -120),
     };
   }
   const d = DISTRICTS.find(x => x.id === id);
-  // Camera rides the circuit highway at cab height. Lateral offset is to
-  // the OPPOSITE side of the building so we frame the building over the
-  // far rail and the road extends into the next checkpoint. Height stays
-  // low (28-46) so the rails and lane dashes always read as live traces.
+  // Place the camera up-and-behind on the OPPOSITE side of the highway
+  // from the building, so the road wraps around between camera and
+  // structure and the building reads framed by the rails.
   const side = d.pos[0] >= 0 ? -1 : 1;
-  const lateral = side * (opts.lateral ?? 28);
-  const height = opts.height ?? 36;
-  const behindZ = opts.behindZ ?? 210;
+  const dx = opts.dx ?? side * 150;
+  const dy = opts.dy ?? 130;
+  const dz = opts.dz ?? 200;
+  const lookY = opts.lookY ?? Math.max(d.tall * 0.45, 30);
   return {
-    pos: new THREE.Vector3(d.pos[0] * 0.18 + lateral, height, d.pos[2] + behindZ),
-    // Look forward toward the next checkpoint so the highway reads as a
-    // continuous trace; bias the look slightly toward the current building
-    // so it sits in frame instead of off to one shoulder.
-    look: new THREE.Vector3(d.pos[0] * 0.45, opts.lookY ?? 24, d.pos[2] - 140),
+    pos:  new THREE.Vector3(d.pos[0] + dx, d.pos[1] + dy, d.pos[2] + dz),
+    look: new THREE.Vector3(d.pos[0],      lookY,         d.pos[2] - 30),
   };
 }
 
 const KEYS = [
   poseAt("hero"),
-  poseAt("spire",       { lateral: 32,  height: 48,  behindZ: 240, lookY: 60 }),
-  poseAt("foundry",     { lateral: 26,  height: 36,  behindZ: 200, lookY: 30 }),
-  poseAt("voice",       { lateral: 30,  height: 42,  behindZ: 210, lookY: 44 }),
-  poseAt("ops",         { lateral: 30,  height: 40,  behindZ: 210, lookY: 42 }),
-  poseAt("revenue",     { lateral: 28,  height: 36,  behindZ: 200, lookY: 32 }),
-  poseAt("content",     { lateral: 30,  height: 36,  behindZ: 200, lookY: 28 }),
-  poseAt("integration", { lateral: 30,  height: 40,  behindZ: 220, lookY: 36 }),
-  poseAt("contact",     { lateral: 18,  height: 40,  behindZ: 230, lookY: 18 }),
+  // Spire is on-axis (x=0), so we orbit out to the right and high to see
+  // the full crown + the highway falling away toward the next checkpoints.
+  poseAt("spire",       { dx:  170, dy: 200, dz: 260, lookY: 110 }),
+  poseAt("foundry",     { dx:  240, dy: 140, dz: 180, lookY: 50 }),
+  poseAt("voice",       { dx: -240, dy: 160, dz: 180, lookY: 70 }),
+  poseAt("ops",         { dx:  250, dy: 170, dz: 200, lookY: 80 }),
+  poseAt("revenue",     { dx: -240, dy: 140, dz: 180, lookY: 55 }),
+  poseAt("content",     { dx:  240, dy: 140, dz: 180, lookY: 50 }),
+  poseAt("integration", { dx: -240, dy: 160, dz: 180, lookY: 60 }),
+  // Contact pull-back: high straight-on so the whole road retreats into
+  // the distance behind the landing pad.
+  poseAt("contact",     { dx:    0, dy: 180, dz: 260, lookY: 30 }),
 ];
 
 const posCurve = new THREE.CatmullRomCurve3(KEYS.map(k => k.pos), false, "catmullrom", 0.25);
