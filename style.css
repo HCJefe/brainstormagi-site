@@ -32,14 +32,16 @@ canvas#scene{
     radial-gradient(ellipse at 50% 65%,#13203a 0%,#070d1c 50%,#02040a 100%)
 }
 
-/* Scanline + vignette + faint micro-grid over the whole page */
+/* Scanline + soft vignette + faint micro-grid over the whole page.
+   Vignette is intentionally light so the persistent 3D circuit-city scene
+   reads through every section, not only the hero. */
 body::before{
   content:"";position:fixed;inset:0;pointer-events:none;z-index:1;
   background:
-    radial-gradient(ellipse at 50% 50%,transparent 55%,rgba(0,0,0,.62) 100%),
-    repeating-linear-gradient(0deg,rgba(255,255,255,.014) 0 1px,transparent 1px 3px),
-    linear-gradient(0deg,rgba(92,242,255,.014) 1px,transparent 1px) 0 0/40px 40px,
-    linear-gradient(90deg,rgba(92,242,255,.014) 1px,transparent 1px) 0 0/40px 40px;
+    radial-gradient(ellipse at 50% 50%,transparent 70%,rgba(0,0,0,.32) 100%),
+    repeating-linear-gradient(0deg,rgba(255,255,255,.012) 0 1px,transparent 1px 3px),
+    linear-gradient(0deg,rgba(92,242,255,.012) 1px,transparent 1px) 0 0/40px 40px,
+    linear-gradient(90deg,rgba(92,242,255,.012) 1px,transparent 1px) 0 0/40px 40px;
   mix-blend-mode:normal;
 }
 /* Top + bottom electric rails — the page looks anchored in a control surface */
