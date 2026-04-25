@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Space+Grotesk:wght@400;500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./style.css?v=20260425-circuit-city-6" />
+<link rel="stylesheet" href="./style.css?v=20260425-circuit-city-7" />
 </head>
 <body>
   <!-- 3D CANVAS STAYS FIXED -->
@@ -379,7 +379,22 @@
        (not a module, no defer) so the SVG checkpoint scenes are populated
        before the user can scroll past hero, and stay visible even if WebGL
        or main.js fails. Each .sec-bg element gets a per-section variant. -->
-  <script src="./section-bg.js?v=20260425-circuit-city-6"></script>
-  <script type="module" src="./main.js?v=20260425-circuit-city-6"></script>
+  <script src="./section-bg.js?v=20260425-circuit-city-7"></script>
+  <script>
+    // Hero-only scroll indicator. Independent of main.js so the cue fades
+    // even if the WebGL module fails to load.
+    (function(){
+      var el = document.querySelector('.scroll-indicator');
+      if (!el) return;
+      function update(){
+        if (window.scrollY > 40) el.classList.add('gone');
+        else el.classList.remove('gone');
+      }
+      window.addEventListener('scroll', update, { passive: true });
+      window.addEventListener('resize', update);
+      update();
+    })();
+  </script>
+  <script type="module" src="./main.js?v=20260425-circuit-city-7"></script>
 </body>
 </html>
