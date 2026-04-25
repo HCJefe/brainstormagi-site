@@ -19,7 +19,7 @@ export const DISTRICTS = [
         "Complete AI systems that ship with the architecture to run in production, not just demo well. Not science projects."
       ],
       metrics: [
-        ["47", "agents active"],
+        ["270+", "agents active"],
         ["18", "industries"],
         ["99.7%", "uptime"],
         ["<200ms", "latency"]
