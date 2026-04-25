@@ -1161,16 +1161,38 @@ window.addEventListener("resize", () => {
 });
 recomputeProgress();
 
-const io = new IntersectionObserver((entries) => {
-  for (const e of entries) {
-    if (e.isIntersecting) {
-      e.target.classList.add("active");
-      const id = e.target.id;
-      if (id) navLinks.forEach(a => a.classList.toggle("active", a.getAttribute("href") === "#" + id));
+// Section reveal. Sections default to visible in CSS so any JS / observer
+// failure cannot leave the page as empty dark space below the hero. We arm
+// the fade-in only when IntersectionObserver is available, then immediately
+// reveal whatever is already on screen. As a safety net, every section is
+// force-revealed after 1.2s regardless of observer state, and any section
+// crossed by the scroll position is revealed too.
+const supportsIO = "IntersectionObserver" in window;
+if (supportsIO) {
+  sections.forEach(s => { if (!s.classList.contains("hero")) s.classList.add("armed"); });
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.isIntersecting) {
+        e.target.classList.add("active");
+        const id = e.target.id;
+        if (id) navLinks.forEach(a => a.classList.toggle("active", a.getAttribute("href") === "#" + id));
+      }
     }
+  }, { threshold: 0.18, rootMargin: "0px 0px -10% 0px" });
+  sections.forEach(s => io.observe(s));
+}
+function revealAll() { sections.forEach(s => s.classList.add("active")); }
+function revealOnScroll() {
+  const vh = window.innerHeight;
+  for (const s of sections) {
+    const r = s.getBoundingClientRect();
+    if (r.top < vh * 0.85 && r.bottom > vh * 0.15) s.classList.add("active");
   }
-}, { threshold: 0.35 });
-sections.forEach(s => io.observe(s));
+}
+window.addEventListener("scroll", revealOnScroll, { passive: true });
+window.addEventListener("load", revealOnScroll);
+setTimeout(revealOnScroll, 200);
+setTimeout(revealAll, 1200);
 
 // ---------- AGENT WALL ----------
 const wall = document.getElementById("agentWall");
