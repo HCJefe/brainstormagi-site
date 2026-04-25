@@ -32,16 +32,14 @@ canvas#scene{
     radial-gradient(ellipse at 50% 65%,#13203a 0%,#070d1c 50%,#02040a 100%)
 }
 
-/* Scanline + soft vignette + faint micro-grid over the whole page.
-   Vignette is intentionally light so the persistent 3D circuit-city scene
-   reads through every section, not only the hero. */
+/* Scanline + very soft vignette over the whole page. Kept extremely
+   light so the persistent 3D circuit-board WebGL scene reads through
+   every section without any dark wash over it. */
 body::before{
   content:"";position:fixed;inset:0;pointer-events:none;z-index:1;
   background:
-    radial-gradient(ellipse at 50% 50%,transparent 70%,rgba(0,0,0,.32) 100%),
-    repeating-linear-gradient(0deg,rgba(255,255,255,.012) 0 1px,transparent 1px 3px),
-    linear-gradient(0deg,rgba(92,242,255,.012) 1px,transparent 1px) 0 0/40px 40px,
-    linear-gradient(90deg,rgba(92,242,255,.012) 1px,transparent 1px) 0 0/40px 40px;
+    radial-gradient(ellipse at 50% 50%,transparent 78%,rgba(0,0,0,.18) 100%),
+    repeating-linear-gradient(0deg,rgba(255,255,255,.010) 0 1px,transparent 1px 3px);
   mix-blend-mode:normal;
 }
 /* Top + bottom electric rails — the page looks anchored in a control surface */
@@ -182,12 +180,13 @@ body::after{
     linear-gradient(90deg,rgba(92,242,255,.025) 1px,transparent 1px) 0 0/24px 24px,
     /* faint scanlines */
     repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 3px),
-    /* base panel */
-    linear-gradient(180deg,rgba(8,14,26,.94),rgba(6,10,20,.88));
-  border:1px solid rgba(92,242,255,.14);
+    /* base panel — kept solid enough to keep copy crisp, but the panel
+       does NOT span the viewport, so the WebGL scene reads around it. */
+    linear-gradient(180deg,rgba(8,14,26,.86),rgba(6,10,20,.78));
+  border:1px solid rgba(92,242,255,.18);
   padding:38px 42px;
-  backdrop-filter:blur(14px);
-  -webkit-backdrop-filter:blur(14px);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
   box-shadow:
     0 30px 80px rgba(0,0,0,.55),
     0 0 0 1px rgba(255,42,42,.10) inset,
@@ -322,23 +321,35 @@ body::after{
   padding-bottom:60px;
 }
 
-/* Guaranteed-visible hero circuit-board scene. Pure SVG behind the hero card,
-   independent of WebGL. Spans full width, anchored to bottom of the hero so
-   the highway, pylons, and skyline sit around and below the hero content card.
-   Always visible above the fold — the page never reads as empty dark space. */
+/* Hero SVG circuit fallback. Acts as a NO-WEBGL safety net only — when
+   WebGL renders, the canvas is the dominant visual, so this layer is
+   nearly invisible (very low opacity, masked away from the centre). It
+   exists so the page never reads as empty dark space if Three.js fails
+   to load, but it must NEVER mask the real 3D scene. */
 .hero-circuit{
   position:absolute;left:0;right:0;bottom:0;
-  height:88%;
+  height:46%;
   pointer-events:none;
   z-index:0;
   overflow:hidden;
-  -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 12%,#000 100%);
-          mask-image:linear-gradient(180deg,transparent 0,#000 12%,#000 100%);
+  opacity:.18;
+  mix-blend-mode:screen;
+  -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 60%,#000 100%);
+          mask-image:linear-gradient(180deg,transparent 0,#000 60%,#000 100%);
 }
 .hero-circuit-svg{
   width:100%;height:100%;
   display:block;
-  filter:drop-shadow(0 0 18px rgba(92,242,255,.15));
+  filter:drop-shadow(0 0 14px rgba(92,242,255,.20));
+}
+/* If WebGL fails (canvas#scene has no GL context), JS adds .no-webgl on
+   <html>. The fallback then becomes the dominant hero visual. */
+html.no-webgl .hero-circuit{
+  height:88%;
+  opacity:1;
+  mix-blend-mode:normal;
+  -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 12%,#000 100%);
+          mask-image:linear-gradient(180deg,transparent 0,#000 12%,#000 100%);
 }
 /* Live circuit pulses on solder pads */
 .hero-circuit .hc-pulse{
