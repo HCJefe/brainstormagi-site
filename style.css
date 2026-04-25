@@ -447,7 +447,9 @@ body::after{
   /* Keep the 3D road visible on phones — feels electric, not dimmed out */
   canvas#scene{opacity:.86}
 
-  /* HUD top: brand left, hamburger right; CTA moves into menu */
+  /* HUD top: brand left, hamburger right; CTA moves into menu.
+     Explicit display rules guarantee no duplicate CTA in collapsed header
+     and that the hamburger is always reachable as a 44px touch target. */
   .hud-top{
     top:calc(10px + var(--safe-top));
     left:max(12px, var(--safe-left));
@@ -456,18 +458,21 @@ body::after{
   }
   .hud-brand{font-size:13px;letter-spacing:.18em}
   .hud-toggle{
-    display:flex;
+    display:flex !important;
+    width:44px;height:44px;min-width:44px;min-height:44px;
     background:rgba(4,8,16,.78);
     border:1px solid rgba(92,242,255,.45);
     box-shadow:
       0 0 0 1px rgba(92,242,255,.10) inset,
       0 0 14px rgba(92,242,255,.35),
       0 0 28px rgba(255,42,42,.18);
+    margin-left:auto;
   }
   .hud-toggle span{background:var(--electric);box-shadow:0 0 6px rgba(92,242,255,.7)}
 
+  /* Desktop nav becomes a fixed overlay sheet, hidden by default. */
   .hud-nav{
-    display:none;
+    display:none !important;
     position:fixed;
     top:calc(64px + var(--safe-top));
     left:max(12px, var(--safe-left));
@@ -475,13 +480,14 @@ body::after{
     background:rgba(4,8,16,.96);
     border:1px solid var(--line);
     backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);
     flex-direction:column;gap:0;
     padding:6px 0 10px;
     max-height:calc(100vh - 100px - var(--safe-top));overflow-y:auto;
     box-shadow:0 20px 60px rgba(0,0,0,.7),0 0 30px rgba(255,42,42,.15);
     z-index:30;
   }
-  .hud-nav.open{display:flex}
+  .hud-nav.open{display:flex !important}
   .hud-nav a{
     padding:14px 20px;font-size:12px;
     border-bottom:1px solid rgba(255,42,42,.12);
@@ -495,9 +501,10 @@ body::after{
   }
   .hud-nav a:last-child{border-bottom:none}
 
-  .hud-top > .hud-btn.primary{display:none}
+  /* Hide the duplicate header CTA on mobile — only the in-menu CTA stays. */
+  .hud-top > .hud-btn.primary{display:none !important}
   .hud-nav > .hud-btn.primary{
-    display:block;margin:10px 16px 4px;text-align:center;padding:16px;
+    display:block !important;margin:10px 16px 4px;text-align:center;padding:16px;
     border-left:none;background:var(--red);
     min-height:48px;font-size:12px;
   }
