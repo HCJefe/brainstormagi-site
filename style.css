@@ -21,7 +21,8 @@ canvas#scene{position:fixed;inset:0;width:100vw;height:100vh;display:block;z-ind
 .hud-top{position:absolute;top:16px;left:24px;right:24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .hud-brand{font-family:"JetBrains Mono",monospace;font-weight:800;letter-spacing:.22em;font-size:16px}
 .hud-brand span{color:var(--red)}
-.hud-nav{display:flex;gap:18px;font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.2em}
+.hud-nav{display:flex;gap:18px;font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.2em;align-items:center}
+.hud-nav > .hud-btn.primary{display:none}
 .hud-nav a{color:#cfd4de;text-decoration:none;padding:6px 2px;border-bottom:1px solid transparent;transition:.2s;text-transform:uppercase}
 .hud-nav a:hover,.hud-nav a.active{color:#fff;border-color:var(--red)}
 .hud-btn{background:transparent;color:#fff;border:1px solid var(--line);padding:9px 16px;font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.2em;text-decoration:none}
@@ -84,12 +85,128 @@ canvas#scene{position:fixed;inset:0;width:100vw;height:100vh;display:block;z-ind
 .cta.big:hover{box-shadow:0 0 50px rgba(255,42,42,.7)}
 .footer-line{margin-top:36px;font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.3em;color:var(--muted)}
 
-/* RESPONSIVE */
+/* MOBILE NAV TOGGLE (hidden on desktop) */
+.hud-toggle{display:none;background:transparent;border:1px solid var(--line);width:40px;height:40px;padding:0;cursor:pointer;align-items:center;justify-content:center;flex-direction:column;gap:4px;pointer-events:auto}
+.hud-toggle span{display:block;width:18px;height:2px;background:#fff;transition:transform .25s,opacity .2s}
+.hud-toggle[aria-expanded="true"] span:nth-child(1){transform:translateY(6px) rotate(45deg)}
+.hud-toggle[aria-expanded="true"] span:nth-child(2){opacity:0}
+.hud-toggle[aria-expanded="true"] span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
+
+/* RESPONSIVE — TABLET */
 @media (max-width:860px){
-  .hud-nav{display:none}
-  .hud-metrics{font-size:9px;padding:5px 10px}
   .progress-rail{display:none}
-  .sec{padding:110px 5vw 60px}
   .sec-inner{padding:28px 24px}
-  .sec-inner.left,.sec-inner.right,.sec-inner.center{margin:0 auto}
+  .sec-inner.left,.sec-inner.right,.sec-inner.center{margin:0 auto;max-width:100%}
+}
+
+/* RESPONSIVE — MOBILE (phones, <=640px) */
+@media (max-width:640px){
+  /* HUD top: brand left, hamburger right; CTA moves into menu */
+  .hud-top{top:12px;left:14px;right:14px;gap:10px;flex-wrap:nowrap}
+  .hud-brand{font-size:13px;letter-spacing:.18em}
+  .hud-toggle{display:flex}
+
+  /* Nav becomes a slide-down panel triggered by toggle */
+  .hud-nav{
+    display:none;
+    position:fixed;top:60px;left:14px;right:14px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    backdrop-filter:blur(12px);
+    flex-direction:column;gap:0;
+    padding:8px 0;
+    max-height:calc(100vh - 80px);overflow-y:auto;
+    box-shadow:0 20px 60px rgba(0,0,0,.5);
+  }
+  .hud-nav.open{display:flex}
+  .hud-nav a{
+    padding:14px 20px;font-size:12px;
+    border-bottom:1px solid rgba(255,42,42,.12);
+    border-left:3px solid transparent;
+    min-height:44px;display:flex;align-items:center;
+  }
+  .hud-nav a:hover,.hud-nav a.active{
+    border-bottom-color:rgba(255,42,42,.12);
+    border-left-color:var(--red);
+    background:rgba(255,42,42,.06);
+  }
+  .hud-nav a:last-child{border-bottom:none}
+
+  /* Primary CTA hidden in top bar — appears in nav panel instead */
+  .hud-top > .hud-btn.primary{display:none}
+  .hud-nav > .hud-btn.primary{
+    display:block;margin:10px 16px 6px;text-align:center;padding:14px;
+    border-left:none;background:var(--red);
+  }
+
+  /* Metrics — compact, allow horizontal scroll if needed */
+  .hud-metrics{
+    top:58px;left:14px;right:14px;
+    font-size:9px;letter-spacing:.08em;
+    padding:6px 10px;gap:6px;
+    overflow-x:auto;white-space:nowrap;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+  .hud-metrics::-webkit-scrollbar{display:none}
+
+  /* Scroll hint smaller and lower */
+  .scroll-indicator{bottom:18px;font-size:9px;letter-spacing:.25em}
+  .scroll-arrow{height:30px}
+
+  /* Sections — leave room for HUD top bar (~44px) + metrics (~32px) + buffer */
+  .sec{padding:108px 18px 56px;min-height:auto}
+  .sec-inner{padding:22px 18px;max-width:100%;border-radius:0}
+
+  .chip{font-size:9px;letter-spacing:.28em;padding:4px 8px;margin-bottom:14px}
+  .sec h2{font-size:34px;line-height:1.05;margin-bottom:10px}
+  .sec .lede{font-size:16px;line-height:1.4}
+  .sec p{font-size:14px;line-height:1.55}
+
+  /* Metric tiles wrap nicely on narrow screens */
+  .metrics{gap:8px;margin-top:16px}
+  .m{padding:8px 10px;flex:1 1 calc(50% - 8px);min-width:0}
+  .m b{font-size:15px}
+  .m span{font-size:9px;letter-spacing:.08em}
+
+  /* HERO */
+  .hero{padding-top:120px;padding-bottom:60px}
+  .hero-mark{font-size:13px;letter-spacing:.2em;margin-bottom:14px}
+  .hero-title{font-size:44px;line-height:1;margin-bottom:14px;letter-spacing:-.015em}
+  .hero-sub{font-size:15px;line-height:1.45;margin-bottom:24px}
+  .hero-stats{gap:14px 18px;justify-content:space-around}
+  .hero-stats div{flex:1 1 38%;min-width:0}
+  .hero-stats b{font-size:22px}
+  .hero-stats span{font-size:9px;letter-spacing:.18em}
+
+  /* Agent wall — 2 columns, taller cards, clearer scroll */
+  .agent-wall{
+    grid-template-columns:repeat(2,1fr);
+    gap:6px;max-height:260px;
+  }
+  .agent-wall .a{padding:10px 8px;font-size:9px}
+  .agent-wall .a b{font-size:10px}
+
+  /* CTA button — fit narrow screens, keep 44px tap target */
+  .cta.big{
+    display:block;width:100%;
+    padding:16px 12px;font-size:12px;letter-spacing:.18em;
+    word-break:break-word;
+    margin:20px 0 8px;
+  }
+  .footer-line{margin-top:28px;font-size:9px;letter-spacing:.22em}
+}
+
+/* Extra-small phones (iPhone SE, ~360px) */
+@media (max-width:380px){
+  .hero-title{font-size:38px}
+  .sec h2{font-size:30px}
+  .hud-brand{font-size:12px}
+  .cta.big{font-size:11px;letter-spacing:.14em}
+}
+
+/* Short viewports — hero shouldn't push stats off-screen */
+@media (max-height:680px) and (max-width:640px){
+  .scroll-indicator{display:none}
+  .hero{padding-top:100px}
 }

@@ -252,6 +252,21 @@ if (wall) {
   wall.innerHTML = AGENT_SAMPLE.map(a => `<div class="a"><b>${a[0]}</b><span>${a[1]}</span></div>`).join("");
 }
 
+// ---------- MOBILE NAV TOGGLE ----------
+const hudToggle = document.getElementById("hudToggle");
+const hudNav = document.getElementById("hudNav");
+if (hudToggle && hudNav) {
+  const closeNav = () => {
+    hudNav.classList.remove("open");
+    hudToggle.setAttribute("aria-expanded", "false");
+  };
+  hudToggle.addEventListener("click", () => {
+    const open = hudNav.classList.toggle("open");
+    hudToggle.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+  hudNav.querySelectorAll("a").forEach(a => a.addEventListener("click", closeNav));
+}
+
 // ---------- LOOP ----------
 const clock = new THREE.Clock();
 const tmpPos = new THREE.Vector3(), tmpLook = new THREE.Vector3();
