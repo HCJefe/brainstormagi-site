@@ -1104,14 +1104,23 @@ function recomputeProgress() {
   else scrollIndicator?.classList.remove("gone");
 }
 window.addEventListener("scroll", recomputeProgress, { passive: true });
-window.addEventListener("resize", () => {
+function handleViewportResize() {
   camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
   recomputeProgress();
-});
+}
+window.addEventListener("resize", handleViewportResize);
+// iOS Safari/Chrome collapse the URL bar without firing window resize, which
+// would leave a blank strip where the canvas no longer covers the viewport.
+// visualViewport changes do fire on bar collapse — relay them so the canvas
+// always tracks the actual visible area.
+window.visualViewport?.addEventListener("resize", handleViewportResize);
 recomputeProgress();
 
-// section reveal + active nav
+// Section reveal + active nav. A lower threshold on coarse-pointer devices
+// makes sure a fling-scroll never races past without ever marking a section
+// active (which previously could leave the page reading as empty between
+// sections during fast mobile scrolls).
 const io = new IntersectionObserver((entries) => {
   for (const e of entries) {
     if (e.isIntersecting) {
@@ -1120,7 +1129,7 @@ const io = new IntersectionObserver((entries) => {
       if (id) navLinks.forEach(a => a.classList.toggle("active", a.getAttribute("href") === "#" + id));
     }
   }
-}, { threshold: 0.35 });
+}, { threshold: lowPower ? 0.12 : 0.35 });
 sections.forEach(s => io.observe(s));
 
 // ---------- AGENT WALL ----------
@@ -1243,10 +1252,11 @@ let scrollSpeed = 0; // smoothed |dProgress/dt|
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.05);
   elapsed += dt;
-  // Smooth scroll progress. Mobile uses a softer lerp so the camera settles
-  // into each section and reads cinematically instead of zipping past.
+  // Smooth scroll progress. Mobile uses a slightly softer lerp so the camera
+  // settles into each section without trailing so far behind that a fast
+  // fling-scroll leaves the user staring at an intermediate camera frame.
   // Reduced-motion: snap straight to the target so no animated camera glide.
-  const lerp = reduceMotion ? 1 : (lowPower ? 0.05 : 0.08);
+  const lerp = reduceMotion ? 1 : (lowPower ? 0.07 : 0.08);
   scrollProgress += (targetProgress - scrollProgress) * lerp;
   // Track scroll velocity to drive the racing-current speed boost. When the
   // user scrolls, electricity along the roads accelerates and streaks stretch

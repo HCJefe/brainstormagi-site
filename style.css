@@ -529,17 +529,21 @@ body::after{
   .scroll-indicator{bottom:calc(16px + var(--safe-bottom));font-size:9px;letter-spacing:.25em}
   .scroll-arrow{height:26px}
 
-  /* Mobile pacing: each section gets a full screen of dwell so the camera
-     keyframe has time to land and the user can read. Scroll-snap proximity
-     gives a soft settle without trapping the scroll like mandatory would. */
-  html{scroll-snap-type:y proximity}
+  /* Mobile pacing: free-flowing scroll (no scroll-snap) so a fling-scroll
+     never lands between snap targets while the previous and next sections
+     are both still faded out. Sections sit at content height with breathing
+     room — no forced 100vh gaps that produce blank screens between cards.
+     Sections stay fully visible on mobile (no IO-gated opacity:0) so a
+     fast scroll never reveals an empty page. */
   .sec{
-    padding:140px 16px 64px;
-    min-height:100vh;
-    scroll-snap-align:start;
-    scroll-snap-stop:normal;
+    padding:120px 16px 56px;
+    min-height:auto;
+    opacity:1;
+    transform:none;
+    transition:none;
   }
-  .sec:first-of-type{padding-top:148px}
+  .sec.hero{padding-top:140px;min-height:100svh;min-height:100vh}
+  .sec:first-of-type{padding-top:140px}
   /* Crisp panels with cyan border + red/cyan glow — restore HUD feel on mobile.
      Explicit width caps so .sec-inner can never exceed viewport minus gutters
      even if a desktop max-width slips through the cascade. */
@@ -626,10 +630,11 @@ body::after{
     font-size:14px;line-height:1.55;
     text-shadow:0 1px 0 rgba(0,0,0,.5),0 0 10px rgba(2,5,12,.55);
   }
-  /* Mobile reveal: stronger settle when a section becomes active so the
-     scroll-snap into the keyframe reads as an intentional landing rather
-     than a slow drift. Slightly slower transition matches the calmer camera. */
-  .sec{transition:opacity 1s ease, transform 1s ease}
+  /* Mobile active settle: the section card already paints fully — when a
+     section enters view we just bump the glow so the user feels the camera
+     landing on it. No section-level opacity transition (that's what caused
+     blank intermediate screens during a fast fling-scroll). */
+  .sec-inner{transition:box-shadow .5s ease, transform .5s ease}
   .sec.active .sec-inner{
     transform:translateY(-3px);
     box-shadow:
