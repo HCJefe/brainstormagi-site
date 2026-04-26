@@ -21,10 +21,11 @@
     return;
   }
 
-  document.documentElement.dataset.sceneEngine = "canvas2d-clean-rails";
-  // QA marker: confirms the rails-only primary renderer is loaded with no
-  // continuous filled deck/route polygon.
-  document.documentElement.dataset.trackMode = "clean-rails";
+  document.documentElement.dataset.sceneEngine = "canvas2d-artdirected-rails";
+  // QA marker: confirms the art-directed screen-space rail renderer is
+  // active. Replaces dynamic projection-based rails which produced visual
+  // knots in the foreground.
+  document.documentElement.dataset.trackMode = "artdirected-rails";
   window.__brainstormRenderFrames = 0;
 
   var REDUCED_MOTION = window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches;
@@ -376,6 +377,115 @@
       nx: nx,
       ny: ny
     };
+  }
+
+  // ---------- Art-directed screen-space track ----------
+  // The previous projection-based rail geometry produced visual knots in the
+  // foreground because the rails followed a dynamically deformed centerline.
+  // This system replaces that with a stable cubic Bezier in screen space.
+  // Control points are anchored to viewport coordinates with a small,
+  // bounded section-driven shift on the mid bend. Rails are obtained by
+  // offsetting along the screen-space normal of the centerline polyline,
+  // so the two rails ALWAYS sit on opposite sides with a depth-tapered gap
+  // and CANNOT cross or tangle regardless of section, scroll, or motion.
+  var TRACK_STEPS = 64;
+  var trackSamples = new Array(TRACK_STEPS + 1);
+  for (var ts = 0; ts <= TRACK_STEPS; ts++) {
+    trackSamples[ts] = { u: 0, cx: 0, cy: 0, nx: 0, ny: 0, gap: 0, lx: 0, ly: 0, rx: 0, ry: 0 };
+  }
+  // Section-driven mid bend shift in [-1,1]. Drives the curve into a gentle
+  // S without ever introducing a self-intersection. Smoothed across sections.
+  function trackBendAt(sectionPos) {
+    var idxA = Math.max(0, Math.min(SECTIONS.length - 1, Math.floor(sectionPos)));
+    var idxB = Math.min(SECTIONS.length - 1, idxA + 1);
+    var local = sectionPos - idxA;
+    var ease = local * local * (3 - 2 * local);
+    var sA = SECTIONS[idxA].side;
+    var sB = SECTIONS[idxB].side;
+    return sA + (sB - sA) * ease;
+  }
+  function buildArtTrack(w, h, horizonY, sectionPos) {
+    var bend = trackBendAt(sectionPos);
+    if (bend > 1) bend = 1; if (bend < -1) bend = -1;
+    // Stable screen-space anchor points.
+    // P0 = far/horizon center, P3 = foreground/bottom center. Track climbs
+    // from bottom of viewport up toward the horizon. P1/P2 control the
+    // bend; only P1 carries the section bend so the foreground always sits
+    // near center and the gap stays consistent at the camera.
+    var fgY = h * 0.96;
+    var horY = horizonY + Math.max(20, h * 0.04);
+    // Modest bend amplitude — strong enough to read as an S-curve, small
+    // enough that ties and trusses always stay on screen.
+    var bendAmp = w * 0.16;
+    var P0x = w * 0.50;            var P0y = horY;
+    var P1x = w * 0.50 + bend * bendAmp;
+    var P1y = horizonY + (h - horizonY) * 0.45;
+    var P2x = w * 0.50 - bend * bendAmp * 0.35;
+    var P2y = horizonY + (h - horizonY) * 0.78;
+    var P3x = w * 0.50;            var P3y = fgY;
+    // Foreground rail-to-rail gap (px). Tapers with depth but never below
+    // a hard floor so QA always sees a clear transparent gap between rails.
+    var gapFG = Math.max(70, Math.min(140, w * 0.085));
+    var gapHor = Math.max(30, w * 0.022);
+    for (var i = 0; i <= TRACK_STEPS; i++) {
+      var u = i / TRACK_STEPS; // 0 = horizon, 1 = foreground
+      var omu = 1 - u;
+      // Cubic Bezier centerline.
+      var cx = omu*omu*omu*P0x + 3*omu*omu*u*P1x + 3*omu*u*u*P2x + u*u*u*P3x;
+      var cy = omu*omu*omu*P0y + 3*omu*omu*u*P1y + 3*omu*u*u*P2y + u*u*u*P3y;
+      // Tangent (derivative of Bezier).
+      var tx = 3*omu*omu*(P1x-P0x) + 6*omu*u*(P2x-P1x) + 3*u*u*(P3x-P2x);
+      var ty = 3*omu*omu*(P1y-P0y) + 6*omu*u*(P2y-P1y) + 3*u*u*(P3y-P2y);
+      var tlen = Math.sqrt(tx*tx + ty*ty) || 1;
+      // Right-hand normal in screen space.
+      var nx = -ty / tlen;
+      var ny =  tx / tlen;
+      // Depth-tapered gap. u=1 is foreground (large gap), u=0 horizon (small).
+      var gap = gapHor + (gapFG - gapHor) * u;
+      var half = gap * 0.5;
+      var s = trackSamples[i];
+      s.u = u;
+      s.cx = cx; s.cy = cy;
+      s.nx = nx; s.ny = ny;
+      s.gap = gap;
+      s.lx = cx - nx * half; s.ly = cy - ny * half;
+      s.rx = cx + nx * half; s.ry = cy + ny * half;
+    }
+  }
+  function projectTrack(u) {
+    var uu = Math.max(0, Math.min(1, u));
+    var f = uu * TRACK_STEPS;
+    var i0 = Math.floor(f);
+    var i1 = Math.min(TRACK_STEPS, i0 + 1);
+    var k = f - i0;
+    var a = trackSamples[i0];
+    var b = trackSamples[i1];
+    return {
+      cx: a.cx + (b.cx - a.cx) * k,
+      cy: a.cy + (b.cy - a.cy) * k,
+      lx: a.lx + (b.lx - a.lx) * k,
+      ly: a.ly + (b.ly - a.ly) * k,
+      rx: a.rx + (b.rx - a.rx) * k,
+      ry: a.ry + (b.ry - a.ry) * k,
+      nx: a.nx + (b.nx - a.nx) * k,
+      ny: a.ny + (b.ny - a.ny) * k,
+      gap: a.gap + (b.gap - a.gap) * k
+    };
+  }
+  function strokeCenterPolyline() {
+    ctx.beginPath();
+    ctx.moveTo(trackSamples[0].cx, trackSamples[0].cy);
+    for (var i = 1; i <= TRACK_STEPS; i++) ctx.lineTo(trackSamples[i].cx, trackSamples[i].cy);
+  }
+  function strokeRailPolyline(side) {
+    ctx.beginPath();
+    if (side < 0) {
+      ctx.moveTo(trackSamples[0].lx, trackSamples[0].ly);
+      for (var i = 1; i <= TRACK_STEPS; i++) ctx.lineTo(trackSamples[i].lx, trackSamples[i].ly);
+    } else {
+      ctx.moveTo(trackSamples[0].rx, trackSamples[0].ry);
+      for (var j = 1; j <= TRACK_STEPS; j++) ctx.lineTo(trackSamples[j].rx, trackSamples[j].ry);
+    }
   }
 
   // ---------- Drawing ----------
@@ -869,40 +979,33 @@
     }
   }
 
-  // Visible support trusses beneath the elevated track. Each truss is a
-  // wide A-frame with two vertical columns spanning the rail gap, multiple
-  // stages of X-bracing, horizontal cap braces, and bright copper footing
-  // pads on the PCB. Drawn frequently and at large scale so QA cannot
-  // miss them in any desktop screenshot. Guaranteed near/midground
-  // sample positions so several supports are always in the viewport.
-  var RAIL_OUTER_REF = 0.95;
+  // Art-directed support trusses below the elevated track. Each truss is a
+  // wide screen-space A-frame anchored to the centerline curve at fixed
+  // u-positions. Two vertical pylons span the gap, multiple stages of X
+  // bracing, horizontal cap braces, copper footing pads. Positions are
+  // chosen in the foreground/midground so several supports are always
+  // unmistakably visible on desktop, and the columns sit DIRECTLY under
+  // the rails (no projection drift).
   function drawSupportTrusses(w, h, horizonY, t, sectionPos) {
-    // Hand-picked z values (fewer, larger) — guaranteed to land in the
-    // foreground/midground rather than crowding the horizon.
-    // Foreground/midground positions — guaranteed visible on desktop.
-    var POSITIONS = [0.20, 0.34, 0.48, 0.62, 0.76, 0.88];
+    // Foreground/midground anchor positions on the curve (u from 0=horizon
+    // to 1=foreground). Five large supports — within the 3-5 spec band.
+    var POSITIONS = [0.30, 0.46, 0.62, 0.78, 0.92];
     for (var i = 0; i < POSITIONS.length; i++) {
-      var z = POSITIONS[i];
-      // Anchor each truss column directly under the corresponding rail.
-      var pL = projectSample(z, -RAIL_OUTER_REF);
-      var pR = projectSample(z,  RAIL_OUTER_REF);
-      var pp = z * z * 0.94 + z * 0.06;
-      var groundY = horizonY + (h - horizonY) * pp + 6;
-      var underYL = pL.y + 3;
-      var underYR = pR.y + 3;
-      // Force a meaningful drop so the truss is always 80-180px tall on
-      // desktop. Without this floor, mild lift values can collapse the
-      // column into invisibility.
-      var minDrop = Math.max(80, (h - horizonY) * 0.22 * pp + 60);
-      if (groundY - underYL < minDrop) underYL = groundY - minDrop;
-      if (groundY - underYR < minDrop) underYR = groundY - minDrop;
-      var dropL = groundY - underYL;
-      var dropR = groundY - underYR;
-      if (dropL <= 30 || dropR <= 30) continue;
-      // Bigger pylon width — clearly readable as a column, not a wire.
-      var pylonW = Math.max(9, pL.halfW * 0.075);
-      var leftX = pL.x;
-      var rightX = pR.x;
+      var u = POSITIONS[i];
+      var p = projectTrack(u);
+      var leftX = p.lx;
+      var rightX = p.rx;
+      // Use the average rail Y for the truss top, vertical columns drop
+      // straight down to the PCB ground. This guarantees orderly columns
+      // (no slanted columns when the rail sags).
+      var topY = Math.max(p.ly, p.ry) + 4;
+      // Ground sits a bit below the bottom of the curve at this u so the
+      // truss is always tall enough to read.
+      var groundY = h - 8 - (1 - u) * (h - horizonY) * 0.05;
+      if (groundY < topY + 60) groundY = topY + 60;
+      // Pylon width scales with the depth-tapered rail gap so foreground
+      // trusses look beefy and midground trusses look proportional.
+      var pylonW = Math.max(7, Math.min(16, p.gap * 0.10));
 
       // ---- Footing solder pads on PCB ----
       function footingPad(fx, fy) {
@@ -920,7 +1023,6 @@
         ctx.beginPath();
         ctx.ellipse(fx, fy, rPad, rPad * 0.45, 0, 0, Math.PI * 2);
         ctx.stroke();
-        // Glow halo
         var gh = ctx.createRadialGradient(fx, fy, 0, fx, fy, rPad * 1.6);
         gh.addColorStop(0, "rgba(255,200,120,0.3)");
         gh.addColorStop(1, "rgba(255,200,120,0)");
@@ -932,22 +1034,18 @@
       footingPad(leftX, groundY);
       footingPad(rightX, groundY);
 
-      // ---- Pseudo-3D columns (two vertical pylons, one under each rail).
-      //      Drawn as a 3D box: front face + side parallelogram + top cap
-      //      so each column reads as a chunky beam, not a thin line. ----
-      function pillar(px, topY, bottomY, accent) {
-        var dropH = bottomY - topY;
+      // ---- Two vertical pylons (front face + side parallelogram + cap) ----
+      function pillar(px, accent) {
+        var dropH = groundY - topY;
         var depth = pylonW * 0.85;
-        // Side face (right shear)
         ctx.fillStyle = "#05080f";
         ctx.beginPath();
         ctx.moveTo(px + pylonW,         topY);
         ctx.lineTo(px + pylonW + depth, topY - depth * 0.5);
-        ctx.lineTo(px + pylonW + depth, bottomY - depth * 0.5);
-        ctx.lineTo(px + pylonW,         bottomY);
+        ctx.lineTo(px + pylonW + depth, groundY - depth * 0.5);
+        ctx.lineTo(px + pylonW,         groundY);
         ctx.closePath();
         ctx.fill();
-        // Top cap
         ctx.fillStyle = "#1a2a48";
         ctx.beginPath();
         ctx.moveTo(px - pylonW,         topY);
@@ -956,7 +1054,6 @@
         ctx.lineTo(px - pylonW + depth, topY - depth * 0.5);
         ctx.closePath();
         ctx.fill();
-        // Front face with a steel gradient
         var pg = ctx.createLinearGradient(px - pylonW, 0, px + pylonW, 0);
         pg.addColorStop(0,    "#0a1424");
         pg.addColorStop(0.45, "#2a4068");
@@ -964,108 +1061,92 @@
         pg.addColorStop(1,    "#06101c");
         ctx.fillStyle = pg;
         ctx.fillRect(px - pylonW, topY, pylonW * 2, dropH);
-        // Hard outline so the column reads against the PCB
         ctx.strokeStyle = "rgba(190,220,255,0.95)";
         ctx.lineWidth = 1.6;
         ctx.strokeRect(px - pylonW + 0.5, topY + 0.5, pylonW * 2 - 1, dropH - 1);
-        // Bright accent rib up the center (cyan or red depending on rail)
         ctx.strokeStyle = accent;
         ctx.shadowColor = accent;
         ctx.shadowBlur = 8;
         ctx.lineWidth = 2.2;
         ctx.beginPath();
         ctx.moveTo(px, topY + 2);
-        ctx.lineTo(px, bottomY - 2);
+        ctx.lineTo(px, groundY - 2);
         ctx.stroke();
         ctx.shadowBlur = 0;
-        // Horizontal flange notches every ~25 px to read as a I-beam
         var flangeStep = 24;
         ctx.strokeStyle = "rgba(190,220,255,0.7)";
         ctx.lineWidth = 1;
-        for (var fy = topY + 16; fy < bottomY - 4; fy += flangeStep) {
+        for (var fy = topY + 16; fy < groundY - 4; fy += flangeStep) {
           ctx.beginPath();
           ctx.moveTo(px - pylonW + 1, fy);
           ctx.lineTo(px + pylonW - 1, fy);
           ctx.stroke();
         }
       }
-      pillar(leftX,  underYL, groundY, "rgba(92,242,255,0.95)");
-      pillar(rightX, underYR, groundY, "rgba(255,90,90,0.95)");
+      pillar(leftX,  "rgba(92,242,255,0.95)");
+      pillar(rightX, "rgba(255,90,90,0.95)");
 
-      // ---- Multi-stage X bracing across the gap (drawn AFTER pillars
-      //      so the braces visibly cross between the two columns). ----
-      var avgUnder = (underYL + underYR) * 0.5;
-      var avgDrop = groundY - avgUnder;
-      var stages = Math.max(3, Math.floor(avgDrop / 26));
+      // ---- Multi-stage X bracing across the gap ----
+      var dropAvg = groundY - topY;
+      var stages = Math.max(3, Math.min(6, Math.floor(dropAvg / 28)));
       for (var st = 0; st < stages; st++) {
         var f0 = st / stages;
         var f1 = (st + 1) / stages;
-        var lyA = underYL + (groundY - underYL) * f0 + 3;
-        var lyB = underYL + (groundY - underYL) * f1 - 3;
-        var ryA = underYR + (groundY - underYR) * f0 + 3;
-        var ryB = underYR + (groundY - underYR) * f1 - 3;
-        // X braces — drawn thicker & with dark underglow + bright stroke
-        // so they read clearly against any background.
+        var yA = topY + dropAvg * f0 + 3;
+        var yB = topY + dropAvg * f1 - 3;
         ctx.strokeStyle = "rgba(8,12,22,0.95)";
         ctx.lineWidth = 4.5;
         ctx.beginPath();
-        ctx.moveTo(leftX,  lyA);
-        ctx.lineTo(rightX, ryB);
-        ctx.moveTo(rightX, ryA);
-        ctx.lineTo(leftX,  lyB);
+        ctx.moveTo(leftX,  yA); ctx.lineTo(rightX, yB);
+        ctx.moveTo(rightX, yA); ctx.lineTo(leftX,  yB);
         ctx.stroke();
         ctx.strokeStyle = "rgba(92,242,255,0.95)";
         ctx.shadowColor = "rgba(92,242,255,0.7)";
         ctx.shadowBlur = 6;
         ctx.lineWidth = 2.6;
         ctx.beginPath();
-        ctx.moveTo(leftX,  lyA);
-        ctx.lineTo(rightX, ryB);
-        ctx.moveTo(rightX, ryA);
-        ctx.lineTo(leftX,  lyB);
+        ctx.moveTo(leftX,  yA); ctx.lineTo(rightX, yB);
+        ctx.moveTo(rightX, yA); ctx.lineTo(leftX,  yB);
         ctx.stroke();
         ctx.shadowBlur = 0;
-        // Connection node at the X intersection
         var midX = (leftX + rightX) / 2;
-        var midY = (lyA + lyB + ryA + ryB) / 4;
+        var midY = (yA + yB) / 2;
         ctx.fillStyle = "rgba(255,220,160,1)";
         ctx.beginPath();
         ctx.arc(midX, midY, 3, 0, Math.PI * 2);
         ctx.fill();
-        // Horizontal stage brace (copper) - thicker
         ctx.strokeStyle = "rgba(0,0,0,0.6)";
         ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.moveTo(leftX  - pylonW * 0.5, lyB);
-        ctx.lineTo(rightX + pylonW * 0.5, ryB);
+        ctx.moveTo(leftX  - pylonW * 0.5, yB);
+        ctx.lineTo(rightX + pylonW * 0.5, yB);
         ctx.stroke();
         ctx.strokeStyle = "rgba(255,180,110,0.98)";
         ctx.lineWidth = 2.4;
         ctx.beginPath();
-        ctx.moveTo(leftX  - pylonW * 0.5, lyB);
-        ctx.lineTo(rightX + pylonW * 0.5, ryB);
+        ctx.moveTo(leftX  - pylonW * 0.5, yB);
+        ctx.lineTo(rightX + pylonW * 0.5, yB);
         ctx.stroke();
       }
 
-      // ---- Top cap brace right at the rail underside (across the gap) ----
+      // ---- Top cap brace at the rail underside ----
       ctx.strokeStyle = "rgba(0,0,0,0.7)";
       ctx.lineWidth = 5;
       ctx.beginPath();
-      ctx.moveTo(leftX  - pylonW * 0.8, underYL + 1);
-      ctx.lineTo(rightX + pylonW * 0.8, underYR + 1);
+      ctx.moveTo(leftX  - pylonW * 0.8, topY + 1);
+      ctx.lineTo(rightX + pylonW * 0.8, topY + 1);
       ctx.stroke();
       ctx.strokeStyle = "rgba(255,220,160,1)";
       ctx.shadowColor = "rgba(255,200,120,0.7)";
       ctx.shadowBlur = 6;
       ctx.lineWidth = 3.2;
       ctx.beginPath();
-      ctx.moveTo(leftX  - pylonW * 0.8, underYL + 1);
-      ctx.lineTo(rightX + pylonW * 0.8, underYR + 1);
+      ctx.moveTo(leftX  - pylonW * 0.8, topY + 1);
+      ctx.lineTo(rightX + pylonW * 0.8, topY + 1);
       ctx.stroke();
       ctx.shadowBlur = 0;
 
-      // ---- Conduit from the column footing to the nearest PCB via,
-      //      reinforcing the "circuit-board world" connection. ----
+      // ---- Conduit from each footing outward to PCB ----
       ctx.strokeStyle = "rgba(255,180,110,0.6)";
       ctx.lineWidth = 1.5;
       ctx.beginPath();
@@ -1079,132 +1160,105 @@
     }
   }
 
-  // Two separate elevated rails — NO continuous deck, NO road slab, NO
-  // longitudinal stripes between the rails. Each rail is its own thick
-  // glowing beam with a hard dark core; cross ties are drawn AFTER the
-  // rails as obvious perpendicular bars that bridge the visible gap.
+  // Art-directed elevated track. Two parallel rails generated by offsetting
+  // a single stable cubic Bezier centerline along its screen-space normal.
+  // This eliminates rail tangling because both rails share the same curve
+  // and are simply translated by +/- (gap/2) along the perpendicular —
+  // mathematical self-intersection is impossible. NO continuous deck, NO
+  // road slab, NO longitudinal stripe between rails. Cross ties are drawn
+  // AFTER the rails as discrete perpendicular bars.
   function drawElevatedTrack(w, h, horizonY, t, sectionPos) {
-    var RAIL_OUTER = 0.95;
-
     // ---- 1) Per-rail elliptical cast shadows on the PCB ----
-    // Discrete shadow blobs, one beneath each rail, never a continuous
-    // shadow strip — preserves the empty gap reading.
-    for (var sh = 0; sh < SAMPLE_COUNT; sh += 3) {
-      var sz = sh / SAMPLE_COUNT;
-      var spL = projectSample(sz, -RAIL_OUTER);
-      var spR = projectSample(sz,  RAIL_OUTER);
-      var pp = sz * sz * 0.94 + sz * 0.06;
-      var groundY = horizonY + (h - horizonY) * pp + 6;
-      var shHalf = spL.halfW * 0.16;
-      var sgL = ctx.createRadialGradient(spL.x, groundY, 0, spL.x, groundY, shHalf);
+    for (var sh = 0; sh < TRACK_STEPS; sh += 4) {
+      var sa = trackSamples[sh];
+      var groundY = h - 6;
+      var shHalf = Math.max(8, sa.gap * 0.18);
+      var sgL = ctx.createRadialGradient(sa.lx, groundY, 0, sa.lx, groundY, shHalf);
       sgL.addColorStop(0, "rgba(0,0,0,0.50)");
       sgL.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = sgL;
       ctx.beginPath();
-      ctx.ellipse(spL.x, groundY, shHalf, shHalf * 0.22, 0, 0, Math.PI * 2);
+      ctx.ellipse(sa.lx, groundY, shHalf, shHalf * 0.22, 0, 0, Math.PI * 2);
       ctx.fill();
-      var sgR = ctx.createRadialGradient(spR.x, groundY, 0, spR.x, groundY, shHalf);
+      var sgR = ctx.createRadialGradient(sa.rx, groundY, 0, sa.rx, groundY, shHalf);
       sgR.addColorStop(0, "rgba(0,0,0,0.50)");
       sgR.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = sgR;
       ctx.beginPath();
-      ctx.ellipse(spR.x, groundY, shHalf, shHalf * 0.22, 0, 0, Math.PI * 2);
+      ctx.ellipse(sa.rx, groundY, shHalf, shHalf * 0.22, 0, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // ---- 2) The two rails as separate beams.
-    //         Each rail draws its own (a) dark graphite core casing,
-    //         (b) glowing color sheath, (c) bright top highlight. The
-    //         beams are kept narrow relative to the rail-to-rail gap so
-    //         the empty space between is large and unambiguous.
+    // ---- 2) Two rails as separate beams. Each is drawn as an outer rim,
+    //         a graphite core, a glowing colored sheath, and a top
+    //         highlight ridge so it reads as a 3D beam, not a flat line.
     function drawRailBeam(side, glowColor, sheathColor, topHL) {
-      // Build the rail as ONE clean polyline using projectSample. Because
-      // the project function uses a screen-space normal with a hard min
-      // gap, this polyline cannot cross the opposite rail.
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
-      // (a) outer rim — wide soft halo
+      // Outer rim
+      strokeRailPolyline(side);
       ctx.strokeStyle = "rgba(40,52,72,0.95)";
       ctx.lineWidth = 9;
-      ctx.beginPath();
-      for (var ka = 0; ka <= SAMPLE_COUNT; ka++) {
-        var za = ka / SAMPLE_COUNT;
-        var pa = projectSample(za, side);
-        if (ka === 0) ctx.moveTo(pa.x, pa.y);
-        else ctx.lineTo(pa.x, pa.y);
-      }
       ctx.stroke();
-      // (b) graphite core casing — solid dark beam
+      // Graphite core
       ctx.strokeStyle = "#0a0f1a";
       ctx.lineWidth = 6.5;
       ctx.stroke();
-      // (c) thinner glowing color sheath ON TOP of the dark core
+      // Glowing sheath
       ctx.strokeStyle = sheathColor;
       ctx.shadowColor = glowColor;
       ctx.shadowBlur = 14;
       ctx.lineWidth = 3.2;
       ctx.stroke();
       ctx.shadowBlur = 0;
-      // (c) top highlight ridge — sits 1.5px above the core line
+      // Top highlight ridge — sample the rail polyline shifted up by 3px.
       ctx.strokeStyle = topHL;
       ctx.lineWidth = 1.6;
       ctx.beginPath();
-      for (var kc = 0; kc <= SAMPLE_COUNT; kc++) {
-        var zc = kc / SAMPLE_COUNT;
-        var pc = projectSample(zc, side);
-        if (kc === 0) ctx.moveTo(pc.x, pc.y - 3);
-        else ctx.lineTo(pc.x, pc.y - 3);
+      for (var i = 0; i <= TRACK_STEPS; i++) {
+        var s = trackSamples[i];
+        var rx = side < 0 ? s.lx : s.rx;
+        var ry = (side < 0 ? s.ly : s.ry) - 3;
+        if (i === 0) ctx.moveTo(rx, ry); else ctx.lineTo(rx, ry);
       }
       ctx.stroke();
     }
+    drawRailBeam(-1, "rgba(92,242,255,1)", "rgba(150,235,255,0.95)", "rgba(220,250,255,0.95)");
+    drawRailBeam( 1, "rgba(255,58,58,1)", "rgba(255,150,150,0.95)", "rgba(255,220,220,0.95)");
 
-    // Left rail: cyan-glow beam. Right rail: red-glow beam. Clear color
-    // separation makes the gap unmistakable in any screenshot.
-    drawRailBeam(-RAIL_OUTER, "rgba(92,242,255,1)", "rgba(150,235,255,0.95)", "rgba(220,250,255,0.95)");
-    drawRailBeam( RAIL_OUTER, "rgba(255,58,58,1)", "rgba(255,150,150,0.95)", "rgba(255,220,220,0.95)");
-
-    // ---- 3) Cross ties: drawn AFTER rails so they sit ON TOP of the
-    //         beams and visibly bridge the gap. Each tie is a discrete
-    //         perpendicular copper/graphite bar. Count and thickness are
-    //         deliberately low so consecutive ties NEVER overlap in
-    //         screen space (which would otherwise merge into a continuous
-    //         filled slab). The PCB substrate must remain visible between
-    //         ties as well as between the two rails. ----
-    var TIES = 9;
-    var tiePhase = (t * 0.10) % (1 / TIES);
+    // ---- 3) Cross ties: orderly perpendicular bars between the rails.
+    //         12 ties in a fixed cadence with a small phase drift for
+    //         motion. Each tie is a thick rectangular polygon with bolt
+    //         heads at the rail contacts. Spacing guarantees the PCB
+    //         remains visible between consecutive ties.
+    var TIES = 12;
+    var tiePhase = (t * 0.05) % (1 / TIES);
     for (var ti = 0; ti < TIES; ti++) {
-      var tz = (ti / TIES + tiePhase);
-      if (tz <= 0.04 || tz >= 0.98) continue;
-      var tL = projectSample(tz, -RAIL_OUTER);
-      var tR = projectSample(tz,  RAIL_OUTER);
-      // Skip if rail span is too short to read as a tie.
-      var tieGap = Math.sqrt((tR.x - tL.x) * (tR.x - tL.x) + (tR.y - tL.y) * (tR.y - tL.y));
-      if (tieGap < 28) continue;
-      // Tie thickness scales with depth — meaty enough to be unmistakable
-      // in the foreground/midground without ever fusing with neighbors.
-      var tieThick = Math.max(5, Math.min(14, tieGap * 0.10));
-      // dx/dy for a perpendicular offset (so we can draw a thick
-      // rectangle as a 4-vertex polygon — a true bar shape rather than
-      // a thin stroke).
-      var dx = tR.x - tL.x;
-      var dy = tR.y - tL.y;
-      var len = Math.sqrt(dx * dx + dy * dy) || 1;
-      var nx = -dy / len;
-      var ny =  dx / len;
+      var tu = (ti / TIES) + tiePhase + 0.04;
+      if (tu <= 0.05 || tu >= 0.99) continue;
+      var p = projectTrack(tu);
+      var dx = p.rx - p.lx;
+      var dy = p.ry - p.ly;
+      var len = Math.sqrt(dx*dx + dy*dy) || 1;
+      if (len < 30) continue;
+      // Perpendicular for tie thickness (extruded into a bar shape).
+      var nxp = -dy / len;
+      var nyp =  dx / len;
+      var tieThick = Math.max(5, Math.min(14, len * 0.10));
       var hw = tieThick * 0.5;
-      // Drop shadow (dark underside)
+      // Drop shadow
       ctx.fillStyle = "rgba(0,0,0,0.55)";
       ctx.beginPath();
-      ctx.moveTo(tL.x + nx * hw + 1, tL.y + ny * hw + 3);
-      ctx.lineTo(tR.x + nx * hw + 1, tR.y + ny * hw + 3);
-      ctx.lineTo(tR.x - nx * hw + 1, tR.y - ny * hw + 3);
-      ctx.lineTo(tL.x - nx * hw + 1, tL.y - ny * hw + 3);
+      ctx.moveTo(p.lx + nxp * hw + 1, p.ly + nyp * hw + 3);
+      ctx.lineTo(p.rx + nxp * hw + 1, p.ry + nyp * hw + 3);
+      ctx.lineTo(p.rx - nxp * hw + 1, p.ry - nyp * hw + 3);
+      ctx.lineTo(p.lx - nxp * hw + 1, p.ly - nyp * hw + 3);
       ctx.closePath();
       ctx.fill();
-      // Main copper bar body
+      // Copper bar body
       var barGrad = ctx.createLinearGradient(
-        tL.x + nx * hw, tL.y + ny * hw,
-        tL.x - nx * hw, tL.y - ny * hw
+        p.lx + nxp * hw, p.ly + nyp * hw,
+        p.lx - nxp * hw, p.ly - nyp * hw
       );
       barGrad.addColorStop(0,    "rgba(120,70,30,1)");
       barGrad.addColorStop(0.45, "rgba(255,180,110,1)");
@@ -1212,30 +1266,30 @@
       barGrad.addColorStop(1,    "rgba(80,40,15,1)");
       ctx.fillStyle = barGrad;
       ctx.beginPath();
-      ctx.moveTo(tL.x + nx * hw, tL.y + ny * hw);
-      ctx.lineTo(tR.x + nx * hw, tR.y + ny * hw);
-      ctx.lineTo(tR.x - nx * hw, tR.y - ny * hw);
-      ctx.lineTo(tL.x - nx * hw, tL.y - ny * hw);
+      ctx.moveTo(p.lx + nxp * hw, p.ly + nyp * hw);
+      ctx.lineTo(p.rx + nxp * hw, p.ry + nyp * hw);
+      ctx.lineTo(p.rx - nxp * hw, p.ry - nyp * hw);
+      ctx.lineTo(p.lx - nxp * hw, p.ly - nyp * hw);
       ctx.closePath();
       ctx.fill();
-      // Outline so the tie has a hard silhouette against the rails
       ctx.strokeStyle = "rgba(20,12,4,0.95)";
       ctx.lineWidth = 1.5;
       ctx.stroke();
-      // Bolt heads at each end where the tie meets the rail
+      // Bolt heads
       ctx.fillStyle = "rgba(255,240,200,0.95)";
       ctx.beginPath();
-      ctx.arc(tL.x, tL.y, Math.max(1.4, tieThick * 0.22), 0, Math.PI * 2);
+      ctx.arc(p.lx, p.ly, Math.max(1.4, tieThick * 0.22), 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = "rgba(255,240,200,0.95)";
       ctx.beginPath();
-      ctx.arc(tR.x, tR.y, Math.max(1.4, tieThick * 0.22), 0, Math.PI * 2);
+      ctx.arc(p.rx, p.ry, Math.max(1.4, tieThick * 0.22), 0, Math.PI * 2);
       ctx.fill();
     }
   }
 
-  // Long tapered electric streaks running along the track. Each streak is
-  // a continuous gradient stroke so it reads as a light trail, not beads.
+  // Art-directed electric streaks: continuous tapered light trails moving
+  // along each rail. Streaks ride exactly on the rail polyline so they
+  // CAN'T cross between rails. Drawn as gradient strokes for clear "light
+  // trail" reading rather than scattered dots.
   function drawElectricStreaks(w, h, horizonY, t, dt, sectionPos) {
     for (var i = 0; i < streaks.length; i++) {
       var sk = streaks[i];
@@ -1244,26 +1298,29 @@
       var head = Math.min(1, sk.z);
       var tail = Math.max(0, sk.z - sk.length);
       if (head <= 0.02) continue;
-      // Sample a polyline for this streak.
       var STEPS = 14;
       var pts = [];
+      var side = sk.lane < 0 ? -1 : 1;
       for (var k = 0; k <= STEPS; k++) {
         var u = tail + (head - tail) * (k / STEPS);
         if (u < 0 || u > 1) continue;
-        pts.push(projectSample(u, sk.lane));
+        pts.push(projectTrack(u));
       }
       if (pts.length < 2) continue;
+      // Build pixel polyline along this rail.
       var headP = pts[pts.length - 1];
       var tailP = pts[0];
+      var hx = side < 0 ? headP.lx : headP.rx;
+      var hy = side < 0 ? headP.ly : headP.ry;
+      var txp = side < 0 ? tailP.lx : tailP.rx;
+      var typ = side < 0 ? tailP.ly : tailP.ry;
 
-      // Build a linear gradient down the streak so the head is bright and
-      // the tail fades to transparent. This kills the bead look.
-      var grad = ctx.createLinearGradient(tailP.x, tailP.y, headP.x, headP.y);
+      var grad = ctx.createLinearGradient(txp, typ, hx, hy);
       if (sk.cmd) {
         grad.addColorStop(0,    "rgba(255,58,58,0)");
         grad.addColorStop(0.55, "rgba(255,58,58,0.55)");
         grad.addColorStop(1,    "rgba(255,200,180,1)");
-      } else if (sk.lane < 0) {
+      } else if (side < 0) {
         grad.addColorStop(0,    "rgba(92,242,255,0)");
         grad.addColorStop(0.55, "rgba(92,242,255,0.55)");
         grad.addColorStop(1,    "rgba(220,250,255,1)");
@@ -1275,18 +1332,20 @@
       ctx.strokeStyle = grad;
       ctx.shadowColor = sk.cmd ? "rgba(255,58,58,0.95)" : "rgba(92,242,255,0.9)";
       ctx.shadowBlur = sk.cmd ? 16 : 12;
-      ctx.lineWidth = Math.max(1.5, headP.halfW * 0.022 * (sk.cmd ? 1.5 : 1.0));
+      ctx.lineWidth = Math.max(1.5, headP.gap * 0.025 * (sk.cmd ? 1.5 : 1.0));
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.beginPath();
-      ctx.moveTo(pts[0].x, pts[0].y);
-      for (var pp = 1; pp < pts.length; pp++) ctx.lineTo(pts[pp].x, pts[pp].y);
+      for (var pp = 0; pp < pts.length; pp++) {
+        var sx = side < 0 ? pts[pp].lx : pts[pp].rx;
+        var sy = side < 0 ? pts[pp].ly : pts[pp].ry;
+        if (pp === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+      }
       ctx.stroke();
       ctx.shadowBlur = 0;
     }
 
-    // Sparse arcing sparks that flash briefly between the rails. Each
-    // spark uses a stable phase so it does not jitter per frame.
+    // Sparse arcing sparks across the rail gap.
     for (var s = 0; s < sparks.length; s++) {
       var sp = sparks[s];
       sp.z += sp.speed * dt;
@@ -1294,17 +1353,16 @@
       if (sp.z < 0.06) continue;
       var phase = (Math.sin(t * 1.2 + sp.offset) + 1) * 0.5;
       if (phase < 0.85) continue;
-      var pa = projectSample(sp.z, -0.95);
-      var pb = projectSample(sp.z,  0.95);
-      var mx = (pa.x + pb.x) / 2 + Math.cos(t * 3 + sp.offset) * 8;
-      var my = (pa.y + pb.y) / 2 - 6 - Math.abs(Math.sin(t * 3 + sp.offset)) * 8;
+      var pa = projectTrack(sp.z);
+      var mx = (pa.lx + pa.rx) / 2 + Math.cos(t * 3 + sp.offset) * 8;
+      var my = (pa.ly + pa.ry) / 2 - 6 - Math.abs(Math.sin(t * 3 + sp.offset)) * 8;
       ctx.strokeStyle = "rgba(255,255,255,0.95)";
       ctx.shadowColor = "rgba(92,242,255,0.95)";
       ctx.shadowBlur = 12;
       ctx.lineWidth = 1.4;
       ctx.beginPath();
-      ctx.moveTo(pa.x, pa.y);
-      ctx.quadraticCurveTo(mx, my, pb.x, pb.y);
+      ctx.moveTo(pa.lx, pa.ly);
+      ctx.quadraticCurveTo(mx, my, pa.rx, pa.ry);
       ctx.stroke();
       ctx.shadowBlur = 0;
     }
@@ -1851,6 +1909,10 @@
     // Rebuild the spline sample table once per frame so every draw call
     // reads from the same stable data (smoothness + cheaper than 5x recompute).
     rebuildSamples(w, h, horizonY, t, sectionPos);
+    // Rebuild the art-directed cubic Bezier track once per frame. All rail,
+    // tie, truss, and streak rendering reads from this stable sample table
+    // instead of the dynamic projection-based curve.
+    buildArtTrack(w, h, horizonY, sectionPos);
 
     // Subtle motion-blur trail: dim the prior frame instead of fully
     // clearing. Keeps text legible because text is DOM, not canvas.
