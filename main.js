@@ -21,7 +21,7 @@
     return;
   }
 
-  document.documentElement.dataset.sceneEngine = "canvas2d-roller-circuit-2";
+  document.documentElement.dataset.sceneEngine = "canvas2d-roller-circuit-3d";
   window.__brainstormRenderFrames = 0;
 
   var REDUCED_MOTION = window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches;
@@ -236,8 +236,8 @@
     // Strong serpentine sway that varies with depth and time. A
     // depth-driven sin wave forces a visible S-curve regardless of
     // section position so QA always sees turns, not a straight line.
-    var sway = Math.sin(zNorm * 5.2 + sectionPos * 1.1 + t * 0.35) * 0.32 * (0.4 + zNorm * 0.6);
-    var twist = Math.cos(t * 0.25 + sectionPos * 1.4 + zNorm * 2.4) * 0.10;
+    var sway = Math.sin(zNorm * 5.2 + sectionPos * 1.1 + t * 0.35) * 0.55 * (0.4 + zNorm * 0.6);
+    var twist = Math.cos(t * 0.25 + sectionPos * 1.4 + zNorm * 2.4) * 0.18;
     var blend = 1 - zNorm;
     return fgSide * (1 - blend) + bgSide * blend + sway + twist;
   }
@@ -287,7 +287,7 @@
       var next = samples[Math.min(SAMPLE_COUNT, k + 1)];
       var slope = (next.centerLat - prev.centerLat);
       samples[k].slope = slope;
-      samples[k].bank = slope * 1.6;
+      samples[k].bank = slope * 3.2;
     }
   }
 
@@ -305,11 +305,11 @@
     var groundY = a.groundY + (b.groundY - a.groundY) * u;
     var bank = a.bank + (b.bank - a.bank) * u;
     var localX = laneOffset * halfW;
-    var cb = Math.cos(bank * 0.18);
-    var sb = Math.sin(bank * 0.18);
+    var cb = Math.cos(bank * 0.35);
+    var sb = Math.sin(bank * 0.35);
     return {
       x: centerX + localX * cb,
-      y: groundY + localX * sb * 0.55,
+      y: groundY + localX * sb * 1.1,
       halfW: halfW,
       centerX: centerX,
       centerY: groundY,
@@ -471,241 +471,320 @@
     }
   }
 
-  // Circuit board substrate underneath the track. Reads explicitly as PCB
-  // with an etched grid, right-angle copper traces, circular vias/solder
-  // pads, SMD chips with pin rows, and connector pads.
-  function drawCircuitBoard(w, h, horizonY, t, sectionPos) {
-    // PCB substrate: dark teal-green so it does not read as a road or
-    // generic floor. Brighter than before so the board surface is obvious.
+  // PCB substrate. Drawn entirely in screen-space (NOT projected through
+  // the track curve) so traces never read as road lanes. The track ribbon
+  // sits ON TOP of this layer with its own visible underside, so the PCB
+  // and the elevated track are visually distinct.
+  function drawPCBSubstrate(w, h, horizonY, t, sectionPos) {
+    // Solder-mask plane: bright graphite green so it cannot be confused
+    // with asphalt. Vertical gradient for depth, but the dominant hue is
+    // unmistakably PCB.
     var grad = ctx.createLinearGradient(0, horizonY, 0, h);
-    grad.addColorStop(0, "#0a2a26");
-    grad.addColorStop(0.5, "#0d3a32");
-    grad.addColorStop(1, "#04140f");
+    grad.addColorStop(0, "#0c3a30");
+    grad.addColorStop(0.45, "#114a3a");
+    grad.addColorStop(1, "#04180f");
     ctx.fillStyle = grad;
     ctx.fillRect(0, horizonY, w, h - horizonY);
 
-    // Etched PCB grid. Both depth lines (perspective) and lateral lines so
-    // the surface reads as a board, not a vanishing-point road. Brighter
-    // than the previous 0.09 so it is visible on desktop without dark wash.
+    // Silkscreen border line at the top of the board (right at horizon).
+    ctx.strokeStyle = "rgba(180,255,220,0.55)";
     ctx.lineWidth = 1;
-    for (var i = 1; i < 38; i++) {
-      var z = i / 38;
-      var pp = z * z * 0.94 + z * 0.06;
-      var y = horizonY + (h - horizonY) * pp;
-      ctx.strokeStyle = "rgba(120,255,200," + (0.05 + z * 0.16).toFixed(3) + ")";
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(w, y);
-      ctx.stroke();
-    }
-    // Lateral grid lines (perspective fan, but drawn straight so the eye
-    // reads them as etched copper lanes on a board).
-    for (var lj = -8; lj <= 8; lj++) {
-      var zNorm = 0.96;
-      var pNear = projectSample(0.04, lj / 4);
-      var pFar  = projectSample(zNorm, lj / 4);
-      ctx.strokeStyle = "rgba(120,255,200,0.18)";
-      ctx.beginPath();
-      ctx.moveTo(pFar.x, pFar.y + 8);
-      ctx.lineTo(pNear.x, pNear.y + 18);
-      ctx.stroke();
-    }
+    ctx.beginPath();
+    ctx.moveTo(0, horizonY + 2);
+    ctx.lineTo(w, horizonY + 2);
+    ctx.stroke();
 
-    // Right-angle copper traces flowing on the board, drawn with bright
-    // copper color so they are unmistakably PCB.
-    for (var tIdx = 0; tIdx < pcbTraces.length; tIdx++) {
-      var trace = pcbTraces[tIdx];
-      trace.z += trace.speed * 0.012;
-      if (trace.z > 1.05) trace.z = -0.05;
-      if (trace.z < 0.02) continue;
-      var pA = projectSample(trace.z, trace.xStart * 1.8);
-      var pB = projectSample(trace.z, trace.xEnd * 1.8);
-      // Two-segment Manhattan trace with a right-angle corner.
-      var midX = (pA.x + pB.x) / 2;
-      ctx.strokeStyle = trace.red ? "rgba(255,140,90,0.85)" : "rgba(160,255,210,0.75)";
-      ctx.lineWidth = Math.max(1.4, pA.halfW * 0.014);
+    // ---- Screen-space orthogonal copper traces ----
+    // Drawn as straight horizontal+vertical Manhattan paths so they read
+    // unambiguously as PCB traces, not as road lanes that follow the curve.
+    var boardH = h - horizonY;
+    var rowSpacing = boardH / 9;
+    var driftX = ((sectionPos * 80) % 90);
+    for (var row = 0; row < 9; row++) {
+      var ry = horizonY + 14 + row * rowSpacing;
+      // Faint etched horizontal rail
+      ctx.strokeStyle = "rgba(140,255,200," + (0.10 + row * 0.025).toFixed(3) + ")";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, ry);
+      ctx.lineTo(w, ry);
+      ctx.stroke();
+      // Bright copper trace with right-angle bends
+      ctx.strokeStyle = (row % 3 === 0) ? "rgba(255,160,90,0.85)" : "rgba(170,255,210,0.85)";
+      ctx.lineWidth = Math.max(2, 2 + row * 0.4);
       ctx.lineCap = "butt";
+      ctx.lineJoin = "miter";
       ctx.beginPath();
-      ctx.moveTo(pA.x, pA.y);
-      ctx.lineTo(midX, pA.y);
-      ctx.lineTo(midX, pB.y);
-      ctx.lineTo(pB.x, pB.y);
-      ctx.stroke();
-      // Corner via at the bend
-      ctx.fillStyle = trace.red ? "rgba(255,160,110,0.95)" : "rgba(180,255,220,0.9)";
-      ctx.beginPath();
-      ctx.arc(midX, pA.y, Math.max(1.6, pA.halfW * 0.018), 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#03100a";
-      ctx.beginPath();
-      ctx.arc(midX, pA.y, Math.max(0.8, pA.halfW * 0.008), 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Circular vias / solder pads sprinkled on the board. Drawn as a copper
-    // ring with a darker center hole so they read unambiguously as PCB vias.
-    for (var vi = 0; vi < pcbVias.length; vi++) {
-      var via = pcbVias[vi];
-      via.z += via.speed * 0.012;
-      if (via.z > 1.05) via.z = -0.05;
-      if (via.z < 0.04) continue;
-      var pv = projectSample(via.z, via.side * via.offset * 1.6);
-      var rOuter = Math.max(2, pv.halfW * via.r * 1.4);
-      var rInner = rOuter * 0.42;
-      ctx.fillStyle = via.red ? "rgba(255,160,110,0.9)" : "rgba(170,255,210,0.92)";
-      ctx.beginPath();
-      ctx.arc(pv.x, pv.y + rOuter * 0.5, rOuter, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#03100a";
-      ctx.beginPath();
-      ctx.arc(pv.x, pv.y + rOuter * 0.5, rInner, 0, Math.PI * 2);
-      ctx.fill();
-      // Short copper trace stub leading toward the track center.
-      ctx.strokeStyle = via.red ? "rgba(255,140,90,0.6)" : "rgba(160,255,210,0.55)";
-      ctx.lineWidth = Math.max(1, pv.halfW * 0.008);
-      ctx.beginPath();
-      ctx.moveTo(pv.x, pv.y + rOuter * 0.5);
-      ctx.lineTo(pv.x - via.side * rOuter * 3, pv.y + rOuter * 0.5);
-      ctx.stroke();
-    }
-
-    // SMD chips on the board: dark body, pin rows top/bottom, label band.
-    for (var ch = 0; ch < smdChips.length; ch++) {
-      var chip = smdChips[ch];
-      chip.z += chip.speed * 0.012;
-      if (chip.z > 1.05) chip.z = -0.05;
-      if (chip.z < 0.04) continue;
-      var chipP = projectSample(chip.z, chip.side * chip.offset);
-      var cw = Math.max(8, chipP.halfW * chip.w);
-      var chh = Math.max(4, chipP.halfW * chip.h);
-      // Chip body
-      ctx.fillStyle = "#02160e";
-      ctx.fillRect(chipP.x - cw / 2, chipP.y - chh / 2, cw, chh);
-      ctx.strokeStyle = "rgba(170,255,210,0.95)";
-      ctx.lineWidth = 1.2;
-      ctx.strokeRect(chipP.x - cw / 2, chipP.y - chh / 2, cw, chh);
-      // Notch dot (pin-1 marker)
-      ctx.fillStyle = "rgba(255,160,110,0.95)";
-      ctx.beginPath();
-      ctx.arc(chipP.x - cw / 2 + 3, chipP.y - chh / 2 + 3, 1.4, 0, Math.PI * 2);
-      ctx.fill();
-      // Pin rows top and bottom: copper colored, very visible.
-      var pinCount = Math.max(4, Math.floor(cw / 4));
-      ctx.fillStyle = "rgba(255,200,130,0.95)";
-      for (var pi = 0; pi < pinCount; pi++) {
-        var px = chipP.x - cw / 2 + 2 + pi * ((cw - 4) / (pinCount - 1));
-        ctx.fillRect(px - 0.8, chipP.y - chh / 2 - 2.2, 1.6, 2.2);
-        ctx.fillRect(px - 0.8, chipP.y + chh / 2, 1.6, 2.2);
+      var segLen = 70 + row * 10;
+      var startX = -((row * 37 + driftX) % segLen);
+      var x = startX;
+      var y = ry;
+      ctx.moveTo(x, y);
+      var pulseOn = ((Math.floor(t * 1.2 + row) % 2) === 0);
+      while (x < w + segLen) {
+        var nx = x + segLen;
+        ctx.lineTo(nx, y);
+        // Drop or rise to next stripe with a right-angle corner
+        var dy = ((row + Math.floor(nx / segLen)) % 2 === 0) ? rowSpacing * 0.45 : -rowSpacing * 0.45;
+        ctx.lineTo(nx, y + dy);
+        // Corner via marker
+        x = nx;
+        y = y + dy;
       }
-      // Label band
-      if (cw > 20) {
-        ctx.fillStyle = "rgba(170,255,210,0.85)";
-        ctx.font = Math.max(7, Math.floor(chh * 0.6)) + "px JetBrains Mono, monospace";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(chip.label, chipP.x, chipP.y);
+      ctx.stroke();
+      if (pulseOn) {
+        ctx.strokeStyle = "rgba(255,255,255,0.30)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
       }
     }
 
-    // Connector pads (rectangle pin headers) along the board edges.
-    for (var ci = 0; ci < pcbConnectors.length; ci++) {
-      var conn = pcbConnectors[ci];
-      conn.z += conn.speed * 0.012;
-      if (conn.z > 1.05) conn.z = -0.05;
-      if (conn.z < 0.04) continue;
-      var pcn = projectSample(conn.z, conn.side * conn.offset);
-      var pw = Math.max(2, pcn.halfW * 0.012);
-      var ph = Math.max(3, pcn.halfW * 0.024);
-      for (var pp2 = 0; pp2 < conn.pins; pp2++) {
-        var ox = pcn.x + (pp2 - conn.pins / 2) * (pw + 1.5);
-        ctx.fillStyle = "rgba(255,200,130,0.95)";
-        ctx.fillRect(ox - pw / 2, pcn.y - ph / 2, pw, ph);
-        ctx.strokeStyle = "rgba(80,40,10,0.8)";
+    // ---- Vertical Manhattan traces ----
+    var colCount = Math.max(8, Math.floor(w / 110));
+    for (var col = 0; col < colCount; col++) {
+      var cx = ((col + 0.5) * (w / colCount) + (sectionPos * 30) % 60) % w;
+      ctx.strokeStyle = (col % 4 === 0) ? "rgba(255,160,90,0.55)" : "rgba(170,255,210,0.5)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cx, horizonY + 6);
+      // Step corner roughly halfway down
+      var stepY = horizonY + boardH * (0.4 + (col % 3) * 0.12);
+      ctx.lineTo(cx, stepY);
+      var dxStep = ((col % 2 === 0) ? 28 : -28);
+      ctx.lineTo(cx + dxStep, stepY);
+      ctx.lineTo(cx + dxStep, h);
+      ctx.stroke();
+    }
+
+    // ---- Big visible vias along the board ----
+    var viaRows = 5;
+    for (var vr = 0; vr < viaRows; vr++) {
+      var vy = horizonY + 22 + vr * (boardH / viaRows);
+      var viasInRow = 6 + vr * 2;
+      for (var vc = 0; vc < viasInRow; vc++) {
+        var vx = ((vc + 0.5) * (w / viasInRow) + (sectionPos * 20 * (vr + 1)) % (w / viasInRow));
+        var rOuter = 4 + vr * 1.4;
+        var rInner = rOuter * 0.42;
+        // Annular ring
+        ctx.fillStyle = (vc % 5 === 0) ? "rgba(255,180,110,0.95)" : "rgba(170,255,210,0.95)";
+        ctx.beginPath();
+        ctx.arc(vx, vy, rOuter, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#03100a";
+        ctx.beginPath();
+        ctx.arc(vx, vy, rInner, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.35)";
         ctx.lineWidth = 0.8;
-        ctx.strokeRect(ox - pw / 2, pcn.y - ph / 2, pw, ph);
+        ctx.beginPath();
+        ctx.arc(vx, vy, rOuter, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    // ---- SMD chip footprints scattered on the board (screen-space) ----
+    var chipPositions = [
+      { x: 0.10, y: 0.20, w: 80, h: 38, label: "MCU" },
+      { x: 0.86, y: 0.18, w: 70, h: 32, label: "DSP" },
+      { x: 0.18, y: 0.55, w: 100, h: 44, label: "FPGA" },
+      { x: 0.78, y: 0.50, w: 90, h: 40, label: "RAM" },
+      { x: 0.30, y: 0.82, w: 110, h: 50, label: "U1" },
+      { x: 0.66, y: 0.86, w: 110, h: 50, label: "U2" }
+    ];
+    for (var cp = 0; cp < chipPositions.length; cp++) {
+      var cps = chipPositions[cp];
+      var ccx = cps.x * w;
+      var ccy = horizonY + cps.y * boardH;
+      var cw = cps.w;
+      var chh = cps.h;
+      // Chip body
+      ctx.fillStyle = "#040f0a";
+      ctx.fillRect(ccx - cw / 2, ccy - chh / 2, cw, chh);
+      ctx.strokeStyle = "rgba(190,255,220,0.95)";
+      ctx.lineWidth = 1.4;
+      ctx.strokeRect(ccx - cw / 2, ccy - chh / 2, cw, chh);
+      // Pin-1 dot
+      ctx.fillStyle = "rgba(255,180,110,0.95)";
+      ctx.beginPath();
+      ctx.arc(ccx - cw / 2 + 5, ccy - chh / 2 + 5, 2, 0, Math.PI * 2);
+      ctx.fill();
+      // Pin rows: vertical pins on left/right, drawn in copper
+      var pinCount = Math.max(6, Math.floor(chh / 5));
+      ctx.fillStyle = "rgba(255,210,140,0.95)";
+      for (var pi = 0; pi < pinCount; pi++) {
+        var py = ccy - chh / 2 + 4 + pi * ((chh - 8) / (pinCount - 1));
+        ctx.fillRect(ccx - cw / 2 - 4, py - 1, 4, 2);
+        ctx.fillRect(ccx + cw / 2,     py - 1, 4, 2);
+      }
+      // Top/bottom pins
+      var topPins = Math.max(4, Math.floor(cw / 8));
+      for (var ti = 0; ti < topPins; ti++) {
+        var ppx = ccx - cw / 2 + 4 + ti * ((cw - 8) / (topPins - 1));
+        ctx.fillRect(ppx - 1, ccy - chh / 2 - 4, 2, 4);
+        ctx.fillRect(ppx - 1, ccy + chh / 2,     2, 4);
+      }
+      // Silkscreen label
+      ctx.fillStyle = "rgba(220,255,235,0.85)";
+      ctx.font = "bold 11px JetBrains Mono, monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(cps.label, ccx, ccy);
+    }
+
+    // ---- Connector pad strips along bottom edge ----
+    var connY = h - 20;
+    for (var ck = 0; ck < 4; ck++) {
+      var groupX = w * (0.12 + ck * 0.22);
+      for (var pn = 0; pn < 8; pn++) {
+        var gx = groupX + pn * 6;
+        ctx.fillStyle = "rgba(255,210,140,0.95)";
+        ctx.fillRect(gx - 2, connY - 6, 4, 8);
+        ctx.strokeStyle = "rgba(80,40,10,0.85)";
+        ctx.lineWidth = 0.8;
+        ctx.strokeRect(gx - 2, connY - 6, 4, 8);
       }
     }
   }
 
-  // Pylons / supports beneath the elevated track. Drawn as wide tapered
-  // posts with cross-bracing, with a copper footing pad that doubles as a
-  // PCB solder pad so the track unmistakably reads as "elevated above a
-  // circuit board."
-  function drawTrackPylons(w, h, horizonY, t, sectionPos) {
-    var COUNT = 16;
+  // Visible support trusses beneath the elevated track. Frequent (every
+  // 1/22 of the track), wide enough to read clearly, with diagonal X
+  // bracing, horizontal cap braces, and copper footing pads on the PCB.
+  // Pylons are explicitly drawn from the track underside down to the PCB
+  // ground so the elevation reads unambiguously.
+  function drawSupportTrusses(w, h, horizonY, t, sectionPos) {
+    var COUNT = 22;
+    var DECK_THICKNESS = 0.32;
     for (var i = 1; i <= COUNT; i++) {
       var z = i / COUNT;
       var pCenter = projectSample(z, 0);
-      var pLeft   = projectSample(z, -0.85);
-      var pRight  = projectSample(z,  0.85);
       var pp = z * z * 0.94 + z * 0.06;
-      var groundY = horizonY + (h - horizonY) * pp;
-      if (groundY <= pCenter.y + 6) continue;
-      var pylonW = Math.max(2.5, pCenter.halfW * 0.07);
-      var dropH = groundY - pCenter.y;
-      // Footing solder pad on PCB (large copper ring with hole).
-      var padR = pylonW * 2.4;
-      ctx.fillStyle = "rgba(255,180,110,0.85)";
-      ctx.beginPath();
-      ctx.ellipse(pCenter.x, groundY, padR, padR * 0.4, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#03100a";
-      ctx.beginPath();
-      ctx.ellipse(pCenter.x, groundY, padR * 0.42, padR * 0.16, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "rgba(170,255,210,0.7)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.ellipse(pCenter.x, groundY, padR, padR * 0.4, 0, 0, Math.PI * 2);
-      ctx.stroke();
+      var groundY = horizonY + (h - horizonY) * pp + 6;
+      // Underside of the track (where the truss attaches): below the deck
+      // by DECK_THICKNESS * halfW so trusses visibly begin at the bottom
+      // of the slab, not the top.
+      var underY = pCenter.y + pCenter.halfW * DECK_THICKNESS + 4;
+      if (groundY <= underY + 6) continue;
+      var pylonW = Math.max(3, pCenter.halfW * 0.10);
+      var spread = Math.max(8, pCenter.halfW * 0.30);
+      var leftX = pCenter.x - spread;
+      var rightX = pCenter.x + spread;
+      var dropH = groundY - underY;
 
-      // Two-pillar truss (left and right of track centerline) to read as
-      // a real elevated structure, not a pole.
-      var leftX = pCenter.x - pylonW * 1.4;
-      var rightX = pCenter.x + pylonW * 1.4;
-      // Pillar fills with a left/right shading for pseudo-3D
-      var pillarGrad = ctx.createLinearGradient(leftX - pylonW * 0.5, 0, rightX + pylonW * 0.5, 0);
-      pillarGrad.addColorStop(0, "#0a1830");
-      pillarGrad.addColorStop(0.5, "#162a4a");
-      pillarGrad.addColorStop(1, "#06101e");
-      ctx.fillStyle = pillarGrad;
-      ctx.fillRect(leftX - pylonW / 2, pCenter.y, pylonW, dropH);
-      ctx.fillRect(rightX - pylonW / 2, pCenter.y, pylonW, dropH);
-      ctx.strokeStyle = "rgba(170,255,210,0.65)";
-      ctx.lineWidth = 1.2;
-      ctx.strokeRect(leftX - pylonW / 2, pCenter.y, pylonW, dropH);
-      ctx.strokeRect(rightX - pylonW / 2, pCenter.y, pylonW, dropH);
+      // ---- Footing solder pads on PCB (one per pillar) ----
+      function footingPad(fx, fy) {
+        var rPad = pylonW * 1.8;
+        ctx.fillStyle = "rgba(255,200,120,0.95)";
+        ctx.beginPath();
+        ctx.ellipse(fx, fy, rPad, rPad * 0.45, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#03100a";
+        ctx.beginPath();
+        ctx.ellipse(fx, fy, rPad * 0.4, rPad * 0.18, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.4)";
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.ellipse(fx, fy, rPad, rPad * 0.45, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      footingPad(leftX, groundY);
+      footingPad(rightX, groundY);
 
-      // Cross bracing (X) between pillars
-      ctx.strokeStyle = "rgba(92,242,255,0.55)";
-      ctx.lineWidth = 1;
+      // ---- Pillar fills with side shading (pseudo-3D columns) ----
+      function pillar(px) {
+        var pg = ctx.createLinearGradient(px - pylonW / 2, 0, px + pylonW / 2, 0);
+        pg.addColorStop(0, "#0c1a32");
+        pg.addColorStop(0.5, "#1c3258");
+        pg.addColorStop(1, "#06101e");
+        ctx.fillStyle = pg;
+        ctx.fillRect(px - pylonW / 2, underY, pylonW, dropH);
+        ctx.strokeStyle = "rgba(170,220,255,0.85)";
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(px - pylonW / 2 + 0.5, underY + 0.5, pylonW - 1, dropH - 1);
+        // Bright vertical highlight rib
+        ctx.strokeStyle = "rgba(92,242,255,0.55)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(px, underY + 2);
+        ctx.lineTo(px, groundY - 2);
+        ctx.stroke();
+      }
+      pillar(leftX);
+      pillar(rightX);
+
+      // ---- X-bracing between pillars (multiple stages so it reads as a
+      //      real truss and not just a single X). ----
+      var stages = Math.max(2, Math.floor(dropH / 36));
+      ctx.strokeStyle = "rgba(92,242,255,0.85)";
+      ctx.lineWidth = 1.6;
+      ctx.shadowColor = "rgba(92,242,255,0.6)";
+      ctx.shadowBlur = 4;
+      for (var st = 0; st < stages; st++) {
+        var y0 = underY + (dropH * st) / stages + 3;
+        var y1 = underY + (dropH * (st + 1)) / stages - 3;
+        ctx.beginPath();
+        ctx.moveTo(leftX,  y0);
+        ctx.lineTo(rightX, y1);
+        ctx.moveTo(rightX, y0);
+        ctx.lineTo(leftX,  y1);
+        ctx.stroke();
+        // Horizontal cap at each stage boundary
+        ctx.strokeStyle = "rgba(255,180,110,0.85)";
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(leftX - pylonW * 0.4,  y1);
+        ctx.lineTo(rightX + pylonW * 0.4, y1);
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(92,242,255,0.85)";
+        ctx.lineWidth = 1.6;
+      }
+      ctx.shadowBlur = 0;
+
+      // ---- Top cap brace right at the deck underside ----
+      ctx.strokeStyle = "rgba(255,210,150,0.95)";
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(leftX,  pCenter.y + 4);
-      ctx.lineTo(rightX, groundY - 4);
-      ctx.moveTo(rightX, pCenter.y + 4);
-      ctx.lineTo(leftX,  groundY - 4);
-      ctx.stroke();
-      // Horizontal cap brace
-      ctx.strokeStyle = "rgba(255,180,110,0.7)";
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.moveTo(leftX - pylonW / 2, pCenter.y + dropH * 0.5);
-      ctx.lineTo(rightX + pylonW / 2, pCenter.y + dropH * 0.5);
+      ctx.moveTo(leftX - pylonW * 0.5,  underY + 2);
+      ctx.lineTo(rightX + pylonW * 0.5, underY + 2);
       ctx.stroke();
     }
   }
 
-  // The elevated roller-coaster ribbon. Drawn as: underside face (so the
-  // track has visible depth from below), side walls (so the track has
-  // visible thickness), deck top (the riding surface), then rails and
-  // cross ties on top. This gives the track unmistakable 3D elevation,
-  // not a flat painted lane.
-  function drawTrackRibbon(w, h, horizonY, t, sectionPos) {
-    var DECK_THICKNESS = 0.18; // local-y offset for the underside/side walls
+  // The elevated roller-coaster track. Built up in z-back-to-front layers:
+  //   1) cast shadow on the PCB beneath the deck
+  //   2) underside slab (deep dark, with cyan highlight ribs)
+  //   3) left/right side walls (visible thickness with shading)
+  //   4) deck top (much narrower than the slab so rails sit clearly above)
+  //   5) cross ties spanning between the rails
+  //   6) two thick raised rails with bank tilt and glow
+  //   7) bright glowing inner power line
+  // The track is intentionally narrower than before so the slab reads as
+  // a coaster spine, not a road. Banking is exaggerated so QA cannot miss
+  // the turn.
+  function drawElevatedTrack(w, h, horizonY, t, sectionPos) {
+    var DECK_THICKNESS = 0.36; // very thick slab
+    var RAIL_OUTER = 0.95;
+    var RAIL_INNER = 0.55;
 
-    // ---- Underside face (drawn first, sits below the deck) ----
-    // The underside is a slightly inset darker trapezoid offset downward
-    // by DECK_THICKNESS * halfW so the track reads as a slab with depth.
+    // ---- 1) Cast shadow on the PCB ----
+    // A dark elliptical shadow strip directly under the deck, projected
+    // onto the PCB ground plane. Subtle but adds 3D depth read.
+    for (var sh = 0; sh < SAMPLE_COUNT; sh += 2) {
+      var sz = sh / SAMPLE_COUNT;
+      var sp = projectSample(sz, 0);
+      var pp = sz * sz * 0.94 + sz * 0.06;
+      var groundY = horizonY + (h - horizonY) * pp + 6;
+      var halfW = sp.halfW * 1.2;
+      var shadowGrad = ctx.createRadialGradient(sp.x, groundY, 0, sp.x, groundY, halfW);
+      shadowGrad.addColorStop(0, "rgba(0,0,0,0.55)");
+      shadowGrad.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = shadowGrad;
+      ctx.beginPath();
+      ctx.ellipse(sp.x, groundY, halfW, halfW * 0.18, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // ---- 2) Underside slab (deep dark with bevel highlight) ----
     for (var u = 0; u < SAMPLE_COUNT; u++) {
       var u0 = u / SAMPLE_COUNT;
       var u1 = (u + 1) / SAMPLE_COUNT;
@@ -715,7 +794,11 @@
       var uR1 = projectSample(u1,  1);
       var thick0 = uL0.halfW * DECK_THICKNESS;
       var thick1 = uL1.halfW * DECK_THICKNESS;
-      ctx.fillStyle = "rgba(2,8,16,0.92)";
+      // Underside trapezoid (the bottom face of the slab)
+      var underGrad = ctx.createLinearGradient(0, uL0.y + thick0 * 0.2, 0, uL0.y + thick0);
+      underGrad.addColorStop(0, "#08111c");
+      underGrad.addColorStop(1, "#02060c");
+      ctx.fillStyle = underGrad;
       ctx.beginPath();
       ctx.moveTo(uL0.x - 1, uL0.y + thick0);
       ctx.lineTo(uR0.x + 1, uR0.y + thick0);
@@ -723,21 +806,18 @@
       ctx.lineTo(uL1.x - 1, uL1.y + thick1);
       ctx.closePath();
       ctx.fill();
-      // Underside cyan highlight ribs that run along the bottom edge so
-      // it reads as an electric monorail underbelly.
+      // Cyan rib along the underside leading edge
       if (u % 2 === 0) {
-        ctx.strokeStyle = "rgba(92,242,255,0.35)";
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = "rgba(92,242,255,0.55)";
+        ctx.lineWidth = 1.4;
         ctx.beginPath();
-        ctx.moveTo(uL0.x, uL0.y + thick0 - 1);
-        ctx.lineTo(uR0.x, uR0.y + thick0 - 1);
+        ctx.moveTo(uL0.x, uL0.y + thick0 - 2);
+        ctx.lineTo(uR0.x, uR0.y + thick0 - 2);
         ctx.stroke();
       }
     }
 
-    // ---- Side walls ----
-    // The left/right side faces of the slab. These are what makes the
-    // track read as raised: you see the side of the structure.
+    // ---- 3) Left + right side walls ----
     for (var sw = 0; sw < SAMPLE_COUNT; sw++) {
       var s0 = sw / SAMPLE_COUNT;
       var s1 = (sw + 1) / SAMPLE_COUNT;
@@ -747,10 +827,11 @@
       var R1 = projectSample(s1,  1);
       var th0 = L0.halfW * DECK_THICKNESS;
       var th1 = L1.halfW * DECK_THICKNESS;
-      // Left side wall: receives less light, darker
+      // Left side wall (in shadow)
       var leftGrad = ctx.createLinearGradient(L0.x, L0.y, L0.x, L0.y + th0);
-      leftGrad.addColorStop(0, "#1a2440");
-      leftGrad.addColorStop(1, "#06101e");
+      leftGrad.addColorStop(0, "#1c2c50");
+      leftGrad.addColorStop(0.5, "#0e1a32");
+      leftGrad.addColorStop(1, "#04081a");
       ctx.fillStyle = leftGrad;
       ctx.beginPath();
       ctx.moveTo(L0.x, L0.y);
@@ -759,10 +840,11 @@
       ctx.lineTo(L0.x, L0.y + th0);
       ctx.closePath();
       ctx.fill();
-      // Right side wall: slightly lighter (catching sun)
+      // Right side wall (catching light)
       var rightGrad = ctx.createLinearGradient(R0.x, R0.y, R0.x, R0.y + th0);
-      rightGrad.addColorStop(0, "#243456");
-      rightGrad.addColorStop(1, "#08142a");
+      rightGrad.addColorStop(0, "#3a527e");
+      rightGrad.addColorStop(0.5, "#1c3258");
+      rightGrad.addColorStop(1, "#06101e");
       ctx.fillStyle = rightGrad;
       ctx.beginPath();
       ctx.moveTo(R0.x, R0.y);
@@ -771,30 +853,35 @@
       ctx.lineTo(R0.x, R0.y + th0);
       ctx.closePath();
       ctx.fill();
-      // Glowing strip on each side wall for the "electric monorail" read
-      ctx.strokeStyle = "rgba(92,242,255,0.55)";
-      ctx.lineWidth = 1.2;
+      // Bright cyan power conduit on left wall
+      ctx.strokeStyle = "rgba(92,242,255,0.85)";
+      ctx.lineWidth = 1.8;
+      ctx.shadowColor = "rgba(92,242,255,0.7)";
+      ctx.shadowBlur = 6;
       ctx.beginPath();
-      ctx.moveTo(L0.x, L0.y + th0 * 0.55);
-      ctx.lineTo(L1.x, L1.y + th1 * 0.55);
+      ctx.moveTo(L0.x + 1, L0.y + th0 * 0.55);
+      ctx.lineTo(L1.x + 1, L1.y + th1 * 0.55);
       ctx.stroke();
-      ctx.strokeStyle = "rgba(255,140,90,0.55)";
+      // Red conduit on right wall
+      ctx.strokeStyle = "rgba(255,58,58,0.85)";
+      ctx.shadowColor = "rgba(255,58,58,0.7)";
       ctx.beginPath();
-      ctx.moveTo(R0.x, R0.y + th0 * 0.55);
-      ctx.lineTo(R1.x, R1.y + th1 * 0.55);
+      ctx.moveTo(R0.x - 1, R0.y + th0 * 0.55);
+      ctx.lineTo(R1.x - 1, R1.y + th1 * 0.55);
       ctx.stroke();
+      ctx.shadowBlur = 0;
     }
 
-    // ---- Deck top (riding surface) ----
+    // ---- 4) Deck top (riding surface, narrower than the slab) ----
     for (var i = 0; i < SAMPLE_COUNT; i++) {
       var z0 = i / SAMPLE_COUNT;
       var z1 = (i + 1) / SAMPLE_COUNT;
-      var p0L = projectSample(z0, -1);
-      var p0R = projectSample(z0,  1);
-      var p1L = projectSample(z1, -1);
-      var p1R = projectSample(z1,  1);
-      var shade = 22 + Math.floor(z0 * 36);
-      ctx.fillStyle = "rgb(" + shade + "," + (shade + 12) + "," + (shade + 40) + ")";
+      var p0L = projectSample(z0, -RAIL_OUTER);
+      var p0R = projectSample(z0,  RAIL_OUTER);
+      var p1L = projectSample(z1, -RAIL_OUTER);
+      var p1R = projectSample(z1,  RAIL_OUTER);
+      var shade = 16 + Math.floor(z0 * 30);
+      ctx.fillStyle = "rgb(" + shade + "," + (shade + 8) + "," + (shade + 30) + ")";
       ctx.beginPath();
       ctx.moveTo(p0L.x, p0L.y);
       ctx.lineTo(p0R.x, p0R.y);
@@ -802,75 +889,92 @@
       ctx.lineTo(p1L.x, p1L.y);
       ctx.closePath();
       ctx.fill();
-
-      // Glowing copper core band running down the deck centerline.
-      var cL0 = projectSample(z0, -0.30);
-      var cR0 = projectSample(z0,  0.30);
-      var cL1 = projectSample(z1, -0.30);
-      var cR1 = projectSample(z1,  0.30);
-      var coreGrad = ctx.createLinearGradient(cL0.x, cL0.y, cR0.x, cR0.y);
-      coreGrad.addColorStop(0, "rgba(92,242,255,0.32)");
-      coreGrad.addColorStop(0.5, "rgba(255,180,110," + (0.30 + z0 * 0.4).toFixed(3) + ")");
-      coreGrad.addColorStop(1, "rgba(255,58,58,0.30)");
-      ctx.fillStyle = coreGrad;
-      ctx.beginPath();
-      ctx.moveTo(cL0.x, cL0.y);
-      ctx.lineTo(cR0.x, cR0.y);
-      ctx.lineTo(cR1.x, cR1.y);
-      ctx.lineTo(cL1.x, cL1.y);
-      ctx.closePath();
-      ctx.fill();
     }
 
-    // Cross ties: prominent transverse bars sliding along the track.
-    var TIES = 28;
-    var tiePhase = (t * 0.18) % (1 / TIES);
+    // ---- 5) Cross ties between the rails (drawn before the rails so the
+    //         rails crown them) ----
+    var TIES = 36;
+    var tiePhase = (t * 0.16) % (1 / TIES);
     for (var ti = 0; ti < TIES; ti++) {
       var tz = (ti / TIES + tiePhase);
       if (tz <= 0.02 || tz >= 1) continue;
-      var tL = projectSample(tz, -0.95);
-      var tR = projectSample(tz,  0.95);
-      ctx.strokeStyle = "rgba(170,210,240," + (0.40 + tz * 0.5).toFixed(3) + ")";
-      ctx.lineWidth = Math.max(1.2, tL.halfW * 0.018);
+      var tL = projectSample(tz, -RAIL_OUTER);
+      var tR = projectSample(tz,  RAIL_OUTER);
+      // Tie body: dark steel
+      ctx.strokeStyle = "rgba(60,80,110,0.95)";
+      ctx.lineWidth = Math.max(2, tL.halfW * 0.030);
       ctx.lineCap = "butt";
       ctx.beginPath();
       ctx.moveTo(tL.x, tL.y);
       ctx.lineTo(tR.x, tR.y);
       ctx.stroke();
+      // Tie highlight: bright top edge
+      ctx.strokeStyle = "rgba(190,220,255," + (0.55 + tz * 0.4).toFixed(3) + ")";
+      ctx.lineWidth = Math.max(1, tL.halfW * 0.014);
+      ctx.beginPath();
+      ctx.moveTo(tL.x, tL.y - 1);
+      ctx.lineTo(tR.x, tR.y - 1);
+      ctx.stroke();
     }
 
-    // Side conduits drawn as long polylines so they read as continuous
-    // glowing rails, not segmented dashes. Drawn last so they crown the
-    // track edges.
+    // ---- 6) Two thick raised rails with bank tilt ----
     function drawRail(side, color, glowCol, lw) {
       ctx.strokeStyle = color;
       ctx.lineWidth = lw;
       ctx.shadowColor = glowCol;
-      ctx.shadowBlur = 14;
+      ctx.shadowBlur = 16;
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
       ctx.beginPath();
       for (var k = 0; k <= SAMPLE_COUNT; k++) {
-        var p = projectSample(k / SAMPLE_COUNT, side);
-        if (k === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+        var z = k / SAMPLE_COUNT;
+        var p = projectSample(z, side);
+        // Raise the rail above the deck by a fraction of halfW so the
+        // rails visibly sit on top of the slab.
+        var raise = p.halfW * 0.12;
+        if (k === 0) ctx.moveTo(p.x, p.y - raise); else ctx.lineTo(p.x, p.y - raise);
       }
       ctx.stroke();
       ctx.shadowBlur = 0;
     }
-    drawRail(-1.02, CYAN, "rgba(92,242,255,0.95)", 4);
-    drawRail( 1.02, RED,  "rgba(255,58,58,0.95)", 4);
-    drawRail(-0.85, "rgba(180,230,255,0.85)", "rgba(92,242,255,0.6)", 2);
-    drawRail( 0.85, "rgba(255,170,170,0.85)", "rgba(255,58,58,0.6)", 2);
+    // Outer rails: thick metallic core + glow
+    drawRail(-RAIL_OUTER, "#dde8f5", "rgba(92,242,255,0.95)", 6);
+    drawRail( RAIL_OUTER, "#f5dde0", "rgba(255,58,58,0.95)", 6);
+    // Inner electric stripes
+    drawRail(-RAIL_INNER, "rgba(140,250,255,0.95)", "rgba(92,242,255,0.7)", 2.5);
+    drawRail( RAIL_INNER, "rgba(255,180,180,0.95)", "rgba(255,58,58,0.7)",  2.5);
 
-    // Center spine.
-    ctx.strokeStyle = "rgba(255,255,255,0.45)";
-    ctx.lineWidth = 1.2;
+    // ---- 7) Bright glowing centerline power line ----
+    ctx.strokeStyle = "rgba(255,240,180,0.85)";
+    ctx.lineWidth = 1.4;
+    ctx.shadowColor = "rgba(255,200,120,0.85)";
+    ctx.shadowBlur = 10;
     ctx.beginPath();
     for (var s = 0; s <= SAMPLE_COUNT; s++) {
-      var pp = projectSample(s / SAMPLE_COUNT, 0);
-      if (s === 0) ctx.moveTo(pp.x, pp.y); else ctx.lineTo(pp.x, pp.y);
+      var pc = projectSample(s / SAMPLE_COUNT, 0);
+      if (s === 0) ctx.moveTo(pc.x, pc.y - pc.halfW * 0.10); else ctx.lineTo(pc.x, pc.y - pc.halfW * 0.10);
     }
     ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // ---- Deck-edge bevel: a thin bright line where the deck top meets
+    //      the side wall, reinforcing the slab thickness read. ----
+    for (var be = 0; be < SAMPLE_COUNT; be++) {
+      var bz0 = be / SAMPLE_COUNT;
+      var bz1 = (be + 1) / SAMPLE_COUNT;
+      var bL0 = projectSample(bz0, -RAIL_OUTER);
+      var bL1 = projectSample(bz1, -RAIL_OUTER);
+      var bR0 = projectSample(bz0,  RAIL_OUTER);
+      var bR1 = projectSample(bz1,  RAIL_OUTER);
+      ctx.strokeStyle = "rgba(120,180,230,0.45)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(bL0.x, bL0.y);
+      ctx.lineTo(bL1.x, bL1.y);
+      ctx.moveTo(bR0.x, bR0.y);
+      ctx.lineTo(bR1.x, bR1.y);
+      ctx.stroke();
+    }
   }
 
   // Long tapered electric streaks running along the track. Each streak is
@@ -946,32 +1050,6 @@
       ctx.quadraticCurveTo(mx, my, pb.x, pb.y);
       ctx.stroke();
       ctx.shadowBlur = 0;
-    }
-  }
-
-  // PCB right-angle branches that peel off the track sides and connect
-  // to chip pads. These replace the noisy "ball" pad clutter.
-  function drawPCBBranches(w, h, horizonY, t, sectionPos) {
-    for (var i = 0; i < pcbBranches.length; i++) {
-      var br = pcbBranches[i];
-      br.z += br.speed * 0.012;
-      if (br.z > 1.05) br.z = -0.05;
-      if (br.z < 0.04) continue;
-      var pStart = projectSample(br.z, br.side * 1.05);
-      var pEnd   = projectSample(br.z, br.side * (1.05 + br.len * 1.4));
-      ctx.strokeStyle = br.red ? "rgba(255,58,58,0.7)" : "rgba(92,242,255,0.65)";
-      ctx.lineWidth = Math.max(1, pStart.halfW * 0.012);
-      ctx.beginPath();
-      ctx.moveTo(pStart.x, pStart.y);
-      var midX = pStart.x + (pEnd.x - pStart.x) * 0.65;
-      var midY = pStart.y;
-      ctx.lineTo(midX, midY);
-      ctx.lineTo(midX, pEnd.y);
-      ctx.lineTo(pEnd.x, pEnd.y);
-      ctx.stroke();
-      // Small pad at the corner (single small marker, not a ball).
-      ctx.fillStyle = br.red ? "rgba(255,90,90,0.85)" : "rgba(120,240,255,0.85)";
-      ctx.fillRect(midX - 1.2, midY - 1.2, 2.4, 2.4);
     }
   }
 
@@ -1444,11 +1522,11 @@
     for (var i = 0; i < SECTIONS.length; i++) {
       var sec = SECTIONS[i];
       var rel = i - sectionPos;
-      var z = 0.62 - rel * 0.30;
+      var z = 0.55 - rel * 0.28;
       if (z <= 0.04 || z >= 0.96) continue;
-      var lateral = 1.55;
-      var p = projectSample(z, (sec.side >= 0 ? 1 : -1) * (Math.abs(sec.side) * 0.6 + lateral));
-      var scale = p.halfW * 0.060;
+      var lateral = 1.85;
+      var p = projectSample(z, (sec.side >= 0 ? 1 : -1) * (Math.abs(sec.side) * 0.7 + lateral));
+      var scale = p.halfW * 0.085;
       ctx.save();
       ctx.globalAlpha = Math.max(0.30, Math.min(1, 0.45 + z * 0.85));
       switch (sec.type) {
@@ -1515,12 +1593,11 @@
     drawBackdrop(w, h, horizonY, scrollFrac, t);
     drawStars(w, horizonY, t);
     drawDistantSkyline(w, horizonY, t, sectionPos);
-    drawCircuitBoard(w, h, horizonY, t, sectionPos);
+    drawPCBSubstrate(w, h, horizonY, t, sectionPos);
     drawDistantBuildings(w, h, horizonY, t, sectionPos);
-    drawTrackPylons(w, h, horizonY, t, sectionPos);
-    drawTrackRibbon(w, h, horizonY, t, sectionPos);
-    drawPCBBranches(w, h, horizonY, t, sectionPos);
     drawSectionBuildings(w, h, horizonY, t, sectionPos);
+    drawSupportTrusses(w, h, horizonY, t, sectionPos);
+    drawElevatedTrack(w, h, horizonY, t, sectionPos);
     drawElectricStreaks(w, h, horizonY, t, dt, sectionPos);
     drawScanlines(w, h);
 
