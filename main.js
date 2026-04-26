@@ -75,7 +75,7 @@
     streaks.length = 0;
     // Streaks ride exactly on the two rails so the electric current
     // visibly flows along the rails, not across an imaginary roadway.
-    var lanes = [-0.85, 0.85];
+    var lanes = [-0.95, 0.95];
     for (var p = 0; p < 14; p++) {
       streaks.push({
         z: (p / 14) + (Math.random() * 0.04),
@@ -152,25 +152,33 @@
         offset: Math.random() * Math.PI * 2
       });
     }
+    // Far-distance skyline silhouettes: fewer but each is a stacked
+    // pseudo-3D space-tower with crown, antenna, ring, or skybridge.
     skylineProps.length = 0;
-    for (var sk = 0; sk < 56; sk++) {
+    for (var sk = 0; sk < 16; sk++) {
       skylineProps.push({
         nx: Math.random(),
-        nh: Math.random(),
-        red: Math.random() < 0.15,
-        antenna: Math.random() < 0.35
+        nh: 0.35 + Math.random() * 0.65,
+        red: Math.random() < 0.25,
+        crown: Math.floor(Math.random() * 4),
+        antenna: Math.random() < 0.6,
+        ring: Math.random() < 0.4
       });
     }
-    // Distant background skyscrapers (separate from per-section landmarks)
+    // Mid-range pseudo-3D buildings flanking the rails (much fewer,
+    // much larger, each volumetric with side face + tiered tops).
     distantBuildings.length = 0;
-    for (var db = 0; db < 14; db++) {
+    for (var db = 0; db < 10; db++) {
       distantBuildings.push({
-        z: 0.05 + Math.random() * 0.35,
-        side: Math.random() < 0.5 ? -1 : 1,
-        offset: 1.7 + Math.random() * 1.2,
-        w: 0.06 + Math.random() * 0.05,
-        h: 0.55 + Math.random() * 0.45,
-        red: Math.random() < 0.20,
+        z: 0.10 + (db / 10) * 0.55 + Math.random() * 0.04,
+        side: db % 2 === 0 ? -1 : 1,
+        offset: 1.55 + Math.random() * 0.6,
+        w: 0.10 + Math.random() * 0.06,
+        h: 0.85 + Math.random() * 0.65,
+        red: Math.random() < 0.30,
+        tiers: 2 + Math.floor(Math.random() * 3),
+        antenna: Math.random() < 0.7,
+        ring: Math.random() < 0.5,
         seed: Math.random() * 100
       });
     }
@@ -362,81 +370,124 @@
     }
   }
 
-  // Distant city skyline at the horizon: stepped pseudo-3D silhouettes
-  // (front face + side parallelogram + tapered crown) so the city does
-  // not read as a row of flat rectangles.
+  // Far-distance skyline: a small number of unmistakable space-tower
+  // silhouettes (tapered cores, antennas, halo rings) at the horizon —
+  // never a continuous row of flat rectangles.
   function drawDistantSkyline(w, horizonY, t, sectionPos) {
-    var drift = sectionPos * 80;
+    var drift = sectionPos * 60;
     for (var i = 0; i < skylineProps.length; i++) {
       var b = skylineProps[i];
-      var bx = ((b.nx * w + drift) % (w + 60)) - 30;
-      var bw = 10 + (b.nh * 26);
-      var bh = 14 + b.nh * 80;
-      var depth = 3 + b.nh * 6;
+      var bx = ((b.nx * w * 1.15 + drift) % (w + 120)) - 60;
+      var bw = 18 + b.nh * 30;
+      var bh = 60 + b.nh * 130;
+      var depth = 5 + b.nh * 7;
       var topY = horizonY - bh;
-      // Side parallelogram (right)
-      ctx.fillStyle = "#04080f";
+      var midY = topY + bh * 0.55;
+      // Side face (parallelogram)
+      ctx.fillStyle = "#03060d";
       ctx.beginPath();
-      ctx.moveTo(bx + bw, topY);
+      ctx.moveTo(bx + bw,         topY);
       ctx.lineTo(bx + bw + depth, topY - depth * 0.5);
       ctx.lineTo(bx + bw + depth, horizonY - depth * 0.5);
-      ctx.lineTo(bx + bw, horizonY);
+      ctx.lineTo(bx + bw,         horizonY);
       ctx.closePath();
       ctx.fill();
-      // Top cap parallelogram
+      // Top cap
       ctx.fillStyle = "#0f1c30";
       ctx.beginPath();
-      ctx.moveTo(bx, topY);
-      ctx.lineTo(bx + bw, topY);
+      ctx.moveTo(bx,              topY);
+      ctx.lineTo(bx + bw,         topY);
       ctx.lineTo(bx + bw + depth, topY - depth * 0.5);
-      ctx.lineTo(bx + depth, topY - depth * 0.5);
+      ctx.lineTo(bx + depth,      topY - depth * 0.5);
       ctx.closePath();
       ctx.fill();
-      // Front face
-      ctx.fillStyle = "#08111e";
-      ctx.fillRect(bx, topY, bw, bh);
-      ctx.strokeStyle = b.red ? "rgba(255,58,58,0.7)" : "rgba(92,242,255,0.55)";
-      ctx.lineWidth = 1;
-      ctx.strokeRect(bx + 0.5, topY + 0.5, Math.max(1, bw - 1), Math.max(1, bh - 1));
-      // Stepped setback (a smaller block on top)
-      if (bh > 30) {
-        var stepW = bw * 0.55;
-        var stepH = Math.min(20, bh * 0.30);
-        var stepX = bx + (bw - stepW) / 2;
-        var stepY = topY - stepH;
-        ctx.fillStyle = "#0f1c30";
-        ctx.beginPath();
-        ctx.moveTo(stepX + stepW, stepY);
-        ctx.lineTo(stepX + stepW + depth * 0.7, stepY - depth * 0.35);
-        ctx.lineTo(stepX + stepW + depth * 0.7, topY - depth * 0.35);
-        ctx.lineTo(stepX + stepW, topY);
-        ctx.closePath();
-        ctx.fill();
-        ctx.fillStyle = "#08111e";
-        ctx.fillRect(stepX, stepY, stepW, stepH);
-        ctx.strokeStyle = "rgba(92,242,255,0.5)";
-        ctx.strokeRect(stepX + 0.5, stepY + 0.5, stepW - 1, stepH - 1);
-      }
-      // Window strips
-      if (bh > 28) {
-        for (var ww = 0; ww < 3; ww++) {
-          for (var hh = 0; hh < Math.floor(bh / 8); hh++) {
-            if (((i + ww + hh) % 5) === 0) {
-              ctx.fillStyle = "rgba(92,242,255,0.65)";
-              ctx.fillRect(bx + 2 + ww * (bw / 3), topY + 2 + hh * 7, 1.5, 2);
-            }
-          }
-        }
-      }
-      if (b.antenna && bh > 36) {
-        ctx.strokeStyle = "rgba(255,58,58,0.85)";
+      // Front face — taper inward at the top so it reads as a tower
+      // rather than a brick. Tapered trapezoid via polygon.
+      var taperT = bw * 0.18;
+      ctx.fillStyle = "#06101e";
+      ctx.beginPath();
+      ctx.moveTo(bx,              horizonY);
+      ctx.lineTo(bx + bw,         horizonY);
+      ctx.lineTo(bx + bw - taperT, midY);
+      ctx.lineTo(bx + bw * 0.78,  topY);
+      ctx.lineTo(bx + bw * 0.22,  topY);
+      ctx.lineTo(bx + taperT,     midY);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = b.red ? "rgba(255,58,58,0.75)" : "rgba(92,242,255,0.65)";
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      // Vertical neon spine on the front face
+      var spineGrad = ctx.createLinearGradient(bx + bw * 0.5, horizonY, bx + bw * 0.5, topY);
+      spineGrad.addColorStop(0, b.red ? "rgba(255,90,90,0)" : "rgba(92,242,255,0)");
+      spineGrad.addColorStop(0.5, b.red ? "rgba(255,90,90,0.85)" : "rgba(92,242,255,0.85)");
+      spineGrad.addColorStop(1, b.red ? "rgba(255,140,140,0)" : "rgba(180,240,255,0)");
+      ctx.fillStyle = spineGrad;
+      ctx.fillRect(bx + bw * 0.5 - 0.8, topY + 4, 1.6, bh - 8);
+      // Optional ring around the upper third (haloed observation deck)
+      if (b.ring) {
+        ctx.strokeStyle = "rgba(92,242,255,0.65)";
         ctx.lineWidth = 1.2;
         ctx.beginPath();
-        ctx.moveTo(bx + bw / 2, topY);
-        ctx.lineTo(bx + bw / 2, topY - 10);
+        ctx.ellipse(bx + bw * 0.5, topY + bh * 0.32, bw * 0.85, bw * 0.18, 0, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.fillStyle = "rgba(255,90,58,0.8)";
-        ctx.fillRect(bx + bw / 2 - 1, topY - 11, 2, 2);
+      }
+      // Crown styles: 0=spire, 1=dome, 2=stepped setback, 3=stack
+      var crownTop = topY;
+      var cx = bx + bw * 0.5;
+      if (b.crown === 0) {
+        ctx.strokeStyle = "rgba(170,220,255,0.85)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(cx, topY);
+        ctx.lineTo(cx, topY - 18);
+        ctx.stroke();
+      } else if (b.crown === 1) {
+        ctx.fillStyle = "#16263e";
+        ctx.beginPath();
+        ctx.arc(cx, topY, bw * 0.35, Math.PI, 0);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(92,242,255,0.7)";
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      } else if (b.crown === 2) {
+        var sw = bw * 0.5;
+        var sh = 10 + b.nh * 8;
+        ctx.fillStyle = "#0f1c30";
+        ctx.fillRect(cx - sw / 2, topY - sh, sw, sh);
+        ctx.strokeStyle = "rgba(92,242,255,0.6)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(cx - sw / 2 + 0.5, topY - sh + 0.5, sw - 1, sh - 1);
+        crownTop = topY - sh;
+      } else {
+        var stack1W = bw * 0.55;
+        var stack1H = 8 + b.nh * 6;
+        var stack2W = bw * 0.32;
+        var stack2H = 6 + b.nh * 5;
+        ctx.fillStyle = "#0f1c30";
+        ctx.fillRect(cx - stack1W / 2, topY - stack1H, stack1W, stack1H);
+        ctx.fillRect(cx - stack2W / 2, topY - stack1H - stack2H, stack2W, stack2H);
+        ctx.strokeStyle = "rgba(92,242,255,0.6)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(cx - stack1W / 2 + 0.5, topY - stack1H + 0.5, stack1W - 1, stack1H - 1);
+        ctx.strokeRect(cx - stack2W / 2 + 0.5, topY - stack1H - stack2H + 0.5, stack2W - 1, stack2H - 1);
+        crownTop = topY - stack1H - stack2H;
+      }
+      if (b.antenna) {
+        ctx.strokeStyle = "rgba(255,58,58,0.9)";
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(cx, crownTop);
+        ctx.lineTo(cx, crownTop - 14);
+        ctx.stroke();
+        var beaconOn = ((Math.sin(t * 2 + i) + 1) * 0.5) > 0.5;
+        ctx.fillStyle = beaconOn ? "#ff5a3a" : "#ffaa55";
+        ctx.shadowColor = "rgba(255,58,58,0.85)";
+        ctx.shadowBlur = beaconOn ? 8 : 3;
+        ctx.beginPath();
+        ctx.arc(cx, crownTop - 14, 1.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
       }
     }
     ctx.strokeStyle = "rgba(92,242,255,0.45)";
@@ -447,31 +498,150 @@
     ctx.stroke();
   }
 
-  // Tall dim background skyscrapers further reinforcing "city" not "road".
+  // Mid-range pseudo-3D space-towers flanking the rails. Multi-tier
+  // volumetric: side face + tiered crowns + accent rings + antennas.
+  // Drawn to dominate the viewport so the city reads volumetric, not
+  // as flat Tetris facades.
   function drawDistantBuildings(w, h, horizonY, t, sectionPos) {
     for (var i = 0; i < distantBuildings.length; i++) {
       var d = distantBuildings[i];
       var pp = projectSample(d.z, d.side * d.offset);
       var hgt = pp.halfW * d.h;
       var ww = pp.halfW * d.w;
+      if (hgt < 24 || ww < 6) continue;
       var gx = pp.x;
       var gy = pp.y;
-      ctx.fillStyle = "#080f1c";
-      ctx.fillRect(gx - ww, gy - hgt, ww * 2, hgt);
-      ctx.strokeStyle = d.red ? "rgba(255,58,58,0.45)" : "rgba(92,242,255,0.35)";
-      ctx.lineWidth = 1;
-      ctx.strokeRect(gx - ww + 0.5, gy - hgt + 0.5, Math.max(1, ww * 2 - 1), Math.max(1, hgt - 1));
-      // Faint window strips
-      var cols = 3;
-      var rows = Math.max(3, Math.floor(hgt / 7));
-      for (var c = 0; c < cols; c++) {
-        for (var r = 0; r < rows; r++) {
-          var on = ((Math.sin(t * 0.9 + r * 1.3 + c + d.seed) + 1) * 0.5) > 0.55;
-          if (!on) continue;
-          ctx.fillStyle = "rgba(92,242,255,0.55)";
-          ctx.fillRect(gx - ww + 2 + c * ((ww * 2 - 4) / cols), gy - hgt + 2 + r * ((hgt - 4) / rows), Math.max(1, (ww * 2 - 4) / cols - 1), 1.4);
-        }
+      var depth = ww * 0.55;
+      var topY = gy - hgt;
+      // ---- Side face (parallelogram) ----
+      ctx.fillStyle = "#04080f";
+      ctx.beginPath();
+      ctx.moveTo(gx + ww,         topY);
+      ctx.lineTo(gx + ww + depth, topY - depth * 0.5);
+      ctx.lineTo(gx + ww + depth, gy - depth * 0.5);
+      ctx.lineTo(gx + ww,         gy);
+      ctx.closePath();
+      ctx.fill();
+      // ---- Top cap parallelogram ----
+      ctx.fillStyle = "#16263e";
+      ctx.beginPath();
+      ctx.moveTo(gx - ww,         topY);
+      ctx.lineTo(gx + ww,         topY);
+      ctx.lineTo(gx + ww + depth, topY - depth * 0.5);
+      ctx.lineTo(gx - ww + depth, topY - depth * 0.5);
+      ctx.closePath();
+      ctx.fill();
+      // ---- Front face with vertical gradient (darker base, lighter top) ----
+      var faceGrad = ctx.createLinearGradient(0, topY, 0, gy);
+      faceGrad.addColorStop(0, "#0e1a32");
+      faceGrad.addColorStop(1, "#04080f");
+      ctx.fillStyle = faceGrad;
+      ctx.fillRect(gx - ww, topY, ww * 2, hgt);
+      // Hard outlines so the volume reads
+      ctx.strokeStyle = d.red ? "rgba(255,58,58,0.85)" : "rgba(92,242,255,0.75)";
+      ctx.lineWidth = 1.2;
+      ctx.strokeRect(gx - ww + 0.5, topY + 0.5, Math.max(1, ww * 2 - 1), Math.max(1, hgt - 1));
+      ctx.beginPath();
+      ctx.moveTo(gx + ww, topY);
+      ctx.lineTo(gx + ww + depth, topY - depth * 0.5);
+      ctx.moveTo(gx + ww + depth, topY - depth * 0.5);
+      ctx.lineTo(gx + ww + depth, gy - depth * 0.5);
+      ctx.moveTo(gx + ww + depth, gy - depth * 0.5);
+      ctx.lineTo(gx + ww,         gy);
+      ctx.moveTo(gx - ww,         topY);
+      ctx.lineTo(gx - ww + depth, topY - depth * 0.5);
+      ctx.lineTo(gx + ww + depth, topY - depth * 0.5);
+      ctx.stroke();
+      // ---- Vertical neon core spine on the front face ----
+      var spineGrad = ctx.createLinearGradient(gx, topY, gx, gy);
+      spineGrad.addColorStop(0,    d.red ? "rgba(255,90,90,0)" : "rgba(92,242,255,0)");
+      spineGrad.addColorStop(0.5,  d.red ? "rgba(255,90,90,0.85)" : "rgba(92,242,255,0.85)");
+      spineGrad.addColorStop(1,    d.red ? "rgba(255,140,140,0.5)" : "rgba(180,240,255,0.5)");
+      ctx.fillStyle = spineGrad;
+      ctx.fillRect(gx - 1, topY + 4, 2, hgt - 8);
+      // ---- Horizontal floor bands (a few faint bands, NOT a window grid) ----
+      var bands = Math.max(3, Math.floor(hgt / 24));
+      for (var bi = 1; bi < bands; bi++) {
+        var by = topY + (hgt / bands) * bi;
+        var on = ((Math.sin(t * 0.9 + bi * 0.7 + d.seed) + 1) * 0.5) > 0.45;
+        ctx.fillStyle = on ? "rgba(92,242,255,0.55)" : "rgba(40,80,140,0.30)";
+        ctx.fillRect(gx - ww + 3, by, ww * 2 - 6, 1.2);
       }
+      // ---- Stacked tier setbacks on top ----
+      var crownTop = topY;
+      for (var ti = 0; ti < d.tiers; ti++) {
+        var tw = ww * (0.78 - ti * 0.18);
+        var th = Math.max(8, hgt * 0.10 - ti * 2);
+        if (tw < 4 || th < 4) break;
+        var ty = crownTop - th;
+        var td = depth * (0.78 - ti * 0.18);
+        // tier side face
+        ctx.fillStyle = "#04080f";
+        ctx.beginPath();
+        ctx.moveTo(gx + tw,      ty);
+        ctx.lineTo(gx + tw + td, ty - td * 0.5);
+        ctx.lineTo(gx + tw + td, crownTop - td * 0.5);
+        ctx.lineTo(gx + tw,      crownTop);
+        ctx.closePath();
+        ctx.fill();
+        // tier top cap
+        ctx.fillStyle = "#1a2a48";
+        ctx.beginPath();
+        ctx.moveTo(gx - tw,      ty);
+        ctx.lineTo(gx + tw,      ty);
+        ctx.lineTo(gx + tw + td, ty - td * 0.5);
+        ctx.lineTo(gx - tw + td, ty - td * 0.5);
+        ctx.closePath();
+        ctx.fill();
+        // tier front
+        ctx.fillStyle = "#0e1a32";
+        ctx.fillRect(gx - tw, ty, tw * 2, th);
+        ctx.strokeStyle = d.red ? "rgba(255,58,58,0.7)" : "rgba(92,242,255,0.6)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(gx - tw + 0.5, ty + 0.5, tw * 2 - 1, th - 1);
+        crownTop = ty;
+      }
+      // ---- Halo ring around the upper section (skybridge / observation) ----
+      if (d.ring) {
+        var ringY = topY + hgt * 0.28;
+        ctx.strokeStyle = "rgba(92,242,255,0.7)";
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.ellipse(gx, ringY, ww * 1.25, ww * 0.32, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      // ---- Antenna mast + beacon ----
+      if (d.antenna) {
+        ctx.strokeStyle = "rgba(170,220,255,0.85)";
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(gx, crownTop);
+        ctx.lineTo(gx, crownTop - 16);
+        ctx.stroke();
+        // crossbar
+        ctx.beginPath();
+        ctx.moveTo(gx - 5, crownTop - 8);
+        ctx.lineTo(gx + 5, crownTop - 8);
+        ctx.stroke();
+        var beaconOn = ((Math.sin(t * 2.2 + d.seed) + 1) * 0.5) > 0.5;
+        ctx.fillStyle = beaconOn ? "#ff5a3a" : "#ffaa55";
+        ctx.shadowColor = "rgba(255,58,58,0.85)";
+        ctx.shadowBlur = beaconOn ? 10 : 4;
+        ctx.beginPath();
+        ctx.arc(gx, crownTop - 16, 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+      // ---- Copper pad footing where the building sits on PCB ----
+      ctx.fillStyle = "rgba(255,180,110,0.55)";
+      ctx.beginPath();
+      ctx.ellipse(gx, gy + 3, ww * 1.4, ww * 0.32, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,200,140,0.85)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.ellipse(gx, gy + 3, ww * 1.4, ww * 0.32, 0, 0, Math.PI * 2);
+      ctx.stroke();
     }
   }
 
@@ -654,12 +824,15 @@
   // wide A-frame with two vertical columns spanning the rail gap, multiple
   // stages of X-bracing, horizontal cap braces, and bright copper footing
   // pads on the PCB. Drawn frequently and at large scale so QA cannot
-  // miss them in any desktop screenshot.
-  var RAIL_OUTER_REF = 0.85;
+  // miss them in any desktop screenshot. Guaranteed near/midground
+  // sample positions so several supports are always in the viewport.
+  var RAIL_OUTER_REF = 0.95;
   function drawSupportTrusses(w, h, horizonY, t, sectionPos) {
-    var COUNT = 16;
-    for (var i = 1; i <= COUNT; i++) {
-      var z = i / COUNT;
+    // Hand-picked z values (fewer, larger) — guaranteed to land in the
+    // foreground/midground rather than crowding the horizon.
+    var POSITIONS = [0.18, 0.30, 0.42, 0.54, 0.66, 0.78, 0.88];
+    for (var i = 0; i < POSITIONS.length; i++) {
+      var z = POSITIONS[i];
       // Anchor each truss column directly under the corresponding rail.
       var pL = projectSample(z, -RAIL_OUTER_REF);
       var pR = projectSample(z,  RAIL_OUTER_REF);
@@ -669,8 +842,9 @@
       var underYR = pR.y + 3;
       var dropL = groundY - underYL;
       var dropR = groundY - underYR;
-      if (dropL <= 18 || dropR <= 18) continue;
-      var pylonW = Math.max(5, pL.halfW * 0.045);
+      if (dropL <= 24 || dropR <= 24) continue;
+      // Bigger pylon width — clearly readable as a column, not a wire.
+      var pylonW = Math.max(7, pL.halfW * 0.065);
       var leftX = pL.x;
       var rightX = pR.x;
 
@@ -702,37 +876,71 @@
       footingPad(leftX, groundY);
       footingPad(rightX, groundY);
 
-      // ---- Pseudo-3D columns (two vertical pylons, one under each rail) ----
-      function pillar(px, topY, bottomY) {
+      // ---- Pseudo-3D columns (two vertical pylons, one under each rail).
+      //      Drawn as a 3D box: front face + side parallelogram + top cap
+      //      so each column reads as a chunky beam, not a thin line. ----
+      function pillar(px, topY, bottomY, accent) {
         var dropH = bottomY - topY;
+        var depth = pylonW * 0.85;
+        // Side face (right shear)
+        ctx.fillStyle = "#05080f";
+        ctx.beginPath();
+        ctx.moveTo(px + pylonW,         topY);
+        ctx.lineTo(px + pylonW + depth, topY - depth * 0.5);
+        ctx.lineTo(px + pylonW + depth, bottomY - depth * 0.5);
+        ctx.lineTo(px + pylonW,         bottomY);
+        ctx.closePath();
+        ctx.fill();
+        // Top cap
+        ctx.fillStyle = "#1a2a48";
+        ctx.beginPath();
+        ctx.moveTo(px - pylonW,         topY);
+        ctx.lineTo(px + pylonW,         topY);
+        ctx.lineTo(px + pylonW + depth, topY - depth * 0.5);
+        ctx.lineTo(px - pylonW + depth, topY - depth * 0.5);
+        ctx.closePath();
+        ctx.fill();
+        // Front face with a steel gradient
         var pg = ctx.createLinearGradient(px - pylonW, 0, px + pylonW, 0);
-        pg.addColorStop(0,   "#08111e");
-        pg.addColorStop(0.45, "#22385e");
-        pg.addColorStop(0.55, "#2c456e");
-        pg.addColorStop(1,   "#04080f");
+        pg.addColorStop(0,    "#0a1424");
+        pg.addColorStop(0.45, "#2a4068");
+        pg.addColorStop(0.55, "#36507e");
+        pg.addColorStop(1,    "#06101c");
         ctx.fillStyle = pg;
         ctx.fillRect(px - pylonW, topY, pylonW * 2, dropH);
-        ctx.strokeStyle = "rgba(170,220,255,0.95)";
-        ctx.lineWidth = 1.4;
-        ctx.strokeRect(px - pylonW + 0.5, topY + 0.5, pylonW * 2 - 1, dropH - 1);
-        // Bright cyan rib up the center
-        ctx.strokeStyle = "rgba(92,242,255,0.85)";
-        ctx.shadowColor = "rgba(92,242,255,0.7)";
-        ctx.shadowBlur = 6;
+        // Hard outline so the column reads against the PCB
+        ctx.strokeStyle = "rgba(190,220,255,0.95)";
         ctx.lineWidth = 1.6;
+        ctx.strokeRect(px - pylonW + 0.5, topY + 0.5, pylonW * 2 - 1, dropH - 1);
+        // Bright accent rib up the center (cyan or red depending on rail)
+        ctx.strokeStyle = accent;
+        ctx.shadowColor = accent;
+        ctx.shadowBlur = 8;
+        ctx.lineWidth = 2.2;
         ctx.beginPath();
         ctx.moveTo(px, topY + 2);
         ctx.lineTo(px, bottomY - 2);
         ctx.stroke();
         ctx.shadowBlur = 0;
+        // Horizontal flange notches every ~25 px to read as a I-beam
+        var flangeStep = 24;
+        ctx.strokeStyle = "rgba(190,220,255,0.7)";
+        ctx.lineWidth = 1;
+        for (var fy = topY + 16; fy < bottomY - 4; fy += flangeStep) {
+          ctx.beginPath();
+          ctx.moveTo(px - pylonW + 1, fy);
+          ctx.lineTo(px + pylonW - 1, fy);
+          ctx.stroke();
+        }
       }
-      pillar(leftX,  underYL, groundY);
-      pillar(rightX, underYR, groundY);
+      pillar(leftX,  underYL, groundY, "rgba(92,242,255,0.95)");
+      pillar(rightX, underYR, groundY, "rgba(255,90,90,0.95)");
 
-      // ---- Multi-stage X bracing across the gap ----
+      // ---- Multi-stage X bracing across the gap (drawn AFTER pillars
+      //      so the braces visibly cross between the two columns). ----
       var avgUnder = (underYL + underYR) * 0.5;
       var avgDrop = groundY - avgUnder;
-      var stages = Math.max(3, Math.floor(avgDrop / 28));
+      var stages = Math.max(3, Math.floor(avgDrop / 26));
       for (var st = 0; st < stages; st++) {
         var f0 = st / stages;
         var f1 = (st + 1) / stages;
@@ -740,11 +948,20 @@
         var lyB = underYL + (groundY - underYL) * f1 - 3;
         var ryA = underYR + (groundY - underYR) * f0 + 3;
         var ryB = underYR + (groundY - underYR) * f1 - 3;
-        // X braces (cyan, glowing)
+        // X braces — drawn thicker & with dark underglow + bright stroke
+        // so they read clearly against any background.
+        ctx.strokeStyle = "rgba(8,12,22,0.95)";
+        ctx.lineWidth = 4.5;
+        ctx.beginPath();
+        ctx.moveTo(leftX,  lyA);
+        ctx.lineTo(rightX, ryB);
+        ctx.moveTo(rightX, ryA);
+        ctx.lineTo(leftX,  lyB);
+        ctx.stroke();
         ctx.strokeStyle = "rgba(92,242,255,0.95)";
-        ctx.shadowColor = "rgba(92,242,255,0.65)";
-        ctx.shadowBlur = 5;
-        ctx.lineWidth = 2.2;
+        ctx.shadowColor = "rgba(92,242,255,0.7)";
+        ctx.shadowBlur = 6;
+        ctx.lineWidth = 2.6;
         ctx.beginPath();
         ctx.moveTo(leftX,  lyA);
         ctx.lineTo(rightX, ryB);
@@ -752,16 +969,22 @@
         ctx.lineTo(leftX,  lyB);
         ctx.stroke();
         ctx.shadowBlur = 0;
-        // Connection nodes at the X intersection
+        // Connection node at the X intersection
         var midX = (leftX + rightX) / 2;
         var midY = (lyA + lyB + ryA + ryB) / 4;
-        ctx.fillStyle = "rgba(255,210,150,0.95)";
+        ctx.fillStyle = "rgba(255,220,160,1)";
         ctx.beginPath();
-        ctx.arc(midX, midY, 2.2, 0, Math.PI * 2);
+        ctx.arc(midX, midY, 3, 0, Math.PI * 2);
         ctx.fill();
-        // Horizontal stage brace (copper)
-        ctx.strokeStyle = "rgba(255,180,110,0.95)";
-        ctx.lineWidth = 1.8;
+        // Horizontal stage brace (copper) - thicker
+        ctx.strokeStyle = "rgba(0,0,0,0.6)";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(leftX  - pylonW * 0.5, lyB);
+        ctx.lineTo(rightX + pylonW * 0.5, ryB);
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(255,180,110,0.98)";
+        ctx.lineWidth = 2.4;
         ctx.beginPath();
         ctx.moveTo(leftX  - pylonW * 0.5, lyB);
         ctx.lineTo(rightX + pylonW * 0.5, ryB);
@@ -769,45 +992,63 @@
       }
 
       // ---- Top cap brace right at the rail underside (across the gap) ----
-      ctx.strokeStyle = "rgba(255,220,160,1)";
-      ctx.shadowColor = "rgba(255,200,120,0.6)";
-      ctx.shadowBlur = 5;
-      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(0,0,0,0.7)";
+      ctx.lineWidth = 5;
       ctx.beginPath();
-      ctx.moveTo(leftX  - pylonW * 0.7, underYL + 1);
-      ctx.lineTo(rightX + pylonW * 0.7, underYR + 1);
+      ctx.moveTo(leftX  - pylonW * 0.8, underYL + 1);
+      ctx.lineTo(rightX + pylonW * 0.8, underYR + 1);
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(255,220,160,1)";
+      ctx.shadowColor = "rgba(255,200,120,0.7)";
+      ctx.shadowBlur = 6;
+      ctx.lineWidth = 3.2;
+      ctx.beginPath();
+      ctx.moveTo(leftX  - pylonW * 0.8, underYL + 1);
+      ctx.lineTo(rightX + pylonW * 0.8, underYR + 1);
       ctx.stroke();
       ctx.shadowBlur = 0;
+
+      // ---- Conduit from the column footing to the nearest PCB via,
+      //      reinforcing the "circuit-board world" connection. ----
+      ctx.strokeStyle = "rgba(255,180,110,0.6)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(leftX, groundY + 4);
+      ctx.lineTo(leftX - pylonW * 3.2, groundY + 4);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(rightX, groundY + 4);
+      ctx.lineTo(rightX + pylonW * 3.2, groundY + 4);
+      ctx.stroke();
     }
   }
 
-  // Two separate elevated rails. No road slab. No deck. Each rail is a
-  // thick glowing tube (cyan left, red right) with a separate dark cast
-  // shadow projected onto the PCB beneath it. Cross ties span the gap
-  // between the rails as visible bars, slanting on banked curves. Banking
-  // is exaggerated so on turns one rail sits noticeably higher on screen.
+  // Two separate elevated rails — NO continuous deck, NO road slab, NO
+  // longitudinal stripes between the rails. Each rail is its own thick
+  // glowing beam with a hard dark core; cross ties are drawn AFTER the
+  // rails as obvious perpendicular bars that bridge the visible gap.
   function drawElevatedTrack(w, h, horizonY, t, sectionPos) {
-    var RAIL_OUTER = 0.85;
+    var RAIL_OUTER = 0.95;
 
-    // ---- 1) Per-rail cast shadows on the PCB ----
-    // Two narrow elliptical shadow strips, one beneath each rail. Drawing
-    // them separately (not as a single road slab) preserves the gap.
-    for (var sh = 0; sh < SAMPLE_COUNT; sh += 2) {
+    // ---- 1) Per-rail elliptical cast shadows on the PCB ----
+    // Discrete shadow blobs, one beneath each rail, never a continuous
+    // shadow strip — preserves the empty gap reading.
+    for (var sh = 0; sh < SAMPLE_COUNT; sh += 3) {
       var sz = sh / SAMPLE_COUNT;
       var spL = projectSample(sz, -RAIL_OUTER);
       var spR = projectSample(sz,  RAIL_OUTER);
       var pp = sz * sz * 0.94 + sz * 0.06;
       var groundY = horizonY + (h - horizonY) * pp + 6;
-      var shHalf = spL.halfW * 0.30;
+      var shHalf = spL.halfW * 0.16;
       var sgL = ctx.createRadialGradient(spL.x, groundY, 0, spL.x, groundY, shHalf);
-      sgL.addColorStop(0, "rgba(0,0,0,0.55)");
+      sgL.addColorStop(0, "rgba(0,0,0,0.50)");
       sgL.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = sgL;
       ctx.beginPath();
       ctx.ellipse(spL.x, groundY, shHalf, shHalf * 0.22, 0, 0, Math.PI * 2);
       ctx.fill();
       var sgR = ctx.createRadialGradient(spR.x, groundY, 0, spR.x, groundY, shHalf);
-      sgR.addColorStop(0, "rgba(0,0,0,0.55)");
+      sgR.addColorStop(0, "rgba(0,0,0,0.50)");
       sgR.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = sgR;
       ctx.beginPath();
@@ -815,111 +1056,121 @@
       ctx.fill();
     }
 
-    // ---- 2) Cross ties between the rails. Drawn FIRST so the rails
-    //         crown them. Each tie is a thick bar with a dark underside,
-    //         and slants on banked curves because L and R y differ. ----
-    var TIES = 30;
-    var tiePhase = (t * 0.16) % (1 / TIES);
-    for (var ti = 0; ti < TIES; ti++) {
-      var tz = (ti / TIES + tiePhase);
-      if (tz <= 0.02 || tz >= 1) continue;
-      var tL = projectSample(tz, -RAIL_OUTER);
-      var tR = projectSample(tz,  RAIL_OUTER);
-      var tieThick = Math.max(3, tL.halfW * 0.052);
-      // Underside / shadow body of the tie
-      ctx.strokeStyle = "rgba(8,12,22,0.95)";
-      ctx.lineWidth = tieThick + 2;
-      ctx.lineCap = "butt";
-      ctx.beginPath();
-      ctx.moveTo(tL.x, tL.y + 2);
-      ctx.lineTo(tR.x, tR.y + 2);
-      ctx.stroke();
-      // Tie main body: dark steel
-      ctx.strokeStyle = "rgba(80,100,140,0.95)";
-      ctx.lineWidth = tieThick;
-      ctx.beginPath();
-      ctx.moveTo(tL.x, tL.y);
-      ctx.lineTo(tR.x, tR.y);
-      ctx.stroke();
-      // Highlighted top edge
-      ctx.strokeStyle = "rgba(210,235,255," + (0.65 + tz * 0.3).toFixed(3) + ")";
-      ctx.lineWidth = Math.max(1.2, tieThick * 0.30);
-      ctx.beginPath();
-      ctx.moveTo(tL.x, tL.y - tieThick * 0.45);
-      ctx.lineTo(tR.x, tR.y - tieThick * 0.45);
-      ctx.stroke();
-      // End caps as small bright squares so the ties read as solid bars
-      ctx.fillStyle = "rgba(255,210,150,0.95)";
-      ctx.fillRect(tL.x - tieThick * 0.4, tL.y - tieThick * 0.5, tieThick * 0.8, tieThick * 1.0);
-      ctx.fillRect(tR.x - tieThick * 0.4, tR.y - tieThick * 0.5, tieThick * 0.8, tieThick * 1.0);
-    }
-
-    // ---- 3) The two rails, drawn in three passes per rail:
-    //         (a) dark underside tube
-    //         (b) main glowing rail core
-    //         (c) bright highlight stripe along the top of the rail
-    function drawRailLayer(side, baseColor, highlightColor, glowColor) {
-      // (a) underside / shadow tube
-      ctx.strokeStyle = "rgba(6,10,18,0.95)";
-      ctx.lineWidth = 14;
+    // ---- 2) The two rails as separate beams.
+    //         Each rail draws its own (a) dark graphite core casing,
+    //         (b) glowing color sheath, (c) bright top highlight. The
+    //         beams are kept narrow relative to the rail-to-rail gap so
+    //         the empty space between is large and unambiguous.
+    function drawRailBeam(side, glowColor, sheathColor, topHL) {
+      // (a) graphite core casing — solid dark beam so the rail reads as
+      //     a physical metal beam, not a glow line.
+      ctx.strokeStyle = "#0a0f1a";
+      ctx.lineWidth = 10;
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
       ctx.beginPath();
-      for (var k0 = 0; k0 <= SAMPLE_COUNT; k0++) {
-        var z0 = k0 / SAMPLE_COUNT;
-        var p0 = projectSample(z0, side);
-        var rad0 = Math.max(2, p0.halfW * 0.05);
-        if (k0 === 0) ctx.moveTo(p0.x, p0.y + rad0 * 0.7);
-        else ctx.lineTo(p0.x, p0.y + rad0 * 0.7);
+      for (var ka = 0; ka <= SAMPLE_COUNT; ka++) {
+        var za = ka / SAMPLE_COUNT;
+        var pa = projectSample(za, side);
+        if (ka === 0) ctx.moveTo(pa.x, pa.y);
+        else ctx.lineTo(pa.x, pa.y);
       }
       ctx.stroke();
-      // (b) main core
-      ctx.strokeStyle = baseColor;
+      // outline rim of the beam
+      ctx.strokeStyle = "rgba(40,52,72,0.95)";
+      ctx.lineWidth = 12;
+      ctx.stroke();
+      // re-stroke graphite for crisp core
+      ctx.strokeStyle = "#0a0f1a";
+      ctx.lineWidth = 8;
+      ctx.stroke();
+      // (b) thinner glowing color sheath ON TOP of the dark core
+      ctx.strokeStyle = sheathColor;
       ctx.shadowColor = glowColor;
-      ctx.shadowBlur = 22;
-      ctx.lineWidth = 11;
-      ctx.beginPath();
-      for (var k1 = 0; k1 <= SAMPLE_COUNT; k1++) {
-        var z1 = k1 / SAMPLE_COUNT;
-        var p1 = projectSample(z1, side);
-        if (k1 === 0) ctx.moveTo(p1.x, p1.y); else ctx.lineTo(p1.x, p1.y);
-      }
+      ctx.shadowBlur = 18;
+      ctx.lineWidth = 4.5;
       ctx.stroke();
       ctx.shadowBlur = 0;
-      // (c) bright highlight along the top of the rail
-      ctx.strokeStyle = highlightColor;
-      ctx.lineWidth = 3;
+      // (c) top highlight ridge — sits 1.5px above the core line
+      ctx.strokeStyle = topHL;
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
-      for (var k2 = 0; k2 <= SAMPLE_COUNT; k2++) {
-        var z2 = k2 / SAMPLE_COUNT;
-        var p2 = projectSample(z2, side);
-        var rad2 = Math.max(2, p2.halfW * 0.05);
-        if (k2 === 0) ctx.moveTo(p2.x, p2.y - rad2 * 0.55);
-        else ctx.lineTo(p2.x, p2.y - rad2 * 0.55);
+      for (var kc = 0; kc <= SAMPLE_COUNT; kc++) {
+        var zc = kc / SAMPLE_COUNT;
+        var pc = projectSample(zc, side);
+        if (kc === 0) ctx.moveTo(pc.x, pc.y - 3);
+        else ctx.lineTo(pc.x, pc.y - 3);
       }
       ctx.stroke();
     }
-    // Left rail = cyan beam, right rail = red beam. Clear color separation
-    // makes the gap unmistakable.
-    drawRailLayer(-RAIL_OUTER, "#5cf2ff", "rgba(220,250,255,0.95)", "rgba(92,242,255,1)");
-    drawRailLayer( RAIL_OUTER, "#ff3a3a", "rgba(255,210,210,0.95)", "rgba(255,58,58,1)");
 
-    // ---- 4) Bank indicator: a faint cross-hatch across the gap that
-    //         tilts with the bank. Reinforces "two rails with a gap"
-    //         instead of "filled deck". ----
-    var HATCH = 18;
-    var hatchPhase = (t * 0.10) % (1 / HATCH);
-    for (var hi = 0; hi < HATCH; hi++) {
-      var hz = (hi / HATCH + hatchPhase);
-      if (hz <= 0.06 || hz >= 0.98) continue;
-      var hL = projectSample(hz, -RAIL_OUTER * 0.85);
-      var hR = projectSample(hz,  RAIL_OUTER * 0.85);
-      ctx.strokeStyle = "rgba(92,242,255,0.18)";
-      ctx.lineWidth = 1;
+    // Left rail: cyan-glow beam. Right rail: red-glow beam. Clear color
+    // separation makes the gap unmistakable in any screenshot.
+    drawRailBeam(-RAIL_OUTER, "rgba(92,242,255,1)", "rgba(150,235,255,0.95)", "rgba(220,250,255,0.95)");
+    drawRailBeam( RAIL_OUTER, "rgba(255,58,58,1)", "rgba(255,150,150,0.95)", "rgba(255,220,220,0.95)");
+
+    // ---- 3) Cross ties: drawn AFTER rails so they sit ON TOP of the
+    //         beams and visibly bridge the gap. Each tie is a thick
+    //         perpendicular copper/graphite bar with a slanted bank
+    //         angle on turns (because tL.y and tR.y differ on banked
+    //         sections). Discrete bars, never a continuous strip. ----
+    var TIES = 22;
+    var tiePhase = (t * 0.18) % (1 / TIES);
+    for (var ti = 0; ti < TIES; ti++) {
+      var tz = (ti / TIES + tiePhase);
+      if (tz <= 0.04 || tz >= 0.98) continue;
+      var tL = projectSample(tz, -RAIL_OUTER);
+      var tR = projectSample(tz,  RAIL_OUTER);
+      // Perpendicular bar: thicker than rails so it reads as crossing them.
+      var tieThick = Math.max(4, tL.halfW * 0.075);
+      // dx/dy for a perpendicular offset (so we can draw a thick
+      // rectangle as a 4-vertex polygon — a true bar shape rather than
+      // a thin stroke).
+      var dx = tR.x - tL.x;
+      var dy = tR.y - tL.y;
+      var len = Math.sqrt(dx * dx + dy * dy) || 1;
+      var nx = -dy / len;
+      var ny =  dx / len;
+      var hw = tieThick * 0.5;
+      // Drop shadow (dark underside)
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
       ctx.beginPath();
-      ctx.moveTo(hL.x, hL.y);
-      ctx.lineTo(hR.x, hR.y);
+      ctx.moveTo(tL.x + nx * hw + 1, tL.y + ny * hw + 3);
+      ctx.lineTo(tR.x + nx * hw + 1, tR.y + ny * hw + 3);
+      ctx.lineTo(tR.x - nx * hw + 1, tR.y - ny * hw + 3);
+      ctx.lineTo(tL.x - nx * hw + 1, tL.y - ny * hw + 3);
+      ctx.closePath();
+      ctx.fill();
+      // Main copper bar body
+      var barGrad = ctx.createLinearGradient(
+        tL.x + nx * hw, tL.y + ny * hw,
+        tL.x - nx * hw, tL.y - ny * hw
+      );
+      barGrad.addColorStop(0,    "rgba(120,70,30,1)");
+      barGrad.addColorStop(0.45, "rgba(255,180,110,1)");
+      barGrad.addColorStop(0.55, "rgba(255,210,150,1)");
+      barGrad.addColorStop(1,    "rgba(80,40,15,1)");
+      ctx.fillStyle = barGrad;
+      ctx.beginPath();
+      ctx.moveTo(tL.x + nx * hw, tL.y + ny * hw);
+      ctx.lineTo(tR.x + nx * hw, tR.y + ny * hw);
+      ctx.lineTo(tR.x - nx * hw, tR.y - ny * hw);
+      ctx.lineTo(tL.x - nx * hw, tL.y - ny * hw);
+      ctx.closePath();
+      ctx.fill();
+      // Outline so the tie has a hard silhouette against the rails
+      ctx.strokeStyle = "rgba(20,12,4,0.95)";
+      ctx.lineWidth = 1;
       ctx.stroke();
+      // Bolt heads at each end where the tie meets the rail
+      ctx.fillStyle = "rgba(255,240,200,0.95)";
+      ctx.beginPath();
+      ctx.arc(tL.x, tL.y, Math.max(1.4, tieThick * 0.22), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,240,200,0.95)";
+      ctx.beginPath();
+      ctx.arc(tR.x, tR.y, Math.max(1.4, tieThick * 0.22), 0, Math.PI * 2);
+      ctx.fill();
     }
   }
 
@@ -983,8 +1234,8 @@
       if (sp.z < 0.06) continue;
       var phase = (Math.sin(t * 1.2 + sp.offset) + 1) * 0.5;
       if (phase < 0.85) continue;
-      var pa = projectSample(sp.z, -0.85);
-      var pb = projectSample(sp.z,  0.85);
+      var pa = projectSample(sp.z, -0.95);
+      var pb = projectSample(sp.z,  0.95);
       var mx = (pa.x + pb.x) / 2 + Math.cos(t * 3 + sp.offset) * 8;
       var my = (pa.y + pb.y) / 2 - 6 - Math.abs(Math.sin(t * 3 + sp.offset)) * 8;
       ctx.strokeStyle = "rgba(255,255,255,0.95)";
@@ -1482,10 +1733,11 @@
       var z = 0.55 - rel * 0.28;
       if (z <= 0.04 || z >= 0.96) continue;
       // Push the towers further off the rails so they sit alongside the
-      // content panels (not overlapping the track) and scale them up.
-      var lateral = 2.35;
-      var p = projectSample(z, (sec.side >= 0 ? 1 : -1) * (Math.abs(sec.side) * 0.5 + lateral));
-      var scale = p.halfW * 0.135;
+      // content panels (not overlapping the track) and scale them up to
+      // dominate the viewport.
+      var lateral = 2.10;
+      var p = projectSample(z, (sec.side >= 0 ? 1 : -1) * (Math.abs(sec.side) * 0.4 + lateral));
+      var scale = p.halfW * 0.20;
       ctx.save();
       ctx.globalAlpha = Math.max(0.45, Math.min(1, 0.55 + z * 0.75));
       switch (sec.type) {

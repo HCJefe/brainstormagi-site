@@ -819,14 +819,25 @@ body::after{
   .sec h2{font-size:28px}
   .hud-brand{font-size:11px;letter-spacing:.14em}
   .cta.big{font-size:12px;letter-spacing:.1em;padding:16px 8px}
-  /* 2x2 metrics grid keeps every label on one line at >=10px */
+  /* 2x2 metrics grid keeps every label on one line at >=9px.
+     pulse spans both rows in column 1; the four stats lay out as
+     a 2-row x 2-col grid in columns 2 and 3. No permanent clipping. */
   .hud-metrics{
-    font-size:10px;letter-spacing:.02em;
+    font-size:9.5px;letter-spacing:.02em;
     padding:8px 10px;
-    grid-template-columns:auto 1fr 1fr;
+    grid-template-columns:auto 1fr 1fr !important;
+    grid-auto-rows:auto;
+    column-gap:8px;row-gap:3px;
+    max-width:none;width:auto;
   }
-  .hud-metrics > span:not(.pulse){font-size:10px}
+  .hud-metrics > span:not(.pulse){
+    font-size:9.5px;
+    overflow:visible;text-overflow:clip;
+    white-space:nowrap;min-width:0;
+  }
   .hero-stats b{font-size:20px}
+  /* Hero stats remain 2x2 (inherited from 640px). Reaffirm explicitly. */
+  .hero-stats{grid-template-columns:repeat(2, 1fr) !important}
   .hero{padding-top:130px}
 }
 
