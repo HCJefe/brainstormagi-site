@@ -21,7 +21,7 @@
     return;
   }
 
-  document.documentElement.dataset.sceneEngine = "canvas2d-roller-circuit-3d";
+  document.documentElement.dataset.sceneEngine = "canvas2d-elevated-rails";
   window.__brainstormRenderFrames = 0;
 
   var REDUCED_MOTION = window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches;
@@ -73,13 +73,15 @@
     // Long tapered light streaks on the track. Two lanes only so the
     // result reads as flowing current, not a swarm of beads.
     streaks.length = 0;
-    var lanes = [-0.55, -0.20, 0.20, 0.55];
-    for (var p = 0; p < 18; p++) {
+    // Streaks ride exactly on the two rails so the electric current
+    // visibly flows along the rails, not across an imaginary roadway.
+    var lanes = [-0.85, 0.85];
+    for (var p = 0; p < 14; p++) {
       streaks.push({
-        z: (p / 18) + (Math.random() * 0.04),
+        z: (p / 14) + (Math.random() * 0.04),
         lane: lanes[p % lanes.length],
         speed: 0.34 + Math.random() * 0.18,
-        length: 0.18 + Math.random() * 0.12,
+        length: 0.16 + Math.random() * 0.10,
         cmd: (p % 5 === 0),
         offset: Math.random() * Math.PI * 2
       });
@@ -282,12 +284,14 @@
       s.groundY = groundY;
     }
     // Pass 2: derive slope/bank from neighbors so the rails twist together.
+    // Bank is intentionally exaggerated so the inner rail is unmistakably
+    // higher/lower than the outer rail in a screenshot.
     for (var k = 0; k <= SAMPLE_COUNT; k++) {
       var prev = samples[Math.max(0, k - 1)];
       var next = samples[Math.min(SAMPLE_COUNT, k + 1)];
       var slope = (next.centerLat - prev.centerLat);
       samples[k].slope = slope;
-      samples[k].bank = slope * 3.2;
+      samples[k].bank = slope * 6.5;
     }
   }
 
@@ -646,333 +650,275 @@
     }
   }
 
-  // Visible support trusses beneath the elevated track. Frequent (every
-  // 1/22 of the track), wide enough to read clearly, with diagonal X
-  // bracing, horizontal cap braces, and copper footing pads on the PCB.
-  // Pylons are explicitly drawn from the track underside down to the PCB
-  // ground so the elevation reads unambiguously.
+  // Visible support trusses beneath the elevated track. Each truss is a
+  // wide A-frame with two vertical columns spanning the rail gap, multiple
+  // stages of X-bracing, horizontal cap braces, and bright copper footing
+  // pads on the PCB. Drawn frequently and at large scale so QA cannot
+  // miss them in any desktop screenshot.
+  var RAIL_OUTER_REF = 0.85;
   function drawSupportTrusses(w, h, horizonY, t, sectionPos) {
-    var COUNT = 22;
-    var DECK_THICKNESS = 0.32;
+    var COUNT = 16;
     for (var i = 1; i <= COUNT; i++) {
       var z = i / COUNT;
-      var pCenter = projectSample(z, 0);
+      // Anchor each truss column directly under the corresponding rail.
+      var pL = projectSample(z, -RAIL_OUTER_REF);
+      var pR = projectSample(z,  RAIL_OUTER_REF);
       var pp = z * z * 0.94 + z * 0.06;
       var groundY = horizonY + (h - horizonY) * pp + 6;
-      // Underside of the track (where the truss attaches): below the deck
-      // by DECK_THICKNESS * halfW so trusses visibly begin at the bottom
-      // of the slab, not the top.
-      var underY = pCenter.y + pCenter.halfW * DECK_THICKNESS + 4;
-      if (groundY <= underY + 6) continue;
-      var pylonW = Math.max(3, pCenter.halfW * 0.10);
-      var spread = Math.max(8, pCenter.halfW * 0.30);
-      var leftX = pCenter.x - spread;
-      var rightX = pCenter.x + spread;
-      var dropH = groundY - underY;
+      var underYL = pL.y + 3;
+      var underYR = pR.y + 3;
+      var dropL = groundY - underYL;
+      var dropR = groundY - underYR;
+      if (dropL <= 18 || dropR <= 18) continue;
+      var pylonW = Math.max(5, pL.halfW * 0.045);
+      var leftX = pL.x;
+      var rightX = pR.x;
 
-      // ---- Footing solder pads on PCB (one per pillar) ----
+      // ---- Footing solder pads on PCB ----
       function footingPad(fx, fy) {
-        var rPad = pylonW * 1.8;
-        ctx.fillStyle = "rgba(255,200,120,0.95)";
+        var rPad = pylonW * 2.4;
+        ctx.fillStyle = "rgba(255,200,120,0.98)";
         ctx.beginPath();
         ctx.ellipse(fx, fy, rPad, rPad * 0.45, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = "#03100a";
         ctx.beginPath();
-        ctx.ellipse(fx, fy, rPad * 0.4, rPad * 0.18, 0, 0, Math.PI * 2);
+        ctx.ellipse(fx, fy, rPad * 0.42, rPad * 0.20, 0, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = "rgba(255,255,255,0.4)";
-        ctx.lineWidth = 0.8;
+        ctx.strokeStyle = "rgba(255,255,255,0.45)";
+        ctx.lineWidth = 0.9;
         ctx.beginPath();
         ctx.ellipse(fx, fy, rPad, rPad * 0.45, 0, 0, Math.PI * 2);
         ctx.stroke();
+        // Glow halo
+        var gh = ctx.createRadialGradient(fx, fy, 0, fx, fy, rPad * 1.6);
+        gh.addColorStop(0, "rgba(255,200,120,0.3)");
+        gh.addColorStop(1, "rgba(255,200,120,0)");
+        ctx.fillStyle = gh;
+        ctx.beginPath();
+        ctx.ellipse(fx, fy, rPad * 1.6, rPad * 0.7, 0, 0, Math.PI * 2);
+        ctx.fill();
       }
       footingPad(leftX, groundY);
       footingPad(rightX, groundY);
 
-      // ---- Pillar fills with side shading (pseudo-3D columns) ----
-      function pillar(px) {
-        var pg = ctx.createLinearGradient(px - pylonW / 2, 0, px + pylonW / 2, 0);
-        pg.addColorStop(0, "#0c1a32");
-        pg.addColorStop(0.5, "#1c3258");
-        pg.addColorStop(1, "#06101e");
+      // ---- Pseudo-3D columns (two vertical pylons, one under each rail) ----
+      function pillar(px, topY, bottomY) {
+        var dropH = bottomY - topY;
+        var pg = ctx.createLinearGradient(px - pylonW, 0, px + pylonW, 0);
+        pg.addColorStop(0,   "#08111e");
+        pg.addColorStop(0.45, "#22385e");
+        pg.addColorStop(0.55, "#2c456e");
+        pg.addColorStop(1,   "#04080f");
         ctx.fillStyle = pg;
-        ctx.fillRect(px - pylonW / 2, underY, pylonW, dropH);
-        ctx.strokeStyle = "rgba(170,220,255,0.85)";
-        ctx.lineWidth = 1.2;
-        ctx.strokeRect(px - pylonW / 2 + 0.5, underY + 0.5, pylonW - 1, dropH - 1);
-        // Bright vertical highlight rib
-        ctx.strokeStyle = "rgba(92,242,255,0.55)";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(px, underY + 2);
-        ctx.lineTo(px, groundY - 2);
-        ctx.stroke();
-      }
-      pillar(leftX);
-      pillar(rightX);
-
-      // ---- X-bracing between pillars (multiple stages so it reads as a
-      //      real truss and not just a single X). ----
-      var stages = Math.max(2, Math.floor(dropH / 36));
-      ctx.strokeStyle = "rgba(92,242,255,0.85)";
-      ctx.lineWidth = 1.6;
-      ctx.shadowColor = "rgba(92,242,255,0.6)";
-      ctx.shadowBlur = 4;
-      for (var st = 0; st < stages; st++) {
-        var y0 = underY + (dropH * st) / stages + 3;
-        var y1 = underY + (dropH * (st + 1)) / stages - 3;
-        ctx.beginPath();
-        ctx.moveTo(leftX,  y0);
-        ctx.lineTo(rightX, y1);
-        ctx.moveTo(rightX, y0);
-        ctx.lineTo(leftX,  y1);
-        ctx.stroke();
-        // Horizontal cap at each stage boundary
-        ctx.strokeStyle = "rgba(255,180,110,0.85)";
+        ctx.fillRect(px - pylonW, topY, pylonW * 2, dropH);
+        ctx.strokeStyle = "rgba(170,220,255,0.95)";
         ctx.lineWidth = 1.4;
-        ctx.beginPath();
-        ctx.moveTo(leftX - pylonW * 0.4,  y1);
-        ctx.lineTo(rightX + pylonW * 0.4, y1);
-        ctx.stroke();
+        ctx.strokeRect(px - pylonW + 0.5, topY + 0.5, pylonW * 2 - 1, dropH - 1);
+        // Bright cyan rib up the center
         ctx.strokeStyle = "rgba(92,242,255,0.85)";
+        ctx.shadowColor = "rgba(92,242,255,0.7)";
+        ctx.shadowBlur = 6;
         ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(px, topY + 2);
+        ctx.lineTo(px, bottomY - 2);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
       }
-      ctx.shadowBlur = 0;
+      pillar(leftX,  underYL, groundY);
+      pillar(rightX, underYR, groundY);
 
-      // ---- Top cap brace right at the deck underside ----
-      ctx.strokeStyle = "rgba(255,210,150,0.95)";
-      ctx.lineWidth = 2;
+      // ---- Multi-stage X bracing across the gap ----
+      var avgUnder = (underYL + underYR) * 0.5;
+      var avgDrop = groundY - avgUnder;
+      var stages = Math.max(3, Math.floor(avgDrop / 28));
+      for (var st = 0; st < stages; st++) {
+        var f0 = st / stages;
+        var f1 = (st + 1) / stages;
+        var lyA = underYL + (groundY - underYL) * f0 + 3;
+        var lyB = underYL + (groundY - underYL) * f1 - 3;
+        var ryA = underYR + (groundY - underYR) * f0 + 3;
+        var ryB = underYR + (groundY - underYR) * f1 - 3;
+        // X braces (cyan, glowing)
+        ctx.strokeStyle = "rgba(92,242,255,0.95)";
+        ctx.shadowColor = "rgba(92,242,255,0.65)";
+        ctx.shadowBlur = 5;
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.moveTo(leftX,  lyA);
+        ctx.lineTo(rightX, ryB);
+        ctx.moveTo(rightX, ryA);
+        ctx.lineTo(leftX,  lyB);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        // Connection nodes at the X intersection
+        var midX = (leftX + rightX) / 2;
+        var midY = (lyA + lyB + ryA + ryB) / 4;
+        ctx.fillStyle = "rgba(255,210,150,0.95)";
+        ctx.beginPath();
+        ctx.arc(midX, midY, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+        // Horizontal stage brace (copper)
+        ctx.strokeStyle = "rgba(255,180,110,0.95)";
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(leftX  - pylonW * 0.5, lyB);
+        ctx.lineTo(rightX + pylonW * 0.5, ryB);
+        ctx.stroke();
+      }
+
+      // ---- Top cap brace right at the rail underside (across the gap) ----
+      ctx.strokeStyle = "rgba(255,220,160,1)";
+      ctx.shadowColor = "rgba(255,200,120,0.6)";
+      ctx.shadowBlur = 5;
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(leftX - pylonW * 0.5,  underY + 2);
-      ctx.lineTo(rightX + pylonW * 0.5, underY + 2);
+      ctx.moveTo(leftX  - pylonW * 0.7, underYL + 1);
+      ctx.lineTo(rightX + pylonW * 0.7, underYR + 1);
       ctx.stroke();
+      ctx.shadowBlur = 0;
     }
   }
 
-  // The elevated roller-coaster track. Built up in z-back-to-front layers:
-  //   1) cast shadow on the PCB beneath the deck
-  //   2) underside slab (deep dark, with cyan highlight ribs)
-  //   3) left/right side walls (visible thickness with shading)
-  //   4) deck top (much narrower than the slab so rails sit clearly above)
-  //   5) cross ties spanning between the rails
-  //   6) two thick raised rails with bank tilt and glow
-  //   7) bright glowing inner power line
-  // The track is intentionally narrower than before so the slab reads as
-  // a coaster spine, not a road. Banking is exaggerated so QA cannot miss
-  // the turn.
+  // Two separate elevated rails. No road slab. No deck. Each rail is a
+  // thick glowing tube (cyan left, red right) with a separate dark cast
+  // shadow projected onto the PCB beneath it. Cross ties span the gap
+  // between the rails as visible bars, slanting on banked curves. Banking
+  // is exaggerated so on turns one rail sits noticeably higher on screen.
   function drawElevatedTrack(w, h, horizonY, t, sectionPos) {
-    var DECK_THICKNESS = 0.36; // very thick slab
-    var RAIL_OUTER = 0.95;
-    var RAIL_INNER = 0.55;
+    var RAIL_OUTER = 0.85;
 
-    // ---- 1) Cast shadow on the PCB ----
-    // A dark elliptical shadow strip directly under the deck, projected
-    // onto the PCB ground plane. Subtle but adds 3D depth read.
+    // ---- 1) Per-rail cast shadows on the PCB ----
+    // Two narrow elliptical shadow strips, one beneath each rail. Drawing
+    // them separately (not as a single road slab) preserves the gap.
     for (var sh = 0; sh < SAMPLE_COUNT; sh += 2) {
       var sz = sh / SAMPLE_COUNT;
-      var sp = projectSample(sz, 0);
+      var spL = projectSample(sz, -RAIL_OUTER);
+      var spR = projectSample(sz,  RAIL_OUTER);
       var pp = sz * sz * 0.94 + sz * 0.06;
       var groundY = horizonY + (h - horizonY) * pp + 6;
-      var halfW = sp.halfW * 1.2;
-      var shadowGrad = ctx.createRadialGradient(sp.x, groundY, 0, sp.x, groundY, halfW);
-      shadowGrad.addColorStop(0, "rgba(0,0,0,0.55)");
-      shadowGrad.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = shadowGrad;
+      var shHalf = spL.halfW * 0.30;
+      var sgL = ctx.createRadialGradient(spL.x, groundY, 0, spL.x, groundY, shHalf);
+      sgL.addColorStop(0, "rgba(0,0,0,0.55)");
+      sgL.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = sgL;
       ctx.beginPath();
-      ctx.ellipse(sp.x, groundY, halfW, halfW * 0.18, 0, 0, Math.PI * 2);
+      ctx.ellipse(spL.x, groundY, shHalf, shHalf * 0.22, 0, 0, Math.PI * 2);
+      ctx.fill();
+      var sgR = ctx.createRadialGradient(spR.x, groundY, 0, spR.x, groundY, shHalf);
+      sgR.addColorStop(0, "rgba(0,0,0,0.55)");
+      sgR.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = sgR;
+      ctx.beginPath();
+      ctx.ellipse(spR.x, groundY, shHalf, shHalf * 0.22, 0, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // ---- 2) Underside slab (deep dark with bevel highlight) ----
-    for (var u = 0; u < SAMPLE_COUNT; u++) {
-      var u0 = u / SAMPLE_COUNT;
-      var u1 = (u + 1) / SAMPLE_COUNT;
-      var uL0 = projectSample(u0, -1);
-      var uR0 = projectSample(u0,  1);
-      var uL1 = projectSample(u1, -1);
-      var uR1 = projectSample(u1,  1);
-      var thick0 = uL0.halfW * DECK_THICKNESS;
-      var thick1 = uL1.halfW * DECK_THICKNESS;
-      // Underside trapezoid (the bottom face of the slab)
-      var underGrad = ctx.createLinearGradient(0, uL0.y + thick0 * 0.2, 0, uL0.y + thick0);
-      underGrad.addColorStop(0, "#08111c");
-      underGrad.addColorStop(1, "#02060c");
-      ctx.fillStyle = underGrad;
-      ctx.beginPath();
-      ctx.moveTo(uL0.x - 1, uL0.y + thick0);
-      ctx.lineTo(uR0.x + 1, uR0.y + thick0);
-      ctx.lineTo(uR1.x + 1, uR1.y + thick1);
-      ctx.lineTo(uL1.x - 1, uL1.y + thick1);
-      ctx.closePath();
-      ctx.fill();
-      // Cyan rib along the underside leading edge
-      if (u % 2 === 0) {
-        ctx.strokeStyle = "rgba(92,242,255,0.55)";
-        ctx.lineWidth = 1.4;
-        ctx.beginPath();
-        ctx.moveTo(uL0.x, uL0.y + thick0 - 2);
-        ctx.lineTo(uR0.x, uR0.y + thick0 - 2);
-        ctx.stroke();
-      }
-    }
-
-    // ---- 3) Left + right side walls ----
-    for (var sw = 0; sw < SAMPLE_COUNT; sw++) {
-      var s0 = sw / SAMPLE_COUNT;
-      var s1 = (sw + 1) / SAMPLE_COUNT;
-      var L0 = projectSample(s0, -1);
-      var L1 = projectSample(s1, -1);
-      var R0 = projectSample(s0,  1);
-      var R1 = projectSample(s1,  1);
-      var th0 = L0.halfW * DECK_THICKNESS;
-      var th1 = L1.halfW * DECK_THICKNESS;
-      // Left side wall (in shadow)
-      var leftGrad = ctx.createLinearGradient(L0.x, L0.y, L0.x, L0.y + th0);
-      leftGrad.addColorStop(0, "#1c2c50");
-      leftGrad.addColorStop(0.5, "#0e1a32");
-      leftGrad.addColorStop(1, "#04081a");
-      ctx.fillStyle = leftGrad;
-      ctx.beginPath();
-      ctx.moveTo(L0.x, L0.y);
-      ctx.lineTo(L1.x, L1.y);
-      ctx.lineTo(L1.x, L1.y + th1);
-      ctx.lineTo(L0.x, L0.y + th0);
-      ctx.closePath();
-      ctx.fill();
-      // Right side wall (catching light)
-      var rightGrad = ctx.createLinearGradient(R0.x, R0.y, R0.x, R0.y + th0);
-      rightGrad.addColorStop(0, "#3a527e");
-      rightGrad.addColorStop(0.5, "#1c3258");
-      rightGrad.addColorStop(1, "#06101e");
-      ctx.fillStyle = rightGrad;
-      ctx.beginPath();
-      ctx.moveTo(R0.x, R0.y);
-      ctx.lineTo(R1.x, R1.y);
-      ctx.lineTo(R1.x, R1.y + th1);
-      ctx.lineTo(R0.x, R0.y + th0);
-      ctx.closePath();
-      ctx.fill();
-      // Bright cyan power conduit on left wall
-      ctx.strokeStyle = "rgba(92,242,255,0.85)";
-      ctx.lineWidth = 1.8;
-      ctx.shadowColor = "rgba(92,242,255,0.7)";
-      ctx.shadowBlur = 6;
-      ctx.beginPath();
-      ctx.moveTo(L0.x + 1, L0.y + th0 * 0.55);
-      ctx.lineTo(L1.x + 1, L1.y + th1 * 0.55);
-      ctx.stroke();
-      // Red conduit on right wall
-      ctx.strokeStyle = "rgba(255,58,58,0.85)";
-      ctx.shadowColor = "rgba(255,58,58,0.7)";
-      ctx.beginPath();
-      ctx.moveTo(R0.x - 1, R0.y + th0 * 0.55);
-      ctx.lineTo(R1.x - 1, R1.y + th1 * 0.55);
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-    }
-
-    // ---- 4) Deck top (riding surface, narrower than the slab) ----
-    for (var i = 0; i < SAMPLE_COUNT; i++) {
-      var z0 = i / SAMPLE_COUNT;
-      var z1 = (i + 1) / SAMPLE_COUNT;
-      var p0L = projectSample(z0, -RAIL_OUTER);
-      var p0R = projectSample(z0,  RAIL_OUTER);
-      var p1L = projectSample(z1, -RAIL_OUTER);
-      var p1R = projectSample(z1,  RAIL_OUTER);
-      var shade = 16 + Math.floor(z0 * 30);
-      ctx.fillStyle = "rgb(" + shade + "," + (shade + 8) + "," + (shade + 30) + ")";
-      ctx.beginPath();
-      ctx.moveTo(p0L.x, p0L.y);
-      ctx.lineTo(p0R.x, p0R.y);
-      ctx.lineTo(p1R.x, p1R.y);
-      ctx.lineTo(p1L.x, p1L.y);
-      ctx.closePath();
-      ctx.fill();
-    }
-
-    // ---- 5) Cross ties between the rails (drawn before the rails so the
-    //         rails crown them) ----
-    var TIES = 36;
+    // ---- 2) Cross ties between the rails. Drawn FIRST so the rails
+    //         crown them. Each tie is a thick bar with a dark underside,
+    //         and slants on banked curves because L and R y differ. ----
+    var TIES = 30;
     var tiePhase = (t * 0.16) % (1 / TIES);
     for (var ti = 0; ti < TIES; ti++) {
       var tz = (ti / TIES + tiePhase);
       if (tz <= 0.02 || tz >= 1) continue;
       var tL = projectSample(tz, -RAIL_OUTER);
       var tR = projectSample(tz,  RAIL_OUTER);
-      // Tie body: dark steel
-      ctx.strokeStyle = "rgba(60,80,110,0.95)";
-      ctx.lineWidth = Math.max(2, tL.halfW * 0.030);
+      var tieThick = Math.max(3, tL.halfW * 0.052);
+      // Underside / shadow body of the tie
+      ctx.strokeStyle = "rgba(8,12,22,0.95)";
+      ctx.lineWidth = tieThick + 2;
       ctx.lineCap = "butt";
+      ctx.beginPath();
+      ctx.moveTo(tL.x, tL.y + 2);
+      ctx.lineTo(tR.x, tR.y + 2);
+      ctx.stroke();
+      // Tie main body: dark steel
+      ctx.strokeStyle = "rgba(80,100,140,0.95)";
+      ctx.lineWidth = tieThick;
       ctx.beginPath();
       ctx.moveTo(tL.x, tL.y);
       ctx.lineTo(tR.x, tR.y);
       ctx.stroke();
-      // Tie highlight: bright top edge
-      ctx.strokeStyle = "rgba(190,220,255," + (0.55 + tz * 0.4).toFixed(3) + ")";
-      ctx.lineWidth = Math.max(1, tL.halfW * 0.014);
+      // Highlighted top edge
+      ctx.strokeStyle = "rgba(210,235,255," + (0.65 + tz * 0.3).toFixed(3) + ")";
+      ctx.lineWidth = Math.max(1.2, tieThick * 0.30);
       ctx.beginPath();
-      ctx.moveTo(tL.x, tL.y - 1);
-      ctx.lineTo(tR.x, tR.y - 1);
+      ctx.moveTo(tL.x, tL.y - tieThick * 0.45);
+      ctx.lineTo(tR.x, tR.y - tieThick * 0.45);
       ctx.stroke();
+      // End caps as small bright squares so the ties read as solid bars
+      ctx.fillStyle = "rgba(255,210,150,0.95)";
+      ctx.fillRect(tL.x - tieThick * 0.4, tL.y - tieThick * 0.5, tieThick * 0.8, tieThick * 1.0);
+      ctx.fillRect(tR.x - tieThick * 0.4, tR.y - tieThick * 0.5, tieThick * 0.8, tieThick * 1.0);
     }
 
-    // ---- 6) Two thick raised rails with bank tilt ----
-    function drawRail(side, color, glowCol, lw) {
-      ctx.strokeStyle = color;
-      ctx.lineWidth = lw;
-      ctx.shadowColor = glowCol;
-      ctx.shadowBlur = 16;
+    // ---- 3) The two rails, drawn in three passes per rail:
+    //         (a) dark underside tube
+    //         (b) main glowing rail core
+    //         (c) bright highlight stripe along the top of the rail
+    function drawRailLayer(side, baseColor, highlightColor, glowColor) {
+      // (a) underside / shadow tube
+      ctx.strokeStyle = "rgba(6,10,18,0.95)";
+      ctx.lineWidth = 14;
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
       ctx.beginPath();
-      for (var k = 0; k <= SAMPLE_COUNT; k++) {
-        var z = k / SAMPLE_COUNT;
-        var p = projectSample(z, side);
-        // Raise the rail above the deck by a fraction of halfW so the
-        // rails visibly sit on top of the slab.
-        var raise = p.halfW * 0.12;
-        if (k === 0) ctx.moveTo(p.x, p.y - raise); else ctx.lineTo(p.x, p.y - raise);
+      for (var k0 = 0; k0 <= SAMPLE_COUNT; k0++) {
+        var z0 = k0 / SAMPLE_COUNT;
+        var p0 = projectSample(z0, side);
+        var rad0 = Math.max(2, p0.halfW * 0.05);
+        if (k0 === 0) ctx.moveTo(p0.x, p0.y + rad0 * 0.7);
+        else ctx.lineTo(p0.x, p0.y + rad0 * 0.7);
+      }
+      ctx.stroke();
+      // (b) main core
+      ctx.strokeStyle = baseColor;
+      ctx.shadowColor = glowColor;
+      ctx.shadowBlur = 22;
+      ctx.lineWidth = 11;
+      ctx.beginPath();
+      for (var k1 = 0; k1 <= SAMPLE_COUNT; k1++) {
+        var z1 = k1 / SAMPLE_COUNT;
+        var p1 = projectSample(z1, side);
+        if (k1 === 0) ctx.moveTo(p1.x, p1.y); else ctx.lineTo(p1.x, p1.y);
       }
       ctx.stroke();
       ctx.shadowBlur = 0;
+      // (c) bright highlight along the top of the rail
+      ctx.strokeStyle = highlightColor;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (var k2 = 0; k2 <= SAMPLE_COUNT; k2++) {
+        var z2 = k2 / SAMPLE_COUNT;
+        var p2 = projectSample(z2, side);
+        var rad2 = Math.max(2, p2.halfW * 0.05);
+        if (k2 === 0) ctx.moveTo(p2.x, p2.y - rad2 * 0.55);
+        else ctx.lineTo(p2.x, p2.y - rad2 * 0.55);
+      }
+      ctx.stroke();
     }
-    // Outer rails: thick metallic core + glow
-    drawRail(-RAIL_OUTER, "#dde8f5", "rgba(92,242,255,0.95)", 6);
-    drawRail( RAIL_OUTER, "#f5dde0", "rgba(255,58,58,0.95)", 6);
-    // Inner electric stripes
-    drawRail(-RAIL_INNER, "rgba(140,250,255,0.95)", "rgba(92,242,255,0.7)", 2.5);
-    drawRail( RAIL_INNER, "rgba(255,180,180,0.95)", "rgba(255,58,58,0.7)",  2.5);
+    // Left rail = cyan beam, right rail = red beam. Clear color separation
+    // makes the gap unmistakable.
+    drawRailLayer(-RAIL_OUTER, "#5cf2ff", "rgba(220,250,255,0.95)", "rgba(92,242,255,1)");
+    drawRailLayer( RAIL_OUTER, "#ff3a3a", "rgba(255,210,210,0.95)", "rgba(255,58,58,1)");
 
-    // ---- 7) Bright glowing centerline power line ----
-    ctx.strokeStyle = "rgba(255,240,180,0.85)";
-    ctx.lineWidth = 1.4;
-    ctx.shadowColor = "rgba(255,200,120,0.85)";
-    ctx.shadowBlur = 10;
-    ctx.beginPath();
-    for (var s = 0; s <= SAMPLE_COUNT; s++) {
-      var pc = projectSample(s / SAMPLE_COUNT, 0);
-      if (s === 0) ctx.moveTo(pc.x, pc.y - pc.halfW * 0.10); else ctx.lineTo(pc.x, pc.y - pc.halfW * 0.10);
-    }
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    // ---- Deck-edge bevel: a thin bright line where the deck top meets
-    //      the side wall, reinforcing the slab thickness read. ----
-    for (var be = 0; be < SAMPLE_COUNT; be++) {
-      var bz0 = be / SAMPLE_COUNT;
-      var bz1 = (be + 1) / SAMPLE_COUNT;
-      var bL0 = projectSample(bz0, -RAIL_OUTER);
-      var bL1 = projectSample(bz1, -RAIL_OUTER);
-      var bR0 = projectSample(bz0,  RAIL_OUTER);
-      var bR1 = projectSample(bz1,  RAIL_OUTER);
-      ctx.strokeStyle = "rgba(120,180,230,0.45)";
+    // ---- 4) Bank indicator: a faint cross-hatch across the gap that
+    //         tilts with the bank. Reinforces "two rails with a gap"
+    //         instead of "filled deck". ----
+    var HATCH = 18;
+    var hatchPhase = (t * 0.10) % (1 / HATCH);
+    for (var hi = 0; hi < HATCH; hi++) {
+      var hz = (hi / HATCH + hatchPhase);
+      if (hz <= 0.06 || hz >= 0.98) continue;
+      var hL = projectSample(hz, -RAIL_OUTER * 0.85);
+      var hR = projectSample(hz,  RAIL_OUTER * 0.85);
+      ctx.strokeStyle = "rgba(92,242,255,0.18)";
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(bL0.x, bL0.y);
-      ctx.lineTo(bL1.x, bL1.y);
-      ctx.moveTo(bR0.x, bR0.y);
-      ctx.lineTo(bR1.x, bR1.y);
+      ctx.moveTo(hL.x, hL.y);
+      ctx.lineTo(hR.x, hR.y);
       ctx.stroke();
     }
   }
@@ -1037,8 +983,8 @@
       if (sp.z < 0.06) continue;
       var phase = (Math.sin(t * 1.2 + sp.offset) + 1) * 0.5;
       if (phase < 0.85) continue;
-      var pa = projectSample(sp.z, -0.95);
-      var pb = projectSample(sp.z,  0.95);
+      var pa = projectSample(sp.z, -0.85);
+      var pb = projectSample(sp.z,  0.85);
       var mx = (pa.x + pb.x) / 2 + Math.cos(t * 3 + sp.offset) * 8;
       var my = (pa.y + pb.y) / 2 - 6 - Math.abs(Math.sin(t * 3 + sp.offset)) * 8;
       ctx.strokeStyle = "rgba(255,255,255,0.95)";
@@ -1108,17 +1054,28 @@
     ctx.stroke();
     return { fx: fx, fy: fy, fw: fw, fh: fh };
   }
+  // Horizontal floor-band glow strips. Replaces the old grid-of-squares
+  // window pattern with thin glowing horizontal bands (with a few vertical
+  // accents) so towers read as architectural rather than Tetris.
   function windowGrid(x, y, w_, h_, cols, rows, t, seed) {
-    for (var c = 0; c < cols; c++) {
-      for (var r = 0; r < rows; r++) {
-        var on = ((Math.sin(t * 1.4 + r * 1.3 + c * 0.7 + seed) + 1) * 0.5) > 0.45;
-        var cx2 = x + 1.5 + c * ((w_ - 3) / cols);
-        var cy2 = y + 1.5 + r * ((h_ - 3) / rows);
-        var cw = Math.max(1, (w_ - 3) / cols - 1);
-        var ch = Math.max(1, (h_ - 3) / rows - 1.2);
-        ctx.fillStyle = on ? "rgba(92,242,255,0.95)" : "rgba(20,40,70,0.6)";
-        ctx.fillRect(cx2, cy2, cw, ch);
-      }
+    var bandH = Math.max(1, (h_ - 4) / Math.max(rows, 6));
+    for (var r = 0; r < rows; r++) {
+      var by = y + 2 + r * bandH;
+      if (by + 1 > y + h_ - 2) break;
+      var lit = ((Math.sin(t * 1.3 + r * 0.9 + seed) + 1) * 0.5) > 0.35;
+      ctx.fillStyle = lit ? "rgba(92,242,255,0.85)" : "rgba(40,80,140,0.35)";
+      ctx.fillRect(x + 2, by, w_ - 4, Math.max(1, bandH * 0.45));
+    }
+    // Vertical accent slits (just a couple, not a grid)
+    var slits = Math.max(1, Math.min(3, Math.floor(cols / 2)));
+    for (var s = 0; s < slits; s++) {
+      var sx = x + (w_ * (s + 1)) / (slits + 1);
+      var lg = ctx.createLinearGradient(sx, y, sx, y + h_);
+      lg.addColorStop(0,   "rgba(92,242,255,0)");
+      lg.addColorStop(0.5, "rgba(92,242,255,0.95)");
+      lg.addColorStop(1,   "rgba(92,242,255,0)");
+      ctx.fillStyle = lg;
+      ctx.fillRect(sx - 0.7, y + 2, 1.4, h_ - 4);
     }
   }
   function pad(p, scale) {
@@ -1135,11 +1092,11 @@
 
   function drawSpire(p, scale, t) {
     pad(p, scale);
-    var hgt = scale * 36;
-    var basew = scale * 3.4;
-    var midw = scale * 2.4;
+    var hgt = scale * 52;
+    var basew = scale * 3.8;
+    var midw = scale * 2.6;
     var topw = scale * 1.4;
-    var depth = scale * 1.6;
+    var depth = scale * 2.0;
 
     var seg1H = hgt * 0.45;
     var seg2H = hgt * 0.32;
@@ -1200,12 +1157,12 @@
 
   function drawFoundry(p, scale, t) {
     pad(p, scale);
-    var hgt = scale * 26;
-    var depth = scale * 1.4;
+    var hgt = scale * 42;
+    var depth = scale * 1.8;
     var towers = [
-      { x: p.x - scale * 3.6, w: scale * 1.8, h: hgt },
-      { x: p.x,                w: scale * 2.4, h: hgt * 1.10 },
-      { x: p.x + scale * 3.6,  w: scale * 1.6, h: hgt * 0.85 }
+      { x: p.x - scale * 4.6, w: scale * 2.2, h: hgt },
+      { x: p.x,                w: scale * 3.0, h: hgt * 1.15 },
+      { x: p.x + scale * 4.6,  w: scale * 2.0, h: hgt * 0.85 }
     ];
     var faces = [];
     towers.forEach(function (tw, idx) {
@@ -1246,9 +1203,9 @@
 
   function drawVoiceArray(p, scale, t) {
     pad(p, scale);
-    var hgt = scale * 32;
-    var w_ = scale * 1.8;
-    var depth = scale * 1.0;
+    var hgt = scale * 50;
+    var w_ = scale * 2.2;
+    var depth = scale * 1.4;
     var face = box3D(p.x, p.y, w_ * 2, hgt * 0.7, depth, "#0a1426", "#040b16", "#162241");
     windowGrid(face.fx, face.fy, face.fw, face.fh, 3, 14, t, p.x);
     ctx.strokeStyle = "rgba(170,200,255,0.85)";
@@ -1291,9 +1248,9 @@
 
   function drawOpsTower(p, scale, t) {
     pad(p, scale);
-    var hgt = scale * 30;
-    var basew = scale * 2.6;
-    var depth = scale * 1.4;
+    var hgt = scale * 46;
+    var basew = scale * 3.2;
+    var depth = scale * 1.8;
     var face = box3D(p.x, p.y, basew * 2, hgt, depth, "#0c1830", "#05101c", "#192746");
     windowGrid(face.fx, face.fy, face.fw, face.fh, 5, 12, t, p.x);
     var deckH = scale * 2.6;
@@ -1334,9 +1291,9 @@
 
   function drawReactor(p, scale, t) {
     pad(p, scale);
-    var hgt = scale * 30;
-    var w_ = scale * 2.6;
-    var depth = scale * 1.4;
+    var hgt = scale * 46;
+    var w_ = scale * 3.2;
+    var depth = scale * 1.8;
     var face = box3D(p.x, p.y, w_ * 2, hgt, depth, "#0e1a2e", "#06101e", "#1a2a48");
     ctx.strokeStyle = "rgba(255,90,58,0.95)";
     ctx.lineWidth = 1.4;
@@ -1383,9 +1340,9 @@
 
   function drawContentForge(p, scale, t) {
     pad(p, scale);
-    var hgt = scale * 26;
-    var basew = scale * 5.0;
-    var depth = scale * 1.6;
+    var hgt = scale * 40;
+    var basew = scale * 6.0;
+    var depth = scale * 2.0;
     var face = box3D(p.x, p.y, basew * 2, hgt, depth, "#0a1628", "#040d1a", "#16263e");
     var lowerH = hgt * 0.45;
     windowGrid(face.fx, face.fy + (hgt - lowerH), face.fw, lowerH, 10, 4, t, p.x);
@@ -1416,9 +1373,9 @@
 
   function drawIntegrationDome(p, scale, t) {
     pad(p, scale);
-    var towerH = scale * 20;
-    var towerW = scale * 1.6;
-    var depth = scale * 1.0;
+    var towerH = scale * 32;
+    var towerW = scale * 2.0;
+    var depth = scale * 1.4;
     var face = box3D(p.x, p.y, towerW * 2, towerH, depth, "#0a1426", "#040b16", "#172445");
     windowGrid(face.fx, face.fy, face.fw, face.fh, 2, 10, t, p.x + 7);
 
@@ -1491,9 +1448,9 @@
     ctx.beginPath();
     ctx.ellipse(p.x, p.y, rRad, rRad * 0.4, 0, 0, Math.PI * 2);
     ctx.stroke();
-    var towerH = scale * 22;
-    var towerW = scale * 1.2;
-    var depthC = scale * 0.9;
+    var towerH = scale * 36;
+    var towerW = scale * 1.6;
+    var depthC = scale * 1.2;
     var face = box3D(p.x, p.y, towerW * 2, towerH, depthC, "#0c1828", "#040b16", "#1a2a48");
     var stripGrad = ctx.createLinearGradient(p.x, face.fy, p.x, p.y);
     stripGrad.addColorStop(0, "rgba(92,242,255,0)");
@@ -1524,11 +1481,13 @@
       var rel = i - sectionPos;
       var z = 0.55 - rel * 0.28;
       if (z <= 0.04 || z >= 0.96) continue;
-      var lateral = 1.85;
-      var p = projectSample(z, (sec.side >= 0 ? 1 : -1) * (Math.abs(sec.side) * 0.7 + lateral));
-      var scale = p.halfW * 0.085;
+      // Push the towers further off the rails so they sit alongside the
+      // content panels (not overlapping the track) and scale them up.
+      var lateral = 2.35;
+      var p = projectSample(z, (sec.side >= 0 ? 1 : -1) * (Math.abs(sec.side) * 0.5 + lateral));
+      var scale = p.halfW * 0.135;
       ctx.save();
-      ctx.globalAlpha = Math.max(0.30, Math.min(1, 0.45 + z * 0.85));
+      ctx.globalAlpha = Math.max(0.45, Math.min(1, 0.55 + z * 0.75));
       switch (sec.type) {
         case "spire":       drawSpire(p, scale, t); break;
         case "foundry":     drawFoundry(p, scale, t); break;
