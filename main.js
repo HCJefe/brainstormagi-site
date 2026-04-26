@@ -22,6 +22,9 @@
   }
 
   document.documentElement.dataset.sceneEngine = "canvas2d-elevated-rails";
+  // QA marker: confirms the rails-only primary renderer is loaded with no
+  // continuous filled deck/route polygon.
+  document.documentElement.dataset.trackMode = "rails-only";
   window.__brainstormRenderFrames = 0;
 
   var REDUCED_MOTION = window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches;
@@ -273,7 +276,11 @@
   }
 
   function rebuildSamples(w, h, horizonY, t, sectionPos) {
-    var roadHalfFG = w * 0.66;
+    // Foreground rail-to-rail half-span. Kept narrow so BOTH rails stay
+    // fully on-screen with a clear PCB-visible gap between them, and so
+    // cross ties never become wide enough to overlap each other into a
+    // continuous tan/orange slab in the viewport.
+    var roadHalfFG = w * 0.22;
     var roadHalfH  = w * 0.012;
     for (var i = 0; i <= SAMPLE_COUNT; i++) {
       var z = i / SAMPLE_COUNT;
@@ -281,7 +288,12 @@
       var halfW = roadHalfH + (roadHalfFG - roadHalfH) * pp;
       var lat = curveLateralAt(z, t, sectionPos);
       var lift = curveLiftAt(z, t, sectionPos);
-      var centerX = w * 0.5 + lat * halfW * 1.55;
+      // Clamp lateral excursion so the rail centerline never sweeps off
+      // the viewport. Prevents the perceived "ramp" silhouette where rails
+      // disappear past the screen edges and the area between them reads as
+      // a continuous filled slab.
+      var clampedLat = Math.max(-1, Math.min(1, lat));
+      var centerX = w * 0.5 + clampedLat * halfW * 0.85;
       var groundY = horizonY + (h - horizonY) * pp - lift * (h - horizonY) * 0.50 * pp;
       var s = samples[i];
       s.z = z;
@@ -1110,19 +1122,22 @@
     drawRailBeam( RAIL_OUTER, "rgba(255,58,58,1)", "rgba(255,150,150,0.95)", "rgba(255,220,220,0.95)");
 
     // ---- 3) Cross ties: drawn AFTER rails so they sit ON TOP of the
-    //         beams and visibly bridge the gap. Each tie is a thick
-    //         perpendicular copper/graphite bar with a slanted bank
-    //         angle on turns (because tL.y and tR.y differ on banked
-    //         sections). Discrete bars, never a continuous strip. ----
-    var TIES = 22;
-    var tiePhase = (t * 0.18) % (1 / TIES);
+    //         beams and visibly bridge the gap. Each tie is a discrete
+    //         perpendicular copper/graphite bar. Count and thickness are
+    //         deliberately low so consecutive ties NEVER overlap in
+    //         screen space (which would otherwise merge into a continuous
+    //         filled slab). The PCB substrate must remain visible between
+    //         ties as well as between the two rails. ----
+    var TIES = 11;
+    var tiePhase = (t * 0.10) % (1 / TIES);
     for (var ti = 0; ti < TIES; ti++) {
       var tz = (ti / TIES + tiePhase);
       if (tz <= 0.04 || tz >= 0.98) continue;
       var tL = projectSample(tz, -RAIL_OUTER);
       var tR = projectSample(tz,  RAIL_OUTER);
-      // Perpendicular bar: thicker than rails so it reads as crossing them.
-      var tieThick = Math.max(4, tL.halfW * 0.075);
+      // Discrete perpendicular bar. Thickness clamped low so adjacent
+      // ties never bleed into each other in the foreground.
+      var tieThick = Math.max(3, Math.min(9, tL.halfW * 0.025));
       // dx/dy for a perpendicular offset (so we can draw a thick
       // rectangle as a 4-vertex polygon — a true bar shape rather than
       // a thin stroke).
