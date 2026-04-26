@@ -203,88 +203,248 @@ DISTRICTS.filter(d => d.id !== "spire").forEach(d => {
 // energy column rises tall and bright behind/around the hero card.
 addEnergyNode(0, 0, 0xff2a2a, 14, { heroBoost: true });
 
-// ---------- DATA PULSES (electric current flowing along the roads) ----------
-// Three packet classes for visible hierarchy: micro pulses (electricity feel),
-// route packets (white-hot), and command packets (large, district-tinted).
-const microGeo = new THREE.SphereGeometry(0.9, 8, 8);
-const routeGeo = new THREE.SphereGeometry(1.6, 12, 12);
-const commandGeo = new THREE.SphereGeometry(2.6, 14, 14);
-const packetMatWhite = new THREE.MeshBasicMaterial({ color: 0xffffff });
-const packetMatElectric = new THREE.MeshBasicMaterial({ color: 0x9ff8ff });
+// ---------- RACING CURRENT (electric current streaking along the roads) ----------
+// Streaks are stretched along the segment direction so the current reads as
+// motion lines rather than balls. Three classes:
+//   - streak: long stretched bar of light (the racing feel)
+//   - pulse: bright white-hot core dot
+//   - command: district-tinted larger streak
+// All use additive blending so they bloom into each other and read as flowing
+// electricity. Speed scales with scroll velocity for a "we're racing" feel.
+const streakGeo = new THREE.BoxGeometry(1, 0.4, 1.2);   // unit box, scaled per-frame to stretch along axis
+const pulseGeo  = new THREE.SphereGeometry(0.9, 8, 8);
+const commandStreakGeo = new THREE.BoxGeometry(1, 0.55, 1.6);
+const packetMatWhite    = new THREE.MeshBasicMaterial({ color: 0xffffff,  transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
+const packetMatElectric = new THREE.MeshBasicMaterial({ color: 0x9ff8ff,  transparent: true, opacity: 0.9,  blending: THREE.AdditiveBlending, depthWrite: false });
 const packets = [];
-const PACKET_COUNT = lowPower ? 110 : 280;
+const PACKET_COUNT = lowPower ? 130 : 320;
 for (let i = 0; i < PACKET_COUNT; i++) {
   const route = roadPaths[i % roadPaths.length];
   let geo, mat;
   const cls = i % 7;
   if (cls === 0) {
-    // Command packet — district-tinted, larger, slower
-    geo = commandGeo;
-    mat = new THREE.MeshBasicMaterial({ color: route.color });
+    // Command streak — district-tinted, larger, slower
+    geo = commandStreakGeo;
+    mat = new THREE.MeshBasicMaterial({ color: route.color, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
   } else if (cls === 1 || cls === 2) {
-    // Route packet — white-hot
-    geo = routeGeo;
+    // Pulse — white-hot dot
+    geo = pulseGeo;
     mat = packetMatWhite;
   } else {
-    // Micro pulse — electric cyan, fast, small
-    geo = microGeo;
+    // Streak — electric cyan, stretched, fast
+    geo = streakGeo;
     mat = packetMatElectric;
   }
   const p = new THREE.Mesh(geo, mat);
   const isCmd = cls === 0;
+  const isStreak = cls >= 3;
   p.userData = {
     route,
     t: Math.random(),
-    speed: isCmd ? 0.05 + Math.random() * 0.06 : 0.09 + Math.random() * 0.18,
+    // Faster baseline so the road feels like current racing along it
+    speed: isCmd ? 0.10 + Math.random() * 0.10 : 0.22 + Math.random() * 0.32,
     isCmd,
-    isMicro: cls >= 3
+    isStreak,
+    streakLen: isCmd ? 9 + Math.random() * 4 : 12 + Math.random() * 8
   };
   scene.add(p);
   packets.push(p);
 }
-function updatePackets(dt) {
+function updatePackets(dt, speedBoost) {
   for (const p of packets) {
-    p.userData.t += dt * p.userData.speed;
+    p.userData.t += dt * p.userData.speed * speedBoost;
     if (p.userData.t > 1) p.userData.t = 0;
     const t = p.userData.t;
     const pts = p.userData.route.points;
-    // Two segments per route: 0..0.5 = pts[0]->pts[1], 0.5..1 = pts[1]->pts[2]
     let from, to, lt;
     if (t < 0.5) { from = pts[0]; to = pts[1]; lt = t / 0.5; }
     else         { from = pts[1]; to = pts[2]; lt = (t - 0.5) / 0.5; }
-    // Command packets fly slightly higher than micro pulses, giving altitude
-    // separation and an antigravity-style sense of layered traffic.
-    const lift = p.userData.isCmd ? 1.6 : (p.userData.isMicro ? 0.4 : 0.7);
+    const lift = p.userData.isCmd ? 1.6 : (p.userData.isStreak ? 0.55 : 0.8);
     p.position.set(
       THREE.MathUtils.lerp(from.x, to.x, lt),
       ROAD_Y + lift,
       THREE.MathUtils.lerp(from.z, to.z, lt)
     );
+    // Stretch the streak along its segment direction so it reads as a motion line
+    if (p.userData.isStreak || p.userData.isCmd) {
+      const horizontal = Math.abs(to.x - from.x) > Math.abs(to.z - from.z);
+      const len = p.userData.streakLen * (1 + (speedBoost - 1) * 0.6);
+      if (horizontal) { p.scale.set(len, 1, 1); }
+      else            { p.scale.set(1, 1, len); }
+    }
   }
 }
 
-// ---------- BUILDINGS ----------
+// ---------- BUILDINGS (high-tech architecture) ----------
+// Shared helpers that turn any base box into a "high-tech building":
+//   - layered base plinth
+//   - vertical light strips on all faces (window mullions / light columns)
+//   - emissive horizontal floor bands (window rows)
+//   - antenna/mast on top with blinking aircraft warning
+//   - glowing roof cap and side detail
+const BUILDING_BASE_COLOR = 0x0a1424;
+
+function addLightStripsToBox(group, w, h, depth, baseY, color) {
+  // Vertical light strips on the four faces — read as window columns
+  const stripColor = color;
+  const stripCount = 4;
+  for (let face = 0; face < 4; face++) {
+    const horizontal = face === 0 || face === 2; // facing +z or -z
+    const sign = (face === 1 || face === 2) ? -1 : 1;
+    for (let i = 1; i <= stripCount; i++) {
+      const t = i / (stripCount + 1);
+      const offset = (t - 0.5) * (horizontal ? w : depth) * 0.95;
+      const strip = new THREE.Mesh(
+        new THREE.BoxGeometry(horizontal ? 0.4 : 0.25, h * 0.85, horizontal ? 0.25 : 0.4),
+        new THREE.MeshBasicMaterial({ color: stripColor, transparent: true, opacity: 0.85 })
+      );
+      if (horizontal) {
+        strip.position.set(offset, baseY + h * 0.5, sign * (depth * 0.5 + 0.15));
+      } else {
+        strip.position.set(sign * (w * 0.5 + 0.15), baseY + h * 0.5, offset);
+      }
+      group.add(strip);
+    }
+  }
+  // Horizontal floor bands — emissive rings at every "floor", reads as window rows
+  const floors = Math.max(3, Math.floor(h / 6));
+  for (let f = 1; f < floors; f++) {
+    const fy = baseY + (f / floors) * h;
+    const band = new THREE.Mesh(
+      new THREE.BoxGeometry(w + 0.2, 0.18, depth + 0.2),
+      new THREE.MeshBasicMaterial({ color: stripColor, transparent: true, opacity: 0.42 })
+    );
+    band.position.set(0, fy, 0);
+    group.add(band);
+  }
+}
+
+function addRooftopGear(group, w, h, depth, baseY, color) {
+  // Roof cap — slightly inset, brighter
+  const cap = new THREE.Mesh(
+    new THREE.BoxGeometry(w * 0.78, 1.4, depth * 0.78),
+    new THREE.MeshStandardMaterial({ color: 0x0d1828, metalness: 0.7, roughness: 0.35, emissive: new THREE.Color(color), emissiveIntensity: 0.5 })
+  );
+  cap.position.set(0, baseY + h + 0.7, 0);
+  group.add(cap);
+  // HVAC / equipment cube on roof
+  const box = new THREE.Mesh(
+    new THREE.BoxGeometry(w * 0.35, 2.2, depth * 0.4),
+    new THREE.MeshStandardMaterial({ color: 0x0a1424, metalness: 0.6, roughness: 0.45 })
+  );
+  box.position.set(-w * 0.18, baseY + h + 2.4, depth * 0.12);
+  group.add(box);
+  // Antenna mast
+  const mast = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.18, 0.18, h * 0.32, 6),
+    new THREE.MeshStandardMaterial({ color: 0x202833, metalness: 0.8, roughness: 0.3 })
+  );
+  mast.position.set(w * 0.25, baseY + h + 1.4 + h * 0.16, depth * 0.05);
+  group.add(mast);
+  // Aircraft warning beacon at mast tip
+  const beacon = new THREE.Mesh(
+    new THREE.SphereGeometry(0.55, 10, 10),
+    new THREE.MeshBasicMaterial({ color: 0xff2a2a })
+  );
+  beacon.position.set(mast.position.x, mast.position.y + h * 0.16 * 0.5 + 0.6, mast.position.z);
+  group.add(beacon);
+}
+
+function makeHighTechBuilding(w, h, depth, baseY, color) {
+  // Returns a group at origin (0,0,0) representing one high-tech building of
+  // given footprint. Caller positions/offsets it. baseY is where the building's
+  // base sits (usually 0). Total height including plinth roughly = h + plinth.
+  const g = new THREE.Group();
+  const col = new THREE.Color(color);
+  // Plinth — wider, short layered base
+  const plinthH = 2.4;
+  const plinth = new THREE.Mesh(
+    new THREE.BoxGeometry(w * 1.18, plinthH, depth * 1.18),
+    new THREE.MeshStandardMaterial({ color: 0x081320, metalness: 0.55, roughness: 0.55, emissive: col, emissiveIntensity: 0.18 })
+  );
+  plinth.position.set(0, baseY + plinthH / 2, 0);
+  g.add(plinth);
+  // Plinth glowing edge ring
+  const plinthEdge = new THREE.Mesh(
+    new THREE.BoxGeometry(w * 1.22, 0.18, depth * 1.22),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85 })
+  );
+  plinthEdge.position.set(0, baseY + plinthH, 0);
+  g.add(plinthEdge);
+  // Main body
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, depth),
+    new THREE.MeshStandardMaterial({ color: BUILDING_BASE_COLOR, roughness: 0.5, metalness: 0.7, emissive: col, emissiveIntensity: 0.18 })
+  );
+  body.position.set(0, baseY + plinthH + h / 2, 0);
+  g.add(body);
+  // Light strips + window bands
+  addLightStripsToBox(g, w, h, depth, baseY + plinthH, color);
+  // Rooftop gear
+  addRooftopGear(g, w, h, depth, baseY + plinthH, color);
+  return g;
+}
+
 function makeTower(d) {
-  const g = new THREE.Group(); const count = d.kind === "plaza" ? 6 : d.kind === "chip" ? 4 : 3; const col = new THREE.Color(d.color);
+  // High-tech cluster of 3-6 buildings of varying heights. Positions stay
+  // within ~60u of the district center to preserve the original composition.
+  const g = new THREE.Group();
+  const count = d.kind === "plaza" ? 6 : d.kind === "chip" ? 4 : 3;
+  // Deterministic spread using a seeded pattern so towers don't shuffle each load
+  const slots = [
+    [-22, -18], [22, -22], [-18, 22], [22, 24], [0, 0], [-2, 30]
+  ];
   for (let i = 0; i < count; i++) {
-    const w = 10 + Math.random() * 10, h = d.tall * (0.5 + Math.random() * 0.8);
-    const box = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), new THREE.MeshStandardMaterial({ color: 0x0a1424, roughness: 0.5, metalness: 0.6, emissive: col, emissiveIntensity: 0.12 }));
-    box.position.set((Math.random() - 0.5) * 60, h / 2, (Math.random() - 0.5) * 60); g.add(box);
-    const cap = new THREE.Mesh(new THREE.BoxGeometry(w * 0.6, 1.2, w * 0.6), new THREE.MeshBasicMaterial({ color: d.color }));
-    cap.position.set(box.position.x, h + 0.6, box.position.z); g.add(cap);
-    const stripes = new THREE.Mesh(new THREE.BoxGeometry(w + 0.05, h * 0.9, 0.2), new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.35 }));
-    stripes.position.set(box.position.x, h / 2, box.position.z + w / 2 + 0.1); g.add(stripes);
+    const w = 12 + (i % 2) * 5;
+    const depth = 12 + ((i + 1) % 2) * 4;
+    const h = d.tall * (0.55 + (i / count) * 0.55);
+    const slot = slots[i % slots.length];
+    const bldg = makeHighTechBuilding(w, h, depth, 0, d.color);
+    bldg.position.set(slot[0], 0, slot[1]);
+    g.add(bldg);
   }
   return g;
 }
 function makeAntenna(d) {
+  // High-tech comms tower — segmented mast with truss collars, dish, and lit cab
   const g = new THREE.Group();
-  const cone = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 14, d.tall, 6), new THREE.MeshStandardMaterial({ color: 0x0a1424, emissive: new THREE.Color(d.color), emissiveIntensity: 0.25, metalness: 0.6, roughness: 0.4 }));
-  cone.position.y = d.tall / 2; g.add(cone);
+  const col = new THREE.Color(d.color);
+  // Hex base building (the cab where techs would work)
+  const cab = makeHighTechBuilding(22, d.tall * 0.32, 22, 0, d.color);
+  g.add(cab);
+  const cabTop = 2.4 + d.tall * 0.32;
+  // Segmented mast rising from cab roof
+  const mastH = d.tall - cabTop * 0.6;
+  const mast = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.4, 2.4, mastH, 8),
+    new THREE.MeshStandardMaterial({ color: 0x0a1424, emissive: col, emissiveIntensity: 0.35, metalness: 0.7, roughness: 0.35 })
+  );
+  mast.position.y = cabTop + mastH / 2;
+  g.add(mast);
+  // Truss collars + transmitter rings climbing the mast
   for (let i = 0; i < 4; i++) {
-    const r = new THREE.Mesh(new THREE.TorusGeometry(10 + i * 4, 0.25, 8, 48), new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.55 - i * 0.1 }));
-    r.rotation.x = Math.PI / 2; r.position.y = 6 + i * 6; g.add(r);
-  } return g;
+    const ringY = cabTop + mastH * (0.2 + i * 0.18);
+    const collar = new THREE.Mesh(
+      new THREE.TorusGeometry(6 + i * 1.2, 0.45, 8, 24),
+      new THREE.MeshStandardMaterial({ color: 0x18222e, metalness: 0.7, roughness: 0.4, emissive: col, emissiveIntensity: 0.4 })
+    );
+    collar.rotation.x = Math.PI / 2; collar.position.y = ringY; g.add(collar);
+  }
+  // Dish array near the top
+  const dish = new THREE.Mesh(
+    new THREE.CylinderGeometry(5, 3, 1.2, 24, 1, true),
+    new THREE.MeshStandardMaterial({ color: 0x111923, metalness: 0.7, roughness: 0.45, side: THREE.DoubleSide })
+  );
+  dish.rotation.x = Math.PI / 2;
+  dish.position.set(4.5, cabTop + mastH * 0.78, 0);
+  g.add(dish);
+  // Tip beacon
+  const tip = new THREE.Mesh(
+    new THREE.SphereGeometry(0.9, 12, 12),
+    new THREE.MeshBasicMaterial({ color: 0xff2a2a })
+  );
+  tip.position.y = cabTop + mastH + 0.7; g.add(tip);
+  return g;
 }
 function makePlaza(d) {
   const g = makeTower(d);
@@ -292,53 +452,274 @@ function makePlaza(d) {
   wall.position.set(0, 7, -14); g.add(wall); return g;
 }
 function makeVault(d) {
+  // High-tech vault — octagonal stepped tower, glowing energy core inside,
+  // ringed observation deck, glowing seam between layers.
   const g = new THREE.Group();
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(22, 24, 14, 8), new THREE.MeshStandardMaterial({ color: 0x141a0b, emissive: new THREE.Color(d.color), emissiveIntensity: 0.25, metalness: 0.7, roughness: 0.4 }));
-  base.position.y = 7; g.add(base);
-  const orb = new THREE.Mesh(new THREE.SphereGeometry(10, 32, 32), new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.35 }));
-  orb.position.y = 22; g.add(orb); return g;
+  const col = new THREE.Color(d.color);
+  // Stepped octagonal base
+  const baseH = 10;
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(24, 26, baseH, 8),
+    new THREE.MeshStandardMaterial({ color: 0x0c1626, emissive: col, emissiveIntensity: 0.25, metalness: 0.75, roughness: 0.35 })
+  );
+  base.position.y = baseH / 2; g.add(base);
+  // Mid section — narrower drum
+  const midH = 14;
+  const mid = new THREE.Mesh(
+    new THREE.CylinderGeometry(18, 20, midH, 8),
+    new THREE.MeshStandardMaterial({ color: 0x0a1424, emissive: col, emissiveIntensity: 0.3, metalness: 0.7, roughness: 0.4 })
+  );
+  mid.position.y = baseH + midH / 2; g.add(mid);
+  // Vertical seam strips around the drum
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    const seam = new THREE.Mesh(
+      new THREE.BoxGeometry(0.45, midH * 0.85, 0.45),
+      new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.85 })
+    );
+    seam.position.set(Math.cos(a) * 19, baseH + midH / 2, Math.sin(a) * 19);
+    g.add(seam);
+  }
+  // Glowing seam ring at top of mid
+  const ringSeam = new THREE.Mesh(
+    new THREE.TorusGeometry(19, 0.5, 8, 32),
+    new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.95 })
+  );
+  ringSeam.rotation.x = Math.PI / 2;
+  ringSeam.position.y = baseH + midH;
+  g.add(ringSeam);
+  // Energy core orb
+  const orb = new THREE.Mesh(
+    new THREE.SphereGeometry(7, 24, 24),
+    new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.7 })
+  );
+  orb.position.y = baseH + midH + 7; g.add(orb);
+  // Containment cage around orb (thin ring)
+  const cage = new THREE.Mesh(
+    new THREE.TorusGeometry(9, 0.25, 6, 32),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 })
+  );
+  cage.rotation.x = Math.PI / 2;
+  cage.position.y = baseH + midH + 7; g.add(cage);
+  return g;
 }
 function makeChip(d) {
+  // High-tech data center / chip campus — base chip plate + multiple high-tech
+  // building blocks rising from its surface, plus a central glowing data core.
   const g = new THREE.Group();
-  const chip = new THREE.Mesh(new THREE.BoxGeometry(46, 6, 46), new THREE.MeshStandardMaterial({ color: 0x0b1018, metalness: 0.7, roughness: 0.3, emissive: new THREE.Color(d.color), emissiveIntensity: 0.15 }));
-  chip.position.y = 3; g.add(chip);
+  const col = new THREE.Color(d.color);
+  // Base chip pad (the "campus floor")
+  const chip = new THREE.Mesh(
+    new THREE.BoxGeometry(46, 4, 46),
+    new THREE.MeshStandardMaterial({ color: 0x0b1018, metalness: 0.75, roughness: 0.3, emissive: col, emissiveIntensity: 0.18 })
+  );
+  chip.position.y = 2; g.add(chip);
+  // Chip-edge connector pins (grounding strips)
   for (let i = -5; i <= 5; i++) for (const side of [-1, 1]) {
-    const pin = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.4, 3), new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 1, roughness: 0.3 }));
-    pin.position.set(i * 3.6, 3, side * 24); g.add(pin);
-    const pin2 = new THREE.Mesh(new THREE.BoxGeometry(3, 1.4, 1.4), new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 1, roughness: 0.3 }));
-    pin2.position.set(side * 24, 3, i * 3.6); g.add(pin2);
+    const pin = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.2, 2.4), new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 1, roughness: 0.3 }));
+    pin.position.set(i * 3.6, 2, side * 24); g.add(pin);
+    const pin2 = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.2, 1.4), new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 1, roughness: 0.3 }));
+    pin2.position.set(side * 24, 2, i * 3.6); g.add(pin2);
   }
-  const logo = new THREE.Mesh(new THREE.BoxGeometry(14, 14, 14), new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.55 }));
-  logo.position.y = 14; g.add(logo); return g;
+  // Glowing border edge on chip top
+  const border = new THREE.Mesh(
+    new THREE.BoxGeometry(46.2, 0.3, 46.2),
+    new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.65 })
+  );
+  border.position.y = 4.1; g.add(border);
+  // Four tall data-center buildings around a central core
+  const slots = [[-12, -12], [12, -12], [-12, 12], [12, 12]];
+  slots.forEach(([sx, sz], i) => {
+    const w = 9, depth = 9, h = d.tall * (0.7 + (i * 0.12));
+    const bldg = makeHighTechBuilding(w, h, depth, 4, d.color);
+    bldg.position.set(sx, 0, sz);
+    g.add(bldg);
+  });
+  // Central data core — translucent obelisk with white-hot inner shaft
+  const coreOuter = new THREE.Mesh(
+    new THREE.BoxGeometry(10, 18, 10),
+    new THREE.MeshStandardMaterial({ color: 0x081320, metalness: 0.7, roughness: 0.3, emissive: col, emissiveIntensity: 0.4, transparent: true, opacity: 0.85 })
+  );
+  coreOuter.position.y = 4 + 9; g.add(coreOuter);
+  const coreInner = new THREE.Mesh(
+    new THREE.BoxGeometry(2.2, 17, 2.2),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 })
+  );
+  coreInner.position.y = 4 + 9; g.add(coreInner);
+  return g;
 }
 function makeBridge(d) {
-  const g = makeTower(d);
-  const arch = new THREE.Mesh(new THREE.TorusGeometry(28, 1.2, 12, 48, Math.PI), new THREE.MeshBasicMaterial({ color: d.color }));
-  arch.rotation.z = Math.PI; arch.position.y = 28; g.add(arch); return g;
+  // Twin high-tech towers connected by an arched skybridge with running lights
+  const g = new THREE.Group();
+  const col = new THREE.Color(d.color);
+  // Two towers
+  const left = makeHighTechBuilding(13, d.tall, 13, 0, d.color);
+  left.position.set(-22, 0, 0); g.add(left);
+  const right = makeHighTechBuilding(13, d.tall, 13, 0, d.color);
+  right.position.set(22, 0, 0); g.add(right);
+  // Arched skybridge connecting them
+  const arch = new THREE.Mesh(
+    new THREE.TorusGeometry(22, 1.6, 12, 48, Math.PI),
+    new THREE.MeshStandardMaterial({ color: 0x101a26, metalness: 0.7, roughness: 0.4, emissive: col, emissiveIntensity: 0.35 })
+  );
+  arch.rotation.z = Math.PI;
+  arch.position.y = d.tall * 0.7;
+  g.add(arch);
+  // Running lights along the arch underside
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * Math.PI;
+    const lx = -22 + Math.cos(Math.PI - a) * 22;
+    const ly = d.tall * 0.7 - Math.sin(a) * 22;
+    if (ly < 1) continue;
+    const dot = new THREE.Mesh(
+      new THREE.SphereGeometry(0.5, 8, 8),
+      new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.95 })
+    );
+    dot.position.set(lx, ly - 1.4, 0); g.add(dot);
+  }
+  // Bridge platform at midspan
+  const platform = new THREE.Mesh(
+    new THREE.BoxGeometry(46, 1.6, 6),
+    new THREE.MeshStandardMaterial({ color: 0x0a1424, metalness: 0.7, roughness: 0.4, emissive: col, emissiveIntensity: 0.3 })
+  );
+  platform.position.y = d.tall * 0.7 - 0.8;
+  g.add(platform);
+  return g;
 }
 function makePad(d) {
+  // High-tech docking / launch pad — layered platform, glowing landing ring,
+  // clamps around the perimeter, central uplink beam, and small support kiosks.
   const g = new THREE.Group();
-  const pad = new THREE.Mesh(new THREE.CylinderGeometry(20, 20, 1.4, 32), new THREE.MeshStandardMaterial({ color: 0x0a1424, emissive: new THREE.Color(d.color), emissiveIntensity: 0.3 }));
-  g.add(pad);
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(24, 0.6, 12, 64), new THREE.MeshBasicMaterial({ color: d.color }));
-  ring.rotation.x = Math.PI / 2; ring.position.y = 1.2; g.add(ring);
-  const beam = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 80, 16, 1, true), new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.25, side: THREE.DoubleSide }));
-  beam.position.y = 40; g.add(beam); return g;
+  const col = new THREE.Color(d.color);
+  // Main pad platform
+  const pad = new THREE.Mesh(
+    new THREE.CylinderGeometry(20, 22, 2.2, 32),
+    new THREE.MeshStandardMaterial({ color: 0x0a1424, emissive: col, emissiveIntensity: 0.35, metalness: 0.7, roughness: 0.4 })
+  );
+  pad.position.y = 1.1; g.add(pad);
+  // Inner glowing landing ring
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(16, 0.55, 12, 64),
+    new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.95 })
+  );
+  ring.rotation.x = Math.PI / 2; ring.position.y = 2.3; g.add(ring);
+  // Outer rim ring
+  const rim = new THREE.Mesh(
+    new THREE.TorusGeometry(22, 0.4, 8, 64),
+    new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.7 })
+  );
+  rim.rotation.x = Math.PI / 2; rim.position.y = 2.3; g.add(rim);
+  // 6 docking clamps around perimeter
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    const clamp = new THREE.Mesh(
+      new THREE.BoxGeometry(2.4, 4, 2.4),
+      new THREE.MeshStandardMaterial({ color: 0x101a26, metalness: 0.8, roughness: 0.35, emissive: col, emissiveIntensity: 0.4 })
+    );
+    clamp.position.set(Math.cos(a) * 22, 4.1, Math.sin(a) * 22);
+    g.add(clamp);
+    const tipLight = new THREE.Mesh(
+      new THREE.SphereGeometry(0.5, 8, 8),
+      new THREE.MeshBasicMaterial({ color: d.color })
+    );
+    tipLight.position.set(Math.cos(a) * 22, 6.3, Math.sin(a) * 22);
+    g.add(tipLight);
+  }
+  // Central uplink beam (taller, brighter)
+  const beam = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.6, 1.6, 110, 18, 1, true),
+    new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false })
+  );
+  beam.position.y = 55; g.add(beam);
+  const beamCore = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.4, 0.4, 100, 8, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, side: THREE.DoubleSide })
+  );
+  beamCore.position.y = 50; g.add(beamCore);
+  return g;
 }
 function makeSpire(d) {
+  // High-tech HQ spire — layered tapered tower with vertical light columns,
+  // glowing seam rings between sections, observation deck near top, and a
+  // bright energy spire tip.
   const g = new THREE.Group();
-  const base = new THREE.Mesh(new THREE.BoxGeometry(80, 4, 80), new THREE.MeshStandardMaterial({ color: 0x0a1424, metalness: 0.6, roughness: 0.4, emissive: new THREE.Color(d.color), emissiveIntensity: 0.1 }));
+  const col = new THREE.Color(d.color);
+  // Plaza base
+  const base = new THREE.Mesh(
+    new THREE.BoxGeometry(86, 4, 86),
+    new THREE.MeshStandardMaterial({ color: 0x081320, metalness: 0.65, roughness: 0.4, emissive: col, emissiveIntensity: 0.16 })
+  );
   base.position.y = 2; g.add(base);
+  // Glowing base edge
+  const baseEdge = new THREE.Mesh(
+    new THREE.BoxGeometry(88, 0.3, 88),
+    new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.85 })
+  );
+  baseEdge.position.y = 4.1; g.add(baseEdge);
   const sections = 7;
   for (let i = 0; i < sections; i++) {
-    const w = 42 - i * 4, h = 13;
-    const sec = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), new THREE.MeshStandardMaterial({ color: 0x0b1018, metalness: 0.8, roughness: 0.25, emissive: new THREE.Color(d.color), emissiveIntensity: 0.15 }));
+    const w = 42 - i * 4;
+    const h = 13;
+    const sec = new THREE.Mesh(
+      new THREE.BoxGeometry(w, h, w),
+      new THREE.MeshStandardMaterial({ color: 0x0b1018, metalness: 0.85, roughness: 0.25, emissive: col, emissiveIntensity: 0.18 })
+    );
     sec.position.y = 4 + i * h + h / 2; g.add(sec);
-    const seam = new THREE.Mesh(new THREE.BoxGeometry(w + 0.1, 0.5, w + 0.1), new THREE.MeshBasicMaterial({ color: d.color }));
+    // Vertical light columns on every face
+    for (const sign of [-1, 1]) {
+      for (let j = -1; j <= 1; j++) {
+        const offset = j * (w * 0.32);
+        const sx = new THREE.Mesh(
+          new THREE.BoxGeometry(0.35, h * 0.85, 0.25),
+          new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.85 })
+        );
+        sx.position.set(offset, 4 + i * h + h / 2, sign * (w * 0.5 + 0.15));
+        g.add(sx);
+        const sz = new THREE.Mesh(
+          new THREE.BoxGeometry(0.25, h * 0.85, 0.35),
+          new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.85 })
+        );
+        sz.position.set(sign * (w * 0.5 + 0.15), 4 + i * h + h / 2, offset);
+        g.add(sz);
+      }
+    }
+    // Glowing seam ring at section top
+    const seam = new THREE.Mesh(
+      new THREE.BoxGeometry(w + 0.4, 0.5, w + 0.4),
+      new THREE.MeshBasicMaterial({ color: d.color })
+    );
     seam.position.y = 4 + i * h + h; g.add(seam);
   }
-  const tip = new THREE.Mesh(new THREE.ConeGeometry(1.4, 16, 6), new THREE.MeshBasicMaterial({ color: d.color }));
-  tip.position.y = 4 + sections * 13 + 8; g.add(tip); return g;
+  // Observation deck near top — wider disc
+  const deck = new THREE.Mesh(
+    new THREE.CylinderGeometry(20, 20, 2.4, 24),
+    new THREE.MeshStandardMaterial({ color: 0x0a1424, metalness: 0.75, roughness: 0.35, emissive: col, emissiveIntensity: 0.45 })
+  );
+  deck.position.y = 4 + sections * 13 + 1.2; g.add(deck);
+  const deckRing = new THREE.Mesh(
+    new THREE.TorusGeometry(20, 0.45, 8, 48),
+    new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.95 })
+  );
+  deckRing.rotation.x = Math.PI / 2;
+  deckRing.position.y = 4 + sections * 13 + 2.4; g.add(deckRing);
+  // Energy spire tip
+  const tipBase = new THREE.Mesh(
+    new THREE.CylinderGeometry(2.4, 4, 8, 8),
+    new THREE.MeshStandardMaterial({ color: 0x0b1018, metalness: 0.85, roughness: 0.25, emissive: col, emissiveIntensity: 0.5 })
+  );
+  tipBase.position.y = 4 + sections * 13 + 6.4; g.add(tipBase);
+  const tip = new THREE.Mesh(
+    new THREE.ConeGeometry(1.4, 18, 8),
+    new THREE.MeshBasicMaterial({ color: d.color })
+  );
+  tip.position.y = 4 + sections * 13 + 19; g.add(tip);
+  // Apex beacon
+  const apex = new THREE.Mesh(
+    new THREE.SphereGeometry(0.9, 12, 12),
+    new THREE.MeshBasicMaterial({ color: 0xffffff })
+  );
+  apex.position.y = 4 + sections * 13 + 28; g.add(apex);
+  return g;
 }
 const builders = { tower: makeTower, antenna: makeAntenna, plaza: makePlaza, vault: makeVault, chip: makeChip, bridge: makeBridge, pad: makePad };
 
@@ -628,11 +1009,21 @@ function updateLabelEdgeSafety() {
 const clock = new THREE.Clock();
 const tmpPos = new THREE.Vector3(), tmpLook = new THREE.Vector3();
 let elapsed = 0;
+let lastProgress = 0;
+let scrollSpeed = 0; // smoothed |dProgress/dt|
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.05);
   elapsed += dt;
   // smooth scroll progress
   scrollProgress += (targetProgress - scrollProgress) * 0.08;
+  // Track scroll velocity to drive the racing-current speed boost. When the
+  // user scrolls, electricity along the roads accelerates and streaks stretch
+  // longer — selling the "we're racing along the circuit board" feeling.
+  const dProg = Math.abs(scrollProgress - lastProgress);
+  lastProgress = scrollProgress;
+  const instSpeed = dt > 0 ? dProg / dt : 0;
+  scrollSpeed += (instSpeed - scrollSpeed) * 0.18;
+  const speedBoost = 1 + Math.min(scrollSpeed * 22, 2.6); // 1x..3.6x
   // camera follows full path across 0..1
   posCurve.getPointAt(scrollProgress, tmpPos);
   lookCurve.getPointAt(scrollProgress, tmpLook);
@@ -673,7 +1064,7 @@ function tick() {
     w.mesh.rotation.x += dt * 0.4;
   }
 
-  updatePackets(dt);
+  updatePackets(dt, speedBoost);
   updateLabelEdgeSafety();
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
