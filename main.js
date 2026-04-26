@@ -41,6 +41,102 @@ gridFine.material.transparent = true; gridFine.material.opacity = lowPower ? 0.5
 const gridCoarse = new THREE.GridHelper(BOARD, 22, 0xff2a2a, 0x4a0c0c);
 gridCoarse.material.transparent = true; gridCoarse.material.opacity = lowPower ? 0.65 : 0.42; gridCoarse.position.y = 0.02; scene.add(gridCoarse);
 
+// ---------- PCB SUBSTRATE (etched chip traces, vias, edge pads) ----------
+// Subtle circuit-board detailing on the floor. Etched right-angle traces fanning
+// out across the board, glowing vias at intersections, and chip-edge pads near
+// the perimeter. Stays close to the floor (Y ~ 0.04..0.08) so it never competes
+// with the road, road nodes, or text/panels above. Mobile uses a sparser version
+// with brighter individual elements.
+const pcbBlinkers = []; // small via lights animated in tick
+function addPcbTrace(x1, z1, x2, z2, color, opacity = 0.32) {
+  const horizontal = Math.abs(x2 - x1) > Math.abs(z2 - z1);
+  const length = horizontal ? Math.abs(x2 - x1) : Math.abs(z2 - z1);
+  if (length < 4) return;
+  const cx = (x1 + x2) / 2;
+  const cz = (z1 + z2) / 2;
+  const w = horizontal ? length : 0.55;
+  const d = horizontal ? 0.55 : length;
+  const trace = new THREE.Mesh(
+    new THREE.BoxGeometry(w, 0.06, d),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity })
+  );
+  trace.position.set(cx, 0.04, cz);
+  scene.add(trace);
+}
+function addPcbVia(x, z, color, size = 1.0, blink = false) {
+  const via = new THREE.Mesh(
+    new THREE.CircleGeometry(size, 16),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85 })
+  );
+  via.rotation.x = -Math.PI / 2;
+  via.position.set(x, 0.06, z);
+  scene.add(via);
+  if (blink) pcbBlinkers.push({ mesh: via, phase: Math.random() * Math.PI * 2, base: 0.5 });
+}
+function addPcbChipPad(x, z, color) {
+  // Tiny rectangular SMT-style chip with two rows of pin pads
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(8, 0.5, 14),
+    new THREE.MeshStandardMaterial({ color: 0x05080d, metalness: 0.85, roughness: 0.35, emissive: new THREE.Color(color), emissiveIntensity: 0.25 })
+  );
+  body.position.set(x, 0.3, z);
+  scene.add(body);
+  for (let i = -2; i <= 2; i++) for (const side of [-1, 1]) {
+    const pin = new THREE.Mesh(
+      new THREE.BoxGeometry(1.2, 0.18, 1.2),
+      new THREE.MeshStandardMaterial({ color: 0xb8c2cc, metalness: 1, roughness: 0.35 })
+    );
+    pin.position.set(x + side * 5.4, 0.18, z + i * 2.4);
+    scene.add(pin);
+  }
+  // glowing label dot on top corner
+  const dot = new THREE.Mesh(
+    new THREE.CircleGeometry(0.8, 12),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95 })
+  );
+  dot.rotation.x = -Math.PI / 2;
+  dot.position.set(x - 2.4, 0.56, z - 5.2);
+  scene.add(dot);
+}
+// Etched perpendicular trace fans behind each district (stay outside the road
+// corridor so they don't fight the road art). Mobile version uses fewer but
+// brighter traces so it still reads.
+const TRACE_LANES = lowPower ? 3 : 5;
+const TRACE_SPACING = 28;
+DISTRICTS.filter(d => d.id !== "spire").forEach(d => {
+  const dx = d.pos[0], dz = d.pos[2];
+  const sgnX = Math.sign(dx) || 1;
+  const sgnZ = Math.sign(dz) || 1;
+  // Short perpendicular traces fanning off the road L-corner toward open board
+  for (let i = 1; i <= TRACE_LANES; i++) {
+    const off = i * TRACE_SPACING;
+    // run perpendicular to the long axis of approach
+    addPcbTrace(dx - sgnX * 60, dz + off * sgnZ * 0.35, dx - sgnX * 60 + sgnX * 90, dz + off * sgnZ * 0.35, d.color, 0.22);
+    addPcbVia(dx - sgnX * 60 + sgnX * 90, dz + off * sgnZ * 0.35, d.color, 1.4, true);
+  }
+  // Right-angle stub trace pair near each district perimeter
+  addPcbTrace(dx + sgnX * 36, dz - sgnZ * 26, dx + sgnX * 36, dz - sgnZ * 76, d.color, 0.28);
+  addPcbTrace(dx + sgnX * 36, dz - sgnZ * 76, dx + sgnX * 96, dz - sgnZ * 76, d.color, 0.28);
+  addPcbVia(dx + sgnX * 96, dz - sgnZ * 76, d.color, 1.6, true);
+});
+// Edge-of-board chip pads (subtle SMT components dotted around the rim).
+// Cyan and red mix on graphite, no purple.
+const PCB_EDGE_CHIPS = lowPower
+  ? [[ -780, -640, 0x4ff3ff ], [ 780, -640, 0xff2a2a ], [ -780, 640, 0xff2a2a ], [ 780, 640, 0x4ff3ff ]]
+  : [
+      [ -780, -640, 0x4ff3ff ], [ -640, -780, 0xff2a2a ],
+      [  780, -640, 0xff2a2a ], [  640, -780, 0x4ff3ff ],
+      [ -780,  640, 0xff2a2a ], [ -640,  780, 0x4ff3ff ],
+      [  780,  640, 0x4ff3ff ], [  640,  780, 0xff2a2a ]
+    ];
+PCB_EDGE_CHIPS.forEach(([x, z, c]) => addPcbChipPad(x, z, c));
+// A handful of glowing standalone vias scattered on the substrate at deterministic
+// spots — pure decoration, blinks gently like LED indicators on a motherboard.
+const PCB_LED_SPOTS = lowPower
+  ? [ [220, 240], [-220, -240], [340, -120], [-340, 120] ]
+  : [ [220, 240], [-220, -240], [340, -120], [-340, 120], [120, -340], [-120, 340], [500, 60], [-500, -60] ];
+PCB_LED_SPOTS.forEach(([x, z], i) => addPcbVia(x, z, i % 2 ? 0x4ff3ff : 0xff2a2a, 1.2, true));
+
 // ---------- ELECTRIFIED ROAD ----------
 // Replace simple traces with a multi-layer "road":
 //   - dark asphalt strip (the road surface)
@@ -332,6 +428,10 @@ function addLightStripsToBox(group, w, h, depth, baseY, color) {
   }
 }
 
+// Tracks port lights / core pulses we want to blink in the tick loop.
+const buildingBlinkers = [];
+const buildingCores = [];
+
 function addRooftopGear(group, w, h, depth, baseY, color) {
   // Roof cap — slightly inset, brighter
   const cap = new THREE.Mesh(
@@ -361,6 +461,97 @@ function addRooftopGear(group, w, h, depth, baseY, color) {
   );
   beacon.position.set(mast.position.x, mast.position.y + h * 0.16 * 0.5 + 0.6, mast.position.z);
   group.add(beacon);
+  buildingBlinkers.push({ mesh: beacon, phase: Math.random() * Math.PI * 2, baseOpacity: 1.0, fastBlink: true });
+  // Secondary thin antenna whip on the opposite roof corner — adds a chip/comms feel
+  const whip = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.08, 0.08, h * 0.22, 4),
+    new THREE.MeshStandardMaterial({ color: 0x18222e, metalness: 0.8, roughness: 0.35 })
+  );
+  whip.position.set(-w * 0.32, baseY + h + 1.4 + h * 0.11, -depth * 0.18);
+  group.add(whip);
+  // Sat-dish detail near roof edge
+  const dish = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.2, 0.6, 0.4, 14, 1, true),
+    new THREE.MeshStandardMaterial({ color: 0x111923, metalness: 0.7, roughness: 0.45, side: THREE.DoubleSide })
+  );
+  dish.rotation.x = Math.PI / 2;
+  dish.position.set(w * 0.28, baseY + h + 1.7, -depth * 0.22);
+  group.add(dish);
+  // Roof glow strip ring around the cap
+  const capRing = new THREE.Mesh(
+    new THREE.BoxGeometry(w * 0.82, 0.18, depth * 0.82),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7 })
+  );
+  capRing.position.set(0, baseY + h + 1.4, 0);
+  group.add(capRing);
+}
+
+function addBuildingPortsAndFins(group, w, h, depth, baseY, color) {
+  // Adds high-tech visual dressing to a single high-tech building:
+  //  - small blinking port lights at midheight on each face (server-rack/router LEDs)
+  //  - vertical neon vent slits on side faces
+  //  - small fin/heatsink ribs near base
+  //  - docking ring at upper third
+  // All positions are relative to the building's local origin; caller already
+  // positions the group, so this just decorates around (0, baseY..baseY+h, 0).
+  const col = new THREE.Color(color);
+  // Port lights — two rows of small blinking dots on each side face
+  const rows = 2;
+  const portsPerRow = 4;
+  for (const sign of [-1, 1]) {
+    for (let face = 0; face < 2; face++) { // 0 = +/-z face, 1 = +/-x face
+      for (let r = 0; r < rows; r++) {
+        for (let i = 0; i < portsPerRow; i++) {
+          const t = (i + 1) / (portsPerRow + 1);
+          const offset = (t - 0.5) * (face === 0 ? w : depth) * 0.7;
+          const yy = baseY + h * (0.32 + r * 0.12);
+          const dot = new THREE.Mesh(
+            new THREE.BoxGeometry(0.35, 0.35, 0.08),
+            new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95 })
+          );
+          if (face === 0) {
+            dot.position.set(offset, yy, sign * (depth * 0.5 + 0.18));
+          } else {
+            dot.position.set(sign * (w * 0.5 + 0.18), yy, offset);
+            dot.rotation.y = Math.PI / 2;
+          }
+          group.add(dot);
+          buildingBlinkers.push({ mesh: dot, phase: Math.random() * Math.PI * 2, baseOpacity: 0.6, fastBlink: i % 2 === 0 });
+        }
+      }
+    }
+  }
+  // Vertical vent slits on side faces (2 per side)
+  for (const sign of [-1, 1]) {
+    for (let i = -1; i <= 1; i += 2) {
+      const slit = new THREE.Mesh(
+        new THREE.BoxGeometry(0.12, h * 0.55, 0.6),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55 })
+      );
+      slit.position.set(sign * (w * 0.5 + 0.12), baseY + h * 0.5, i * depth * 0.22);
+      group.add(slit);
+    }
+  }
+  // Fin / heatsink ribs near base on long faces
+  for (let i = -2; i <= 2; i++) {
+    for (const sign of [-1, 1]) {
+      const fin = new THREE.Mesh(
+        new THREE.BoxGeometry(0.6, 1.6, 0.3),
+        new THREE.MeshStandardMaterial({ color: 0x10202e, metalness: 0.8, roughness: 0.4, emissive: col, emissiveIntensity: 0.2 })
+      );
+      fin.position.set(i * (w * 0.18), baseY + 1.0, sign * (depth * 0.5 + 0.18));
+      group.add(fin);
+    }
+  }
+  // Docking ring at upper third — a flat torus circling the building
+  const ringR = Math.max(w, depth) * 0.55;
+  const dockRing = new THREE.Mesh(
+    new THREE.TorusGeometry(ringR, 0.22, 6, 32),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.72 })
+  );
+  dockRing.rotation.x = Math.PI / 2;
+  dockRing.position.set(0, baseY + h * 0.7, 0);
+  group.add(dockRing);
 }
 
 function makeHighTechBuilding(w, h, depth, baseY, color) {
@@ -393,6 +584,8 @@ function makeHighTechBuilding(w, h, depth, baseY, color) {
   g.add(body);
   // Light strips + window bands
   addLightStripsToBox(g, w, h, depth, baseY + plinthH, color);
+  // High-tech ports, vents, fins, docking ring
+  addBuildingPortsAndFins(g, w, h, depth, baseY + plinthH, color);
   // Rooftop gear
   addRooftopGear(g, w, h, depth, baseY + plinthH, color);
   return g;
@@ -507,6 +700,7 @@ function makeVault(d) {
     new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.7 })
   );
   orb.position.y = baseH + midH + 7; g.add(orb);
+  buildingCores.push({ mesh: orb, baseOpacity: 0.7, amp: 0.22, phase: Math.random() * Math.PI * 2 });
   // Containment cage around orb (thin ring)
   const cage = new THREE.Mesh(
     new THREE.TorusGeometry(9, 0.25, 6, 32),
@@ -559,6 +753,15 @@ function makeChip(d) {
     new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 })
   );
   coreInner.position.y = 4 + 9; g.add(coreInner);
+  buildingCores.push({ mesh: coreInner, baseOpacity: 0.85, amp: 0.15, phase: Math.random() * Math.PI * 2 });
+  // Trace lines etched on the chip pad surface (right-angle PCB feel)
+  const traceMat = new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.55 });
+  for (let i = -2; i <= 2; i++) {
+    const tline = new THREE.Mesh(new THREE.BoxGeometry(38, 0.08, 0.45), traceMat);
+    tline.position.set(0, 4.05, i * 7); g.add(tline);
+    const tline2 = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.08, 38), traceMat);
+    tline2.position.set(i * 7, 4.05, 0); g.add(tline2);
+  }
   return g;
 }
 function makeBridge(d) {
@@ -633,10 +836,11 @@ function makePad(d) {
     g.add(clamp);
     const tipLight = new THREE.Mesh(
       new THREE.SphereGeometry(0.5, 8, 8),
-      new THREE.MeshBasicMaterial({ color: d.color })
+      new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 1 })
     );
     tipLight.position.set(Math.cos(a) * 22, 6.3, Math.sin(a) * 22);
     g.add(tipLight);
+    buildingBlinkers.push({ mesh: tipLight, phase: i * 0.7, baseOpacity: 1.0, fastBlink: i % 2 === 0 });
   }
   // Central uplink beam (taller, brighter)
   const beam = new THREE.Mesh(
@@ -729,9 +933,10 @@ function makeSpire(d) {
   // Apex beacon
   const apex = new THREE.Mesh(
     new THREE.SphereGeometry(0.9, 12, 12),
-    new THREE.MeshBasicMaterial({ color: 0xffffff })
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1 })
   );
   apex.position.y = 4 + sections * 13 + 28; g.add(apex);
+  buildingCores.push({ mesh: apex, baseOpacity: 1.0, amp: 0.35, phase: 0 });
   return g;
 }
 const builders = { tower: makeTower, antenna: makeAntenna, plaza: makePlaza, vault: makeVault, chip: makeChip, bridge: makeBridge, pad: makePad };
@@ -1083,6 +1288,24 @@ function tick() {
   }
 
   updatePackets(dt, speedBoost);
+
+  // Building port-light blinks — small router/server LED twinkles
+  for (const b of buildingBlinkers) {
+    const f = b.fastBlink ? 5.2 : 2.4;
+    const v = 0.5 + 0.5 * Math.sin(elapsed * f + b.phase);
+    b.mesh.material.opacity = b.baseOpacity * (0.45 + v * 0.55);
+  }
+  // Building core pulses — vault orb, chip core, spire apex
+  for (const c of buildingCores) {
+    const v = 0.5 + 0.5 * Math.sin(elapsed * 1.6 + c.phase);
+    c.mesh.material.opacity = c.baseOpacity + (v - 0.5) * 2 * c.amp;
+  }
+  // PCB via blinkers — slow heartbeat across the substrate
+  for (const p of pcbBlinkers) {
+    const v = 0.5 + 0.5 * Math.sin(elapsed * 1.1 + p.phase);
+    p.mesh.material.opacity = 0.4 + v * 0.55;
+  }
+
   updateLabelEdgeSafety();
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
