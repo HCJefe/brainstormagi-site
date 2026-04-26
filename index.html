@@ -8,13 +8,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Space+Grotesk:wght@400;500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./style.css?v=20260425-curved-electric-route-1" />
+<link rel="stylesheet" href="./style.css?v=20260425-roller-circuit-1" />
 </head>
 <body>
-  <!-- Primary scene: first-party Canvas2D pseudo-3D circuit-board flight.
-       Bezier-spline road that visibly twists and banks between section
-       specific structures. No remote dependencies. Persists across every
-       section. -->
+  <!-- Primary scene: first-party Canvas2D pseudo-3D roller-coaster track
+       across a circuit-board world. Twists, banks, climbs, and dives
+       between section-specific futuristic skyscrapers. Electric current
+       flows along the track as elongated light streaks (no ball clutter).
+       No remote dependencies. Persists across every section. -->
   <canvas id="scene"></canvas>
   <!-- Defensive procedural fallback. Only paints if the primary engine
        cannot acquire a 2D context. Hidden in normal operation. -->
@@ -212,9 +213,9 @@
   <!-- Defensive procedural fallback. Only paints if the primary engine
        cannot acquire a 2D context. Loaded first so it is always available
        to the watchdog. -->
-  <script src="./fallback.js?v=20260425-curved-electric-route-1"></script>
-  <!-- Primary engine: first-party Canvas2D curved electric route. -->
-  <script src="./main.js?v=20260425-curved-electric-route-1"></script>
+  <script src="./fallback.js?v=20260425-roller-circuit-1"></script>
+  <!-- Primary engine: first-party Canvas2D roller-coaster circuit-board. -->
+  <script src="./main.js?v=20260425-roller-circuit-1"></script>
   <script>
     // Watchdog: if the primary engine has not painted a frame within 2.5s,
     // light up the defensive fallback so the route is never empty.
