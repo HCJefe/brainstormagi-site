@@ -21,10 +21,10 @@
     return;
   }
 
-  document.documentElement.dataset.sceneEngine = "canvas2d-elevated-rails";
+  document.documentElement.dataset.sceneEngine = "canvas2d-clean-rails";
   // QA marker: confirms the rails-only primary renderer is loaded with no
   // continuous filled deck/route polygon.
-  document.documentElement.dataset.trackMode = "rails-only";
+  document.documentElement.dataset.trackMode = "clean-rails";
   window.__brainstormRenderFrames = 0;
 
   var REDUCED_MOTION = window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches;
@@ -244,15 +244,16 @@
     // Track curves strongly down its length so a visible S-bend appears in
     // the foreground/midground at all times. Far end aims at the next
     // section, near end at the current section.
-    var fgSide = sideA + (sideB - sideA) * ease * 0.55;
-    var bgSide = sideB + (sideA - sideB) * (1 - ease) * 0.45;
-    // Strong serpentine sway that varies with depth and time. A
-    // depth-driven sin wave forces a visible S-curve regardless of
-    // section position so QA always sees turns, not a straight line.
-    var sway = Math.sin(zNorm * 5.2 + sectionPos * 1.1 + t * 0.35) * 0.55 * (0.4 + zNorm * 0.6);
-    var twist = Math.cos(t * 0.25 + sectionPos * 1.4 + zNorm * 2.4) * 0.18;
+    var fgSide = sideA + (sideB - sideA) * ease * 0.35;
+    var bgSide = sideB + (sideA - sideB) * (1 - ease) * 0.30;
+    // Single low-frequency S-bend. Amplitude is gated so the foreground
+    // (zNorm < ~0.35) stays nearly straight — prevents the rails from
+    // crossing or tangling near the camera. Mid/far still curves.
+    var depthGate = Math.max(0, (zNorm - 0.18)) * 1.2;
+    if (depthGate > 1) depthGate = 1;
+    var sway = Math.sin(zNorm * 2.6 + sectionPos * 0.9 + t * 0.22) * 0.28 * depthGate;
     var blend = 1 - zNorm;
-    return fgSide * (1 - blend) + bgSide * blend + sway + twist;
+    return fgSide * (1 - blend) + bgSide * blend + sway;
   }
 
   function curveLiftAt(zNorm, t, sectionPos) {
@@ -262,17 +263,16 @@
     var ease = local * local * (3 - 2 * local);
     var liftA = SECTIONS[idxA].lift;
     var liftB = SECTIONS[idxB].lift;
-    var fg = liftA + (liftB - liftA) * ease * 0.5;
-    var bg = liftB + (liftA - liftB) * (1 - ease) * 0.35;
+    var fg = liftA + (liftB - liftA) * ease * 0.4;
+    var bg = liftB + (liftA - liftB) * (1 - ease) * 0.30;
     // Strong baseline elevation so the track always reads as suspended
     // above the PCB, never flush with the ground.
-    var baseLift = 0.22 + zNorm * 0.10;
-    // Continuous coaster wave gives the track climbs and dives even within
-    // a single section.
-    var wave = Math.sin(t * 0.55 + zNorm * 4.6 + sectionPos * 0.7) * 0.13 * (1 - zNorm * 0.3);
-    var crest = Math.sin(zNorm * Math.PI * 2 + sectionPos * 1.2 + t * 0.32) * 0.08;
+    var baseLift = 0.32 + zNorm * 0.10;
+    // Single low-amplitude wave for a gentle climb/dive — kept small so
+    // adjacent samples stay near each other and rails never criss-cross.
+    var wave = Math.sin(t * 0.4 + zNorm * 2.6 + sectionPos * 0.6) * 0.06;
     var blend = 1 - zNorm;
-    return fg * (1 - blend) + bg * blend + wave + crest + baseLift;
+    return fg * (1 - blend) + bg * blend + wave + baseLift;
   }
 
   function rebuildSamples(w, h, horizonY, t, sectionPos) {
@@ -303,19 +303,45 @@
       s.centerX = centerX;
       s.groundY = groundY;
     }
-    // Pass 2: derive slope/bank from neighbors so the rails twist together.
-    // Bank is intentionally exaggerated so the inner rail is unmistakably
-    // higher/lower than the outer rail in a screenshot.
+    // Pass 2: derive slope/bank and a screen-space tangent normal from
+    // neighbor samples. The normal is what we use to offset the rails so
+    // they always sit on opposite sides of the centerline in screen space
+    // (no possibility of crossing/tangling regardless of bank or curve).
     for (var k = 0; k <= SAMPLE_COUNT; k++) {
       var prev = samples[Math.max(0, k - 1)];
       var next = samples[Math.min(SAMPLE_COUNT, k + 1)];
       var slope = (next.centerLat - prev.centerLat);
       samples[k].slope = slope;
-      samples[k].bank = slope * 6.5;
+      // Bank kept small — visible tilt but cannot rotate the lane offset
+      // past 90 deg, which is what previously caused the rails to swap
+      // sides and tangle in the foreground.
+      samples[k].bank = Math.max(-0.45, Math.min(0.45, slope * 1.2));
+      // Screen-space tangent (dx,dy) along the centerline polyline.
+      var tdx = next.centerX - prev.centerX;
+      var tdy = next.groundY - prev.groundY;
+      var tlen = Math.sqrt(tdx * tdx + tdy * tdy) || 1;
+      // Perpendicular (right-hand normal): rotate (tdx,tdy) by +90deg.
+      samples[k].nx = -tdy / tlen;
+      samples[k].ny =  tdx / tlen;
     }
   }
 
+  // Minimum on-screen gap between the two rails. Prevents the rails from
+  // ever visually merging or crossing — they always sit at least this far
+  // apart in screen space regardless of curve, bank, or projection.
+  function minRailGapPx(zNorm) {
+    var vw = canvas.width || 1280;
+    // ~6% of viewport at horizon, ~10% in foreground. Scales with depth.
+    var fg = Math.max(60, vw * 0.10);
+    var bg = Math.max(36, vw * 0.06);
+    return bg + (fg - bg) * zNorm;
+  }
+
   // Project a track-relative coordinate using the precomputed samples.
+  // Rails (laneOffset = +/-1) are placed using the screen-space normal of
+  // the centerline polyline so the two rails ALWAYS sit on opposite sides
+  // of the centerline, with a minimum visible gap. This makes self-
+  // intersection geometrically impossible.
   function projectSample(zNorm, laneOffset) {
     var z = Math.max(0, Math.min(1, zNorm));
     var f = z * SAMPLE_COUNT;
@@ -328,16 +354,27 @@
     var centerX = a.centerX + (b.centerX - a.centerX) * u;
     var groundY = a.groundY + (b.groundY - a.groundY) * u;
     var bank = a.bank + (b.bank - a.bank) * u;
-    var localX = laneOffset * halfW;
-    var cb = Math.cos(bank * 0.35);
-    var sb = Math.sin(bank * 0.35);
+    var nx = a.nx + (b.nx - a.nx) * u;
+    var ny = a.ny + (b.ny - a.ny) * u;
+    // Lateral offset has TWO floors: the projected rail half-span, and a
+    // hard minimum screen-space gap. Whichever is larger wins. This is
+    // the key fix that prevents foreground rail tangling.
+    var minHalf = minRailGapPx(z) * 0.5;
+    var effHalf = Math.max(halfW, minHalf);
+    var sign = laneOffset >= 0 ? 1 : -1;
+    var amt = sign * effHalf;
+    // Bank lifts the offset rail slightly along Y for a subtle tilt look,
+    // but is clamped so it can never reverse left/right ordering.
+    var by = bank * 0.35;
     return {
-      x: centerX + localX * cb,
-      y: groundY + localX * sb * 1.1,
-      halfW: halfW,
+      x: centerX + nx * amt,
+      y: groundY + ny * amt + amt * by * 0.18,
+      halfW: effHalf,
       centerX: centerX,
       centerY: groundY,
-      bank: bank
+      bank: bank,
+      nx: nx,
+      ny: ny
     };
   }
 
@@ -842,7 +879,8 @@
   function drawSupportTrusses(w, h, horizonY, t, sectionPos) {
     // Hand-picked z values (fewer, larger) — guaranteed to land in the
     // foreground/midground rather than crowding the horizon.
-    var POSITIONS = [0.18, 0.30, 0.42, 0.54, 0.66, 0.78, 0.88];
+    // Foreground/midground positions — guaranteed visible on desktop.
+    var POSITIONS = [0.20, 0.34, 0.48, 0.62, 0.76, 0.88];
     for (var i = 0; i < POSITIONS.length; i++) {
       var z = POSITIONS[i];
       // Anchor each truss column directly under the corresponding rail.
@@ -852,11 +890,17 @@
       var groundY = horizonY + (h - horizonY) * pp + 6;
       var underYL = pL.y + 3;
       var underYR = pR.y + 3;
+      // Force a meaningful drop so the truss is always 80-180px tall on
+      // desktop. Without this floor, mild lift values can collapse the
+      // column into invisibility.
+      var minDrop = Math.max(80, (h - horizonY) * 0.22 * pp + 60);
+      if (groundY - underYL < minDrop) underYL = groundY - minDrop;
+      if (groundY - underYR < minDrop) underYR = groundY - minDrop;
       var dropL = groundY - underYL;
       var dropR = groundY - underYR;
-      if (dropL <= 24 || dropR <= 24) continue;
+      if (dropL <= 30 || dropR <= 30) continue;
       // Bigger pylon width — clearly readable as a column, not a wire.
-      var pylonW = Math.max(7, pL.halfW * 0.065);
+      var pylonW = Math.max(9, pL.halfW * 0.075);
       var leftX = pL.x;
       var rightX = pR.x;
 
@@ -1074,12 +1118,14 @@
     //         beams are kept narrow relative to the rail-to-rail gap so
     //         the empty space between is large and unambiguous.
     function drawRailBeam(side, glowColor, sheathColor, topHL) {
-      // (a) graphite core casing — solid dark beam so the rail reads as
-      //     a physical metal beam, not a glow line.
-      ctx.strokeStyle = "#0a0f1a";
-      ctx.lineWidth = 10;
+      // Build the rail as ONE clean polyline using projectSample. Because
+      // the project function uses a screen-space normal with a hard min
+      // gap, this polyline cannot cross the opposite rail.
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
+      // (a) outer rim — wide soft halo
+      ctx.strokeStyle = "rgba(40,52,72,0.95)";
+      ctx.lineWidth = 9;
       ctx.beginPath();
       for (var ka = 0; ka <= SAMPLE_COUNT; ka++) {
         var za = ka / SAMPLE_COUNT;
@@ -1088,19 +1134,15 @@
         else ctx.lineTo(pa.x, pa.y);
       }
       ctx.stroke();
-      // outline rim of the beam
-      ctx.strokeStyle = "rgba(40,52,72,0.95)";
-      ctx.lineWidth = 12;
-      ctx.stroke();
-      // re-stroke graphite for crisp core
+      // (b) graphite core casing — solid dark beam
       ctx.strokeStyle = "#0a0f1a";
-      ctx.lineWidth = 8;
+      ctx.lineWidth = 6.5;
       ctx.stroke();
-      // (b) thinner glowing color sheath ON TOP of the dark core
+      // (c) thinner glowing color sheath ON TOP of the dark core
       ctx.strokeStyle = sheathColor;
       ctx.shadowColor = glowColor;
-      ctx.shadowBlur = 18;
-      ctx.lineWidth = 4.5;
+      ctx.shadowBlur = 14;
+      ctx.lineWidth = 3.2;
       ctx.stroke();
       ctx.shadowBlur = 0;
       // (c) top highlight ridge — sits 1.5px above the core line
@@ -1128,16 +1170,19 @@
     //         screen space (which would otherwise merge into a continuous
     //         filled slab). The PCB substrate must remain visible between
     //         ties as well as between the two rails. ----
-    var TIES = 11;
+    var TIES = 9;
     var tiePhase = (t * 0.10) % (1 / TIES);
     for (var ti = 0; ti < TIES; ti++) {
       var tz = (ti / TIES + tiePhase);
       if (tz <= 0.04 || tz >= 0.98) continue;
       var tL = projectSample(tz, -RAIL_OUTER);
       var tR = projectSample(tz,  RAIL_OUTER);
-      // Discrete perpendicular bar. Thickness clamped low so adjacent
-      // ties never bleed into each other in the foreground.
-      var tieThick = Math.max(3, Math.min(9, tL.halfW * 0.025));
+      // Skip if rail span is too short to read as a tie.
+      var tieGap = Math.sqrt((tR.x - tL.x) * (tR.x - tL.x) + (tR.y - tL.y) * (tR.y - tL.y));
+      if (tieGap < 28) continue;
+      // Tie thickness scales with depth — meaty enough to be unmistakable
+      // in the foreground/midground without ever fusing with neighbors.
+      var tieThick = Math.max(5, Math.min(14, tieGap * 0.10));
       // dx/dy for a perpendicular offset (so we can draw a thick
       // rectangle as a 4-vertex polygon — a true bar shape rather than
       // a thin stroke).
@@ -1175,7 +1220,7 @@
       ctx.fill();
       // Outline so the tie has a hard silhouette against the rails
       ctx.strokeStyle = "rgba(20,12,4,0.95)";
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 1.5;
       ctx.stroke();
       // Bolt heads at each end where the tie meets the rail
       ctx.fillStyle = "rgba(255,240,200,0.95)";
