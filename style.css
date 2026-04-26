@@ -435,8 +435,9 @@ body::after{
 
 /* RESPONSIVE — MOBILE (phones, <=640px) */
 @media (max-width:640px){
-  /* Keep the 3D road visible on phones — feels electric, not dimmed out */
-  canvas#scene{opacity:.86}
+  /* Mobile 3D boost: render canvas at full opacity so the scene reads clearly
+     through the (now more transparent) section panels */
+  canvas#scene{opacity:1}
 
   /* HUD top: brand left, hamburger right; CTA moves into menu */
   .hud-top{
@@ -537,22 +538,28 @@ body::after{
   .sec-inner.left,
   .sec-inner.right,
   .sec-inner.center{
-    padding:24px 18px;
+    padding:22px 16px;
     width:100%;
-    max-width:calc(100vw - 32px);
+    /* Slightly narrower on mobile so the 3D scene shows in side gutters,
+       framed by the cyan/red glow rather than buried behind opaque panels */
+    max-width:calc(100vw - 40px);
     margin-left:auto;margin-right:auto;
     border-radius:6px;
-    border:1px solid rgba(92,242,255,.28);
+    border:1px solid rgba(92,242,255,.42);
+    /* More transparent panel base so the racing-current and buildings read
+       through. Body copy stays legible thanks to the dark base + scanlines. */
     background:
-      linear-gradient(0deg,rgba(92,242,255,.025) 1px,transparent 1px) 0 0/18px 18px,
-      linear-gradient(90deg,rgba(92,242,255,.025) 1px,transparent 1px) 0 0/18px 18px,
+      linear-gradient(0deg,rgba(92,242,255,.03) 1px,transparent 1px) 0 0/18px 18px,
+      linear-gradient(90deg,rgba(92,242,255,.03) 1px,transparent 1px) 0 0/18px 18px,
       repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 3px),
-      linear-gradient(180deg,rgba(6,10,20,.80),rgba(4,8,16,.74));
+      linear-gradient(180deg,rgba(6,10,20,.62),rgba(4,8,16,.56));
+    /* Stronger outer glow on mobile so the panel frames the 3D scene
+       instead of hiding it. Cyan + red rim reads as a HUD bezel. */
     box-shadow:
-      0 18px 50px rgba(0,0,0,.55),
-      0 0 0 1px rgba(255,42,42,.16) inset,
-      0 0 40px rgba(92,242,255,.14),
-      0 0 30px rgba(255,42,42,.10);
+      0 18px 50px rgba(0,0,0,.5),
+      0 0 0 1px rgba(255,42,42,.22) inset,
+      0 0 56px rgba(92,242,255,.22),
+      0 0 44px rgba(255,42,42,.16);
     overflow:hidden;
   }
   /* Hide the desktop corner brackets on mobile — they would clip outside the
@@ -576,13 +583,18 @@ body::after{
   .sec-inner .agent-wall{position:relative;z-index:2}
 
   .hero .sec-inner{
-    padding:28px 18px;
-    border:1px solid rgba(92,242,255,.30);
+    padding:26px 16px;
+    border:1px solid rgba(92,242,255,.45);
+    /* Hero panel: see-through enough that the spire + roads behind it read
+       on first paint. Title and stats stay readable due to inner glow. */
+    background:
+      radial-gradient(ellipse at 50% 0%,rgba(255,42,42,.14),transparent 60%),
+      linear-gradient(180deg,rgba(6,10,20,.55),rgba(4,8,16,.50));
     box-shadow:
-      0 20px 60px rgba(0,0,0,.6),
-      0 0 0 1px rgba(255,42,42,.18) inset,
-      0 0 50px rgba(255,42,42,.14),
-      0 0 40px rgba(92,242,255,.14);
+      0 20px 60px rgba(0,0,0,.55),
+      0 0 0 1px rgba(255,42,42,.22) inset,
+      0 0 60px rgba(255,42,42,.20),
+      0 0 50px rgba(92,242,255,.22);
   }
   .hero .sec-inner::before{
     width:auto;height:2px;
