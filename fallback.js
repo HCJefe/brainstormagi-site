@@ -190,70 +190,237 @@
     }
   }
 
+  // Rails-only elevated track. NO filled deck/road polygon, NO copper
+  // band between rails, NO longitudinal stripes that could read as a
+  // road surface. Only:
+  //   - left rail beam (cyan)
+  //   - right rail beam (red)
+  //   - perpendicular cross ties between the rails
+  //   - support trusses beneath the rails
   function drawHighway(w, h, horizonY, t) {
-    // Filled road polygon.
-    var top = project(0.0, 0, w, h, horizonY);
-    var bot = project(1.0, 0, w, h, horizonY);
-    ctx.fillStyle = "#0e1c34";
-    ctx.beginPath();
-    ctx.moveTo(top.x - top.halfW, top.y);
-    ctx.lineTo(top.x + top.halfW, top.y);
-    ctx.lineTo(bot.x + bot.halfW, bot.y);
-    ctx.lineTo(bot.x - bot.halfW, bot.y);
-    ctx.closePath();
-    ctx.fill();
+    var RAIL = 0.95;
 
-    // Inner copper band.
-    var topI = project(0.0, 0, w, h, horizonY);
-    var botI = project(1.0, 0, w, h, horizonY);
-    ctx.fillStyle = "rgba(192,68,40,0.45)";
-    ctx.beginPath();
-    ctx.moveTo(topI.x - topI.halfW * 0.55, topI.y);
-    ctx.lineTo(topI.x + topI.halfW * 0.55, topI.y);
-    ctx.lineTo(botI.x + botI.halfW * 0.55, botI.y);
-    ctx.lineTo(botI.x - botI.halfW * 0.55, botI.y);
-    ctx.closePath();
-    ctx.fill();
+    // ---- Per-rail polylines projected with a slight elevation lift so
+    //      the track reads as suspended above the PCB, not flush. ----
+    var SAMPLES = 28;
+    var leftPts = [];
+    var rightPts = [];
+    var groundPts = [];
+    for (var s = 0; s <= SAMPLES; s++) {
+      var z = s / SAMPLES;
+      var pL = project(z, -RAIL, w, h, horizonY);
+      var pR = project(z,  RAIL, w, h, horizonY);
+      var lift = (h - horizonY) * 0.08 * (z * z * 0.95 + z * 0.05);
+      leftPts.push({ x: pL.x, y: pL.y - lift, halfW: pL.halfW });
+      rightPts.push({ x: pR.x, y: pR.y - lift, halfW: pR.halfW });
+      groundPts.push({ x: (pL.x + pR.x) * 0.5, y: pL.y + 4 });
+    }
 
-    // Cyan rail (left).
-    ctx.strokeStyle = CYAN;
-    ctx.lineWidth = 3;
-    ctx.shadowColor = "rgba(92,242,255,0.7)";
-    ctx.shadowBlur = 8;
-    ctx.beginPath();
-    ctx.moveTo(top.x - top.halfW, top.y);
-    ctx.lineTo(bot.x - bot.halfW, bot.y);
-    ctx.stroke();
-    // Red rail (right).
-    ctx.strokeStyle = RED;
-    ctx.shadowColor = "rgba(255,58,58,0.7)";
-    ctx.beginPath();
-    ctx.moveTo(top.x + top.halfW, top.y);
-    ctx.lineTo(bot.x + bot.halfW, bot.y);
-    ctx.stroke();
-    ctx.shadowBlur = 0;
+    // ---- Support trusses BELOW the rails, drawn first so the rails
+    //      and ties sit on top. Guaranteed visible foreground/midground
+    //      positions independent of perspective math.
+    var TRUSS_Z = [0.22, 0.40, 0.58, 0.74, 0.88];
+    for (var ti = 0; ti < TRUSS_Z.length; ti++) {
+      var tz = TRUSS_Z[ti];
+      var idx = Math.min(SAMPLES, Math.round(tz * SAMPLES));
+      var lp = leftPts[idx];
+      var rp = rightPts[idx];
+      var gy = horizonY + (h - horizonY) * (tz * tz * 0.96 + tz * 0.04) + 6;
+      if (gy - lp.y < 24) continue;
+      var pylonW = Math.max(6, lp.halfW * 0.06);
 
-    // Center spine + animated dashes.
-    ctx.strokeStyle = "rgba(255,255,255,0.85)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(top.x, top.y);
-    ctx.lineTo(bot.x, bot.y);
-    ctx.stroke();
+      // Footing pads (copper)
+      function pad(fx, fy) {
+        var rPad = pylonW * 2.4;
+        ctx.fillStyle = "rgba(255,200,120,0.95)";
+        ctx.beginPath();
+        ctx.ellipse(fx, fy, rPad, rPad * 0.45, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#03100a";
+        ctx.beginPath();
+        ctx.ellipse(fx, fy, rPad * 0.42, rPad * 0.20, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      pad(lp.x, gy);
+      pad(rp.x, gy);
 
-    // Dashes — march from horizon to viewer with time.
-    var dashCount = 16;
-    for (var i = 0; i < dashCount; i++) {
-      var di = (i + (t * 0.6) % 1) / dashCount;
-      var pTop = project(Math.max(0, di - 0.04), 0, w, h, horizonY);
-      var pBot = project(Math.min(1, di + 0.04), 0, w, h, horizonY);
-      ctx.strokeStyle = i % 2 === 0 ? "#ffffff" : ORANGE;
-      ctx.lineWidth = Math.max(1, 0.5 + di * 5);
+      // Two columns (one under each rail). Filled steel rectangles with
+      // an outline so they read as chunky beams against the PCB.
+      function column(cx, top) {
+        ctx.fillStyle = "#0a1424";
+        ctx.fillRect(cx - pylonW, top, pylonW * 2, gy - top);
+        ctx.strokeStyle = "rgba(190,220,255,0.95)";
+        ctx.lineWidth = 1.6;
+        ctx.strokeRect(cx - pylonW + 0.5, top + 0.5, pylonW * 2 - 1, gy - top - 1);
+      }
+      column(lp.x, lp.y);
+      column(rp.x, rp.y);
+
+      // X bracing between the columns (multi-stage), so the truss is
+      // unmistakably a structural support and not a flat banner.
+      var stages = Math.max(3, Math.floor((gy - Math.min(lp.y, rp.y)) / 30));
+      for (var st = 0; st < stages; st++) {
+        var f0 = st / stages;
+        var f1 = (st + 1) / stages;
+        var lyA = lp.y + (gy - lp.y) * f0 + 3;
+        var lyB = lp.y + (gy - lp.y) * f1 - 3;
+        var ryA = rp.y + (gy - rp.y) * f0 + 3;
+        var ryB = rp.y + (gy - rp.y) * f1 - 3;
+        ctx.strokeStyle = "rgba(8,12,22,0.95)";
+        ctx.lineWidth = 4.5;
+        ctx.beginPath();
+        ctx.moveTo(lp.x, lyA); ctx.lineTo(rp.x, ryB);
+        ctx.moveTo(rp.x, ryA); ctx.lineTo(lp.x, lyB);
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(92,242,255,0.95)";
+        ctx.shadowColor = "rgba(92,242,255,0.7)";
+        ctx.shadowBlur = 6;
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.moveTo(lp.x, lyA); ctx.lineTo(rp.x, ryB);
+        ctx.moveTo(rp.x, ryA); ctx.lineTo(lp.x, lyB);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        // Horizontal cap brace (copper)
+        ctx.strokeStyle = "rgba(255,180,110,0.95)";
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.moveTo(lp.x - pylonW * 0.6, lyB);
+        ctx.lineTo(rp.x + pylonW * 0.6, ryB);
+        ctx.stroke();
+      }
+    }
+
+    // ---- Rails: each rail is a thick beam (graphite core + colored
+    //      sheath + bright top highlight). NO connecting fill polygon
+    //      between them — the gap is intentionally transparent so the
+    //      PCB substrate reads through. ----
+    function railBeam(pts, glow, sheath, hl) {
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      // Graphite outline
+      ctx.strokeStyle = "rgba(40,52,72,0.95)";
+      ctx.lineWidth = 9;
       ctx.beginPath();
-      ctx.moveTo(pTop.x, pTop.y);
-      ctx.lineTo(pBot.x, pBot.y);
+      for (var i = 0; i < pts.length; i++) {
+        if (i === 0) ctx.moveTo(pts[i].x, pts[i].y);
+        else ctx.lineTo(pts[i].x, pts[i].y);
+      }
+      ctx.stroke();
+      // Dark core
+      ctx.strokeStyle = "#0a0f1a";
+      ctx.lineWidth = 7;
+      ctx.stroke();
+      // Glowing sheath
+      ctx.strokeStyle = sheath;
+      ctx.shadowColor = glow;
+      ctx.shadowBlur = 16;
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      // Bright top ridge
+      ctx.strokeStyle = hl;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      for (var k = 0; k < pts.length; k++) {
+        if (k === 0) ctx.moveTo(pts[k].x, pts[k].y - 2.5);
+        else ctx.lineTo(pts[k].x, pts[k].y - 2.5);
+      }
       ctx.stroke();
     }
+    railBeam(leftPts,  "rgba(92,242,255,1)", "rgba(150,235,255,0.95)", "rgba(220,250,255,0.95)");
+    railBeam(rightPts, "rgba(255,58,58,1)",  "rgba(255,150,150,0.95)", "rgba(255,220,220,0.95)");
+
+    // ---- Cross ties: short perpendicular copper bars bridging the
+    //      rails. Drawn AFTER rails so they sit on top of the beams and
+    //      visibly cross the gap as discrete bars (never a strip). ----
+    var TIES = 20;
+    var phase = (t * 0.18) % (1 / TIES);
+    for (var ki = 0; ki < TIES; ki++) {
+      var kz = (ki / TIES + phase);
+      if (kz <= 0.04 || kz >= 0.98) continue;
+      var ix = Math.min(SAMPLES, Math.max(0, Math.round(kz * SAMPLES)));
+      var L = leftPts[ix];
+      var R = rightPts[ix];
+      var thick = Math.max(3.5, L.halfW * 0.07);
+      var dx = R.x - L.x;
+      var dy = R.y - L.y;
+      var len = Math.sqrt(dx * dx + dy * dy) || 1;
+      var nx = -dy / len, ny = dx / len;
+      var hw = thick * 0.5;
+      // Drop shadow
+      ctx.fillStyle = "rgba(0,0,0,0.5)";
+      ctx.beginPath();
+      ctx.moveTo(L.x + nx * hw + 1, L.y + ny * hw + 3);
+      ctx.lineTo(R.x + nx * hw + 1, R.y + ny * hw + 3);
+      ctx.lineTo(R.x - nx * hw + 1, R.y - ny * hw + 3);
+      ctx.lineTo(L.x - nx * hw + 1, L.y - ny * hw + 3);
+      ctx.closePath();
+      ctx.fill();
+      // Copper bar body (gradient)
+      var grad = ctx.createLinearGradient(
+        L.x + nx * hw, L.y + ny * hw,
+        L.x - nx * hw, L.y - ny * hw
+      );
+      grad.addColorStop(0,    "rgba(120,70,30,1)");
+      grad.addColorStop(0.45, "rgba(255,180,110,1)");
+      grad.addColorStop(0.55, "rgba(255,210,150,1)");
+      grad.addColorStop(1,    "rgba(80,40,15,1)");
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(L.x + nx * hw, L.y + ny * hw);
+      ctx.lineTo(R.x + nx * hw, R.y + ny * hw);
+      ctx.lineTo(R.x - nx * hw, R.y - ny * hw);
+      ctx.lineTo(L.x - nx * hw, L.y - ny * hw);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "rgba(20,12,4,0.95)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      // Bolt heads
+      ctx.fillStyle = "rgba(255,240,200,0.95)";
+      ctx.beginPath();
+      ctx.arc(L.x, L.y, Math.max(1.2, thick * 0.22), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(R.x, R.y, Math.max(1.2, thick * 0.22), 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // ---- Animated electric pulses traveling ALONG each rail (not
+    //      across a roadway). Tapered gradient strokes so they read as
+    //      light trails, not beads or dashes. ----
+    function pulse(pts, color, glow, off) {
+      var head = ((t * 0.55 + off) % 1);
+      var tail = head - 0.18;
+      if (tail < 0) tail = 0;
+      var i0 = Math.floor(tail * SAMPLES);
+      var i1 = Math.ceil(head * SAMPLES);
+      if (i1 <= i0 + 1) return;
+      var hP = pts[Math.min(i1, SAMPLES)];
+      var tP = pts[Math.max(0, i0)];
+      var lg = ctx.createLinearGradient(tP.x, tP.y, hP.x, hP.y);
+      lg.addColorStop(0,    color.replace(",1)", ",0)"));
+      lg.addColorStop(0.6,  color.replace(",1)", ",0.55)"));
+      lg.addColorStop(1,    color);
+      ctx.strokeStyle = lg;
+      ctx.shadowColor = glow;
+      ctx.shadowBlur = 12;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (var pi = i0; pi <= Math.min(i1, SAMPLES); pi++) {
+        if (pi === i0) ctx.moveTo(pts[pi].x, pts[pi].y - 1);
+        else ctx.lineTo(pts[pi].x, pts[pi].y - 1);
+      }
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+    pulse(leftPts,  "rgba(220,250,255,1)", "rgba(92,242,255,0.9)", 0.0);
+    pulse(leftPts,  "rgba(220,250,255,1)", "rgba(92,242,255,0.9)", 0.45);
+    pulse(rightPts, "rgba(255,220,200,1)", "rgba(255,90,90,0.9)",  0.22);
+    pulse(rightPts, "rgba(255,220,200,1)", "rgba(255,90,90,0.9)",  0.70);
   }
 
   function drawPylons(w, h, horizonY, t, scrollFrac) {
@@ -332,7 +499,6 @@
     drawGround(w, h, horizonY);
     drawHighway(w, h, horizonY, t + scrollFrac * 4);
     drawPylons(w, h, horizonY, t, scrollFrac);
-    drawPackets(w, h, horizonY, t, dt);
     drawScanlines(w, h);
 
     rafId = requestAnimationFrame(drawFrame);
