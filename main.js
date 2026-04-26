@@ -11,7 +11,9 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: !lowPower, powerPr
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, lowPower ? 1.5 : 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = lowPower ? 1.08 : 1.05;
+// Mobile gets a noticeable exposure lift so the 3D scene reads strongly through
+// (now more transparent) mobile content panels. Desktop unchanged.
+renderer.toneMappingExposure = lowPower ? 1.32 : 1.05;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x04060a);
@@ -21,10 +23,10 @@ const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerH
 camera.position.set(0, 400, 600);
 camera.lookAt(0, 0, 0);
 
-scene.add(new THREE.AmbientLight(0x334466, lowPower ? 0.55 : 0.5));
-const key = new THREE.DirectionalLight(0xffd0c0, lowPower ? 0.9 : 0.7); key.position.set(300, 400, 200); scene.add(key);
-const rim = new THREE.DirectionalLight(0xff3344, lowPower ? 0.6 : 0.5); rim.position.set(-300, 200, -400); scene.add(rim);
-const cyanLight = new THREE.DirectionalLight(0x4ff3ff, lowPower ? 0.6 : 0.35); cyanLight.position.set(0, 200, 400); scene.add(cyanLight);
+scene.add(new THREE.AmbientLight(0x334466, lowPower ? 0.78 : 0.5));
+const key = new THREE.DirectionalLight(0xffd0c0, lowPower ? 1.15 : 0.7); key.position.set(300, 400, 200); scene.add(key);
+const rim = new THREE.DirectionalLight(0xff3344, lowPower ? 0.85 : 0.5); rim.position.set(-300, 200, -400); scene.add(rim);
+const cyanLight = new THREE.DirectionalLight(0x4ff3ff, lowPower ? 0.85 : 0.35); cyanLight.position.set(0, 200, 400); scene.add(cyanLight);
 
 // ---------- CIRCUIT BOARD FLOOR ----------
 const BOARD = 1800;
@@ -35,9 +37,9 @@ const floor = new THREE.Mesh(
 floor.rotation.x = -Math.PI / 2;
 scene.add(floor);
 const gridFine = new THREE.GridHelper(BOARD, 180, 0x0e1a2c, 0x070d18);
-gridFine.material.transparent = true; gridFine.material.opacity = 0.35; scene.add(gridFine);
+gridFine.material.transparent = true; gridFine.material.opacity = lowPower ? 0.55 : 0.35; scene.add(gridFine);
 const gridCoarse = new THREE.GridHelper(BOARD, 22, 0xff2a2a, 0x4a0c0c);
-gridCoarse.material.transparent = true; gridCoarse.material.opacity = 0.42; gridCoarse.position.y = 0.02; scene.add(gridCoarse);
+gridCoarse.material.transparent = true; gridCoarse.material.opacity = lowPower ? 0.65 : 0.42; gridCoarse.position.y = 0.02; scene.add(gridCoarse);
 
 // ---------- ELECTRIFIED ROAD ----------
 // Replace simple traces with a multi-layer "road":
@@ -135,11 +137,13 @@ function addEnergyNode(x, z, color, size = 6, opts = {}) {
   // road reads instantly above the fold. Mobile keeps a shorter column to
   // protect performance and avoid overpowering text.
   const heroBoost = !!opts.heroBoost;
+  // Mobile: taller, slightly fatter columns so the electric uplinks read strongly
+  // around/through the mobile content panels. Desktop heights unchanged.
   const shaftHeight = heroBoost
-    ? (lowPower ? 180 : 320)
-    : (lowPower ? 90 : 140);
-  const shaftRadius = heroBoost ? 1.6 : 0.9;
-  const shaftOpacity = heroBoost ? 0.46 : 0.32;
+    ? (lowPower ? 280 : 320)
+    : (lowPower ? 160 : 140);
+  const shaftRadius = heroBoost ? (lowPower ? 1.9 : 1.6) : (lowPower ? 1.2 : 0.9);
+  const shaftOpacity = heroBoost ? (lowPower ? 0.62 : 0.46) : (lowPower ? 0.46 : 0.32);
   const shaft = new THREE.Mesh(
     new THREE.CylinderGeometry(shaftRadius, shaftRadius, shaftHeight, 12, 1, true),
     new THREE.MeshBasicMaterial({ color, transparent: true, opacity: shaftOpacity, side: THREE.DoubleSide })
@@ -149,21 +153,25 @@ function addEnergyNode(x, z, color, size = 6, opts = {}) {
 
   // Inner white-hot core inside the column for an electrified look
   const coreH = shaftHeight * 0.9;
-  const coreR = heroBoost ? 0.55 : 0.25;
+  const coreR = heroBoost ? (lowPower ? 0.7 : 0.55) : (lowPower ? 0.4 : 0.25);
+  const coreOpacity = heroBoost
+    ? (lowPower ? 0.92 : 0.78)
+    : (lowPower ? 0.75 : 0.55);
   const core = new THREE.Mesh(
     new THREE.CylinderGeometry(coreR, coreR, coreH, 8, 1, true),
-    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: heroBoost ? 0.78 : 0.55, side: THREE.DoubleSide })
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: coreOpacity, side: THREE.DoubleSide })
   );
   core.position.set(x, coreH / 2, z);
   scene.add(core);
 
   // Outer halo cylinder for hero-boosted nodes — soft glow that reads as a
   // light shaft from a distance without taxing fillrate too hard.
+  // Mobile gets a halo too so the electric uplink reads at a glance.
   let halo = null;
-  if (heroBoost && !lowPower) {
+  if (heroBoost) {
     halo = new THREE.Mesh(
-      new THREE.CylinderGeometry(4.2, 4.2, shaftHeight, 14, 1, true),
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.10, side: THREE.DoubleSide, depthWrite: false })
+      new THREE.CylinderGeometry(lowPower ? 5.0 : 4.2, lowPower ? 5.0 : 4.2, shaftHeight, lowPower ? 10 : 14, 1, true),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: lowPower ? 0.16 : 0.10, side: THREE.DoubleSide, depthWrite: false })
     );
     halo.position.set(x, shaftHeight / 2, z);
     scene.add(halo);
@@ -214,10 +222,12 @@ addEnergyNode(0, 0, 0xff2a2a, 14, { heroBoost: true });
 const streakGeo = new THREE.BoxGeometry(1, 0.4, 1.2);   // unit box, scaled per-frame to stretch along axis
 const pulseGeo  = new THREE.SphereGeometry(0.9, 8, 8);
 const commandStreakGeo = new THREE.BoxGeometry(1, 0.55, 1.6);
-const packetMatWhite    = new THREE.MeshBasicMaterial({ color: 0xffffff,  transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
-const packetMatElectric = new THREE.MeshBasicMaterial({ color: 0x9ff8ff,  transparent: true, opacity: 0.9,  blending: THREE.AdditiveBlending, depthWrite: false });
+const packetMatWhite    = new THREE.MeshBasicMaterial({ color: 0xffffff,  transparent: true, opacity: lowPower ? 1.0 : 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
+const packetMatElectric = new THREE.MeshBasicMaterial({ color: 0x9ff8ff,  transparent: true, opacity: lowPower ? 1.0 : 0.9,  blending: THREE.AdditiveBlending, depthWrite: false });
 const packets = [];
-const PACKET_COUNT = lowPower ? 130 : 320;
+// Mobile: fewer than desktop but enough to read as a flowing current.
+// Desktop unchanged.
+const PACKET_COUNT = lowPower ? 180 : 320;
 for (let i = 0; i < PACKET_COUNT; i++) {
   const route = roadPaths[i % roadPaths.length];
   let geo, mat;
@@ -245,7 +255,10 @@ for (let i = 0; i < PACKET_COUNT; i++) {
     speed: isCmd ? 0.10 + Math.random() * 0.10 : 0.22 + Math.random() * 0.32,
     isCmd,
     isStreak,
-    streakLen: isCmd ? 9 + Math.random() * 4 : 12 + Math.random() * 8
+    // Mobile: longer streaks so racing current reads clearly through the panels
+    streakLen: isCmd
+      ? (lowPower ? 14 + Math.random() * 5 : 9 + Math.random() * 4)
+      : (lowPower ? 18 + Math.random() * 9 : 12 + Math.random() * 8)
   };
   scene.add(p);
   packets.push(p);
@@ -786,8 +799,8 @@ DISTRICTS.forEach(d => {
     const r = 30 + i * 7;
     const tilt = (i - 1) * 0.32;
     const tor = new THREE.Mesh(
-      new THREE.TorusGeometry(r, 0.35, 6, 64),
-      new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.55 - i * 0.08 })
+      new THREE.TorusGeometry(r, lowPower ? 0.5 : 0.35, 6, 64),
+      new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: (lowPower ? 0.78 : 0.55) - i * 0.08 })
     );
     const liftY = d.tall + 14 + i * 9;
     tor.position.set(d.pos[0], liftY, d.pos[2]);
@@ -837,6 +850,11 @@ function districtById(id) { return DISTRICTS.find(d => d.id === id); }
 // helper: offset from district for a cinematic camera pose
 function poseFor(id, dx, dy, dz, lookY = 20) {
   if (id === "hero") {
+    // Mobile: pull camera closer + lower so buildings/road dominate above the
+    // fold. Desktop pose unchanged.
+    if (lowPower) {
+      return { pos: new THREE.Vector3(0, 300, 540), look: new THREE.Vector3(0, 60, 0) };
+    }
     return { pos: new THREE.Vector3(0, 380, 720), look: new THREE.Vector3(0, 40, 0) };
   }
   const d = districtById(id);
