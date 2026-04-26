@@ -21,7 +21,7 @@
     return;
   }
 
-  document.documentElement.dataset.sceneEngine = "canvas2d-roller-circuit";
+  document.documentElement.dataset.sceneEngine = "canvas2d-roller-circuit-2";
   window.__brainstormRenderFrames = 0;
 
   var REDUCED_MOTION = window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches;
@@ -31,17 +31,18 @@
   var RED = "#ff3a3a";
 
   // Each section: lateral side target plus a vertical lift target so the
-  // track climbs and dives between sections like a roller-coaster.
+  // track climbs and dives between sections like a roller-coaster. Sides
+  // alternate aggressively so the route reads as a serpentine S-curve.
   var SECTIONS = [
-    { id: "hero",        side:  0.00, lift:  0.05, type: "spire" },
-    { id: "spire",       side: -0.55, lift:  0.22, type: "spire" },
-    { id: "foundry",     side:  0.70, lift: -0.18, type: "foundry" },
-    { id: "voice",       side: -0.80, lift:  0.28, type: "voice" },
-    { id: "ops",         side:  0.60, lift: -0.14, type: "ops" },
-    { id: "revenue",     side: -0.70, lift:  0.20, type: "revenue" },
-    { id: "content",     side:  0.75, lift: -0.18, type: "content" },
-    { id: "integration", side: -0.55, lift:  0.24, type: "integration" },
-    { id: "contact",     side:  0.00, lift:  0.00, type: "contact" }
+    { id: "hero",        side:  0.55, lift:  0.18, type: "spire" },
+    { id: "spire",       side: -0.85, lift:  0.34, type: "spire" },
+    { id: "foundry",     side:  0.90, lift: -0.22, type: "foundry" },
+    { id: "voice",       side: -0.95, lift:  0.40, type: "voice" },
+    { id: "ops",         side:  0.85, lift: -0.18, type: "ops" },
+    { id: "revenue",     side: -0.90, lift:  0.32, type: "revenue" },
+    { id: "content",     side:  0.95, lift: -0.22, type: "content" },
+    { id: "integration", side: -0.80, lift:  0.36, type: "integration" },
+    { id: "contact",     side:  0.10, lift:  0.05, type: "contact" }
   ];
 
   // ---------- Stable seeded props ----------
@@ -51,6 +52,8 @@
   var streaks = [];
   var pcbBranches = [];
   var pcbTraces = [];
+  var pcbVias = [];
+  var pcbConnectors = [];
   var smdChips = [];
   var sparks = [];
   var skylineProps = [];
@@ -104,13 +107,38 @@
       });
     }
     smdChips.length = 0;
-    for (var c = 0; c < 8; c++) {
+    for (var c = 0; c < 14; c++) {
       smdChips.push({
-        z: c / 8 + Math.random() * 0.04,
+        z: c / 14 + Math.random() * 0.04,
         side: c % 2 === 0 ? -1 : 1,
-        offset: 0.95 + Math.random() * 0.5,
-        w: 0.10 + Math.random() * 0.06,
-        h: 0.05 + Math.random() * 0.03,
+        offset: 1.10 + Math.random() * 0.9,
+        w: 0.13 + Math.random() * 0.08,
+        h: 0.06 + Math.random() * 0.04,
+        speed: 0.04 + Math.random() * 0.04,
+        red: Math.random() < 0.30,
+        label: ["IC","U1","U2","MCU","RAM","DSP","FPGA"][c % 7]
+      });
+    }
+    // Circular vias / solder pads dotting the board.
+    pcbVias.length = 0;
+    for (var vv = 0; vv < 36; vv++) {
+      pcbVias.push({
+        z: vv / 36 + Math.random() * 0.02,
+        side: Math.random() < 0.5 ? -1 : 1,
+        offset: 0.85 + Math.random() * 1.5,
+        r: 0.014 + Math.random() * 0.012,
+        speed: 0.04 + Math.random() * 0.04,
+        red: Math.random() < 0.30
+      });
+    }
+    // Connector pads (small rectangle clusters along edges).
+    pcbConnectors.length = 0;
+    for (var cn = 0; cn < 10; cn++) {
+      pcbConnectors.push({
+        z: cn / 10 + Math.random() * 0.04,
+        side: cn % 2 === 0 ? -1 : 1,
+        offset: 1.45 + Math.random() * 0.9,
+        pins: 4 + Math.floor(Math.random() * 4),
         speed: 0.04 + Math.random() * 0.04
       });
     }
@@ -200,12 +228,16 @@
     var ease = local * local * (3 - 2 * local);
     var sideA = SECTIONS[idxA].side;
     var sideB = SECTIONS[idxB].side;
-    // Track curves down its length: far end aims at the next section,
-    // near end at the current section.
-    var fgSide = sideA + (sideB - sideA) * ease * 0.45;
-    var bgSide = sideB + (sideA - sideB) * (1 - ease) * 0.30;
-    var sway = Math.sin(t * 0.45 + zNorm * 3.0 + sectionPos * 0.6) * 0.18 * (1 - zNorm * 0.4);
-    var twist = Math.cos(t * 0.30 + sectionPos * 1.4 + zNorm * 2.2) * 0.08;
+    // Track curves strongly down its length so a visible S-bend appears in
+    // the foreground/midground at all times. Far end aims at the next
+    // section, near end at the current section.
+    var fgSide = sideA + (sideB - sideA) * ease * 0.55;
+    var bgSide = sideB + (sideA - sideB) * (1 - ease) * 0.45;
+    // Strong serpentine sway that varies with depth and time. A
+    // depth-driven sin wave forces a visible S-curve regardless of
+    // section position so QA always sees turns, not a straight line.
+    var sway = Math.sin(zNorm * 5.2 + sectionPos * 1.1 + t * 0.35) * 0.32 * (0.4 + zNorm * 0.6);
+    var twist = Math.cos(t * 0.25 + sectionPos * 1.4 + zNorm * 2.4) * 0.10;
     var blend = 1 - zNorm;
     return fgSide * (1 - blend) + bgSide * blend + sway + twist;
   }
@@ -219,12 +251,15 @@
     var liftB = SECTIONS[idxB].lift;
     var fg = liftA + (liftB - liftA) * ease * 0.5;
     var bg = liftB + (liftA - liftB) * (1 - ease) * 0.35;
+    // Strong baseline elevation so the track always reads as suspended
+    // above the PCB, never flush with the ground.
+    var baseLift = 0.22 + zNorm * 0.10;
     // Continuous coaster wave gives the track climbs and dives even within
     // a single section.
-    var wave = Math.sin(t * 0.55 + zNorm * 4.6 + sectionPos * 0.7) * 0.11 * (1 - zNorm * 0.3);
-    var crest = Math.sin(zNorm * Math.PI * 2 + sectionPos * 1.2 + t * 0.32) * 0.06;
+    var wave = Math.sin(t * 0.55 + zNorm * 4.6 + sectionPos * 0.7) * 0.13 * (1 - zNorm * 0.3);
+    var crest = Math.sin(zNorm * Math.PI * 2 + sectionPos * 1.2 + t * 0.32) * 0.08;
     var blend = 1 - zNorm;
-    return fg * (1 - blend) + bg * blend + wave + crest;
+    return fg * (1 - blend) + bg * blend + wave + crest + baseLift;
   }
 
   function rebuildSamples(w, h, horizonY, t, sectionPos) {
@@ -323,35 +358,81 @@
     }
   }
 
-  // Distant city skyline at the horizon (varies per section via drift).
+  // Distant city skyline at the horizon: stepped pseudo-3D silhouettes
+  // (front face + side parallelogram + tapered crown) so the city does
+  // not read as a row of flat rectangles.
   function drawDistantSkyline(w, horizonY, t, sectionPos) {
     var drift = sectionPos * 80;
     for (var i = 0; i < skylineProps.length; i++) {
       var b = skylineProps[i];
       var bx = ((b.nx * w + drift) % (w + 60)) - 30;
-      var bw = 8 + (b.nh * 22);
-      var bh = 6 + b.nh * 70;
+      var bw = 10 + (b.nh * 26);
+      var bh = 14 + b.nh * 80;
+      var depth = 3 + b.nh * 6;
+      var topY = horizonY - bh;
+      // Side parallelogram (right)
+      ctx.fillStyle = "#04080f";
+      ctx.beginPath();
+      ctx.moveTo(bx + bw, topY);
+      ctx.lineTo(bx + bw + depth, topY - depth * 0.5);
+      ctx.lineTo(bx + bw + depth, horizonY - depth * 0.5);
+      ctx.lineTo(bx + bw, horizonY);
+      ctx.closePath();
+      ctx.fill();
+      // Top cap parallelogram
+      ctx.fillStyle = "#0f1c30";
+      ctx.beginPath();
+      ctx.moveTo(bx, topY);
+      ctx.lineTo(bx + bw, topY);
+      ctx.lineTo(bx + bw + depth, topY - depth * 0.5);
+      ctx.lineTo(bx + depth, topY - depth * 0.5);
+      ctx.closePath();
+      ctx.fill();
+      // Front face
       ctx.fillStyle = "#08111e";
-      ctx.fillRect(bx, horizonY - bh, bw, bh);
-      ctx.strokeStyle = b.red ? "rgba(255,58,58,0.6)" : "rgba(92,242,255,0.45)";
+      ctx.fillRect(bx, topY, bw, bh);
+      ctx.strokeStyle = b.red ? "rgba(255,58,58,0.7)" : "rgba(92,242,255,0.55)";
       ctx.lineWidth = 1;
-      ctx.strokeRect(bx + 0.5, horizonY - bh + 0.5, Math.max(1, bw - 1), Math.max(1, bh - 1));
+      ctx.strokeRect(bx + 0.5, topY + 0.5, Math.max(1, bw - 1), Math.max(1, bh - 1));
+      // Stepped setback (a smaller block on top)
+      if (bh > 30) {
+        var stepW = bw * 0.55;
+        var stepH = Math.min(20, bh * 0.30);
+        var stepX = bx + (bw - stepW) / 2;
+        var stepY = topY - stepH;
+        ctx.fillStyle = "#0f1c30";
+        ctx.beginPath();
+        ctx.moveTo(stepX + stepW, stepY);
+        ctx.lineTo(stepX + stepW + depth * 0.7, stepY - depth * 0.35);
+        ctx.lineTo(stepX + stepW + depth * 0.7, topY - depth * 0.35);
+        ctx.lineTo(stepX + stepW, topY);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#08111e";
+        ctx.fillRect(stepX, stepY, stepW, stepH);
+        ctx.strokeStyle = "rgba(92,242,255,0.5)";
+        ctx.strokeRect(stepX + 0.5, stepY + 0.5, stepW - 1, stepH - 1);
+      }
+      // Window strips
       if (bh > 28) {
         for (var ww = 0; ww < 3; ww++) {
           for (var hh = 0; hh < Math.floor(bh / 8); hh++) {
             if (((i + ww + hh) % 5) === 0) {
-              ctx.fillStyle = "rgba(92,242,255,0.55)";
-              ctx.fillRect(bx + 2 + ww * (bw / 3), horizonY - bh + 2 + hh * 7, 1.5, 2);
+              ctx.fillStyle = "rgba(92,242,255,0.65)";
+              ctx.fillRect(bx + 2 + ww * (bw / 3), topY + 2 + hh * 7, 1.5, 2);
             }
           }
         }
       }
       if (b.antenna && bh > 36) {
-        ctx.strokeStyle = "rgba(255,58,58,0.7)";
+        ctx.strokeStyle = "rgba(255,58,58,0.85)";
+        ctx.lineWidth = 1.2;
         ctx.beginPath();
-        ctx.moveTo(bx + bw / 2, horizonY - bh);
-        ctx.lineTo(bx + bw / 2, horizonY - bh - 8);
+        ctx.moveTo(bx + bw / 2, topY);
+        ctx.lineTo(bx + bw / 2, topY - 10);
         ctx.stroke();
+        ctx.fillStyle = "rgba(255,90,58,0.8)";
+        ctx.fillRect(bx + bw / 2 - 1, topY - 11, 2, 2);
       }
     }
     ctx.strokeStyle = "rgba(92,242,255,0.45)";
@@ -390,135 +471,321 @@
     }
   }
 
-  // Circuit board substrate underneath the track. Uses long horizontal
-  // copper traces and right-angle conduits, not random dots.
+  // Circuit board substrate underneath the track. Reads explicitly as PCB
+  // with an etched grid, right-angle copper traces, circular vias/solder
+  // pads, SMD chips with pin rows, and connector pads.
   function drawCircuitBoard(w, h, horizonY, t, sectionPos) {
+    // PCB substrate: dark teal-green so it does not read as a road or
+    // generic floor. Brighter than before so the board surface is obvious.
     var grad = ctx.createLinearGradient(0, horizonY, 0, h);
-    grad.addColorStop(0, "#0a1830");
-    grad.addColorStop(0.5, "#0c1a2e");
-    grad.addColorStop(1, "#040810");
+    grad.addColorStop(0, "#0a2a26");
+    grad.addColorStop(0.5, "#0d3a32");
+    grad.addColorStop(1, "#04140f");
     ctx.fillStyle = grad;
     ctx.fillRect(0, horizonY, w, h - horizonY);
 
-    // Faint depth grid lines.
-    ctx.strokeStyle = "rgba(92,242,255,0.09)";
+    // Etched PCB grid. Both depth lines (perspective) and lateral lines so
+    // the surface reads as a board, not a vanishing-point road. Brighter
+    // than the previous 0.09 so it is visible on desktop without dark wash.
     ctx.lineWidth = 1;
-    for (var i = 1; i < 30; i++) {
-      var z = i / 30;
+    for (var i = 1; i < 38; i++) {
+      var z = i / 38;
       var pp = z * z * 0.94 + z * 0.06;
       var y = horizonY + (h - horizonY) * pp;
+      ctx.strokeStyle = "rgba(120,255,200," + (0.05 + z * 0.16).toFixed(3) + ")";
       ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(w, y);
       ctx.stroke();
     }
-
-    // Vanishing converging traces toward the track's far end.
-    var farLat = samples[0].centerLat;
-    var vpX = w * 0.5 + farLat * (w * 0.31);
-    ctx.strokeStyle = "rgba(255,90,90,0.16)";
-    for (var v = -10; v <= 10; v++) {
-      if (v === 0) continue;
-      var bottomX = w * 0.5 + (v / 10) * w * 0.95;
+    // Lateral grid lines (perspective fan, but drawn straight so the eye
+    // reads them as etched copper lanes on a board).
+    for (var lj = -8; lj <= 8; lj++) {
+      var zNorm = 0.96;
+      var pNear = projectSample(0.04, lj / 4);
+      var pFar  = projectSample(zNorm, lj / 4);
+      ctx.strokeStyle = "rgba(120,255,200,0.18)";
       ctx.beginPath();
-      ctx.moveTo(vpX, horizonY);
-      ctx.lineTo(bottomX, h);
+      ctx.moveTo(pFar.x, pFar.y + 8);
+      ctx.lineTo(pNear.x, pNear.y + 18);
       ctx.stroke();
     }
 
-    // Long horizontal copper traces flowing across the board (replace dots).
+    // Right-angle copper traces flowing on the board, drawn with bright
+    // copper color so they are unmistakably PCB.
     for (var tIdx = 0; tIdx < pcbTraces.length; tIdx++) {
       var trace = pcbTraces[tIdx];
       trace.z += trace.speed * 0.012;
       if (trace.z > 1.05) trace.z = -0.05;
       if (trace.z < 0.02) continue;
-      var pA = projectSample(trace.z, trace.xStart * 1.6);
-      var pB = projectSample(trace.z, trace.xEnd * 1.6);
-      ctx.strokeStyle = trace.red ? "rgba(255,90,90,0.45)" : "rgba(92,242,255,0.4)";
-      ctx.lineWidth = Math.max(1, pA.halfW * 0.010);
+      var pA = projectSample(trace.z, trace.xStart * 1.8);
+      var pB = projectSample(trace.z, trace.xEnd * 1.8);
+      // Two-segment Manhattan trace with a right-angle corner.
+      var midX = (pA.x + pB.x) / 2;
+      ctx.strokeStyle = trace.red ? "rgba(255,140,90,0.85)" : "rgba(160,255,210,0.75)";
+      ctx.lineWidth = Math.max(1.4, pA.halfW * 0.014);
+      ctx.lineCap = "butt";
       ctx.beginPath();
       ctx.moveTo(pA.x, pA.y);
-      ctx.lineTo(pB.x, pA.y);
+      ctx.lineTo(midX, pA.y);
+      ctx.lineTo(midX, pB.y);
       ctx.lineTo(pB.x, pB.y);
+      ctx.stroke();
+      // Corner via at the bend
+      ctx.fillStyle = trace.red ? "rgba(255,160,110,0.95)" : "rgba(180,255,220,0.9)";
+      ctx.beginPath();
+      ctx.arc(midX, pA.y, Math.max(1.6, pA.halfW * 0.018), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#03100a";
+      ctx.beginPath();
+      ctx.arc(midX, pA.y, Math.max(0.8, pA.halfW * 0.008), 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Circular vias / solder pads sprinkled on the board. Drawn as a copper
+    // ring with a darker center hole so they read unambiguously as PCB vias.
+    for (var vi = 0; vi < pcbVias.length; vi++) {
+      var via = pcbVias[vi];
+      via.z += via.speed * 0.012;
+      if (via.z > 1.05) via.z = -0.05;
+      if (via.z < 0.04) continue;
+      var pv = projectSample(via.z, via.side * via.offset * 1.6);
+      var rOuter = Math.max(2, pv.halfW * via.r * 1.4);
+      var rInner = rOuter * 0.42;
+      ctx.fillStyle = via.red ? "rgba(255,160,110,0.9)" : "rgba(170,255,210,0.92)";
+      ctx.beginPath();
+      ctx.arc(pv.x, pv.y + rOuter * 0.5, rOuter, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#03100a";
+      ctx.beginPath();
+      ctx.arc(pv.x, pv.y + rOuter * 0.5, rInner, 0, Math.PI * 2);
+      ctx.fill();
+      // Short copper trace stub leading toward the track center.
+      ctx.strokeStyle = via.red ? "rgba(255,140,90,0.6)" : "rgba(160,255,210,0.55)";
+      ctx.lineWidth = Math.max(1, pv.halfW * 0.008);
+      ctx.beginPath();
+      ctx.moveTo(pv.x, pv.y + rOuter * 0.5);
+      ctx.lineTo(pv.x - via.side * rOuter * 3, pv.y + rOuter * 0.5);
       ctx.stroke();
     }
 
-    // SMD chips sitting on the board.
+    // SMD chips on the board: dark body, pin rows top/bottom, label band.
     for (var ch = 0; ch < smdChips.length; ch++) {
       var chip = smdChips[ch];
       chip.z += chip.speed * 0.012;
       if (chip.z > 1.05) chip.z = -0.05;
-      if (chip.z < 0.02) continue;
-      var chipP = projectSample(chip.z, chip.side * chip.offset * 1.6);
-      var cw = chipP.halfW * chip.w;
-      var chh = chipP.halfW * chip.h;
-      ctx.fillStyle = "#0a1428";
+      if (chip.z < 0.04) continue;
+      var chipP = projectSample(chip.z, chip.side * chip.offset);
+      var cw = Math.max(8, chipP.halfW * chip.w);
+      var chh = Math.max(4, chipP.halfW * chip.h);
+      // Chip body
+      ctx.fillStyle = "#02160e";
       ctx.fillRect(chipP.x - cw / 2, chipP.y - chh / 2, cw, chh);
-      ctx.strokeStyle = "rgba(92,242,255,0.7)";
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = "rgba(170,255,210,0.95)";
+      ctx.lineWidth = 1.2;
       ctx.strokeRect(chipP.x - cw / 2, chipP.y - chh / 2, cw, chh);
-      ctx.fillStyle = "rgba(255,90,58,0.85)";
-      var pins = 4;
-      for (var pi = 0; pi < pins; pi++) {
-        var px = chipP.x - cw / 2 + (pi + 0.5) * (cw / pins);
-        ctx.fillRect(px - 0.5, chipP.y - chh / 2 - 1.5, 1, 1.5);
-        ctx.fillRect(px - 0.5, chipP.y + chh / 2, 1, 1.5);
+      // Notch dot (pin-1 marker)
+      ctx.fillStyle = "rgba(255,160,110,0.95)";
+      ctx.beginPath();
+      ctx.arc(chipP.x - cw / 2 + 3, chipP.y - chh / 2 + 3, 1.4, 0, Math.PI * 2);
+      ctx.fill();
+      // Pin rows top and bottom: copper colored, very visible.
+      var pinCount = Math.max(4, Math.floor(cw / 4));
+      ctx.fillStyle = "rgba(255,200,130,0.95)";
+      for (var pi = 0; pi < pinCount; pi++) {
+        var px = chipP.x - cw / 2 + 2 + pi * ((cw - 4) / (pinCount - 1));
+        ctx.fillRect(px - 0.8, chipP.y - chh / 2 - 2.2, 1.6, 2.2);
+        ctx.fillRect(px - 0.8, chipP.y + chh / 2, 1.6, 2.2);
+      }
+      // Label band
+      if (cw > 20) {
+        ctx.fillStyle = "rgba(170,255,210,0.85)";
+        ctx.font = Math.max(7, Math.floor(chh * 0.6)) + "px JetBrains Mono, monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(chip.label, chipP.x, chipP.y);
+      }
+    }
+
+    // Connector pads (rectangle pin headers) along the board edges.
+    for (var ci = 0; ci < pcbConnectors.length; ci++) {
+      var conn = pcbConnectors[ci];
+      conn.z += conn.speed * 0.012;
+      if (conn.z > 1.05) conn.z = -0.05;
+      if (conn.z < 0.04) continue;
+      var pcn = projectSample(conn.z, conn.side * conn.offset);
+      var pw = Math.max(2, pcn.halfW * 0.012);
+      var ph = Math.max(3, pcn.halfW * 0.024);
+      for (var pp2 = 0; pp2 < conn.pins; pp2++) {
+        var ox = pcn.x + (pp2 - conn.pins / 2) * (pw + 1.5);
+        ctx.fillStyle = "rgba(255,200,130,0.95)";
+        ctx.fillRect(ox - pw / 2, pcn.y - ph / 2, pw, ph);
+        ctx.strokeStyle = "rgba(80,40,10,0.8)";
+        ctx.lineWidth = 0.8;
+        ctx.strokeRect(ox - pw / 2, pcn.y - ph / 2, pw, ph);
       }
     }
   }
 
-  // Pylons / supports beneath the elevated track.
+  // Pylons / supports beneath the elevated track. Drawn as wide tapered
+  // posts with cross-bracing, with a copper footing pad that doubles as a
+  // PCB solder pad so the track unmistakably reads as "elevated above a
+  // circuit board."
   function drawTrackPylons(w, h, horizonY, t, sectionPos) {
-    var COUNT = 12;
-    for (var i = 1; i < COUNT; i++) {
+    var COUNT = 16;
+    for (var i = 1; i <= COUNT; i++) {
       var z = i / COUNT;
       var pCenter = projectSample(z, 0);
+      var pLeft   = projectSample(z, -0.85);
+      var pRight  = projectSample(z,  0.85);
       var pp = z * z * 0.94 + z * 0.06;
       var groundY = horizonY + (h - horizonY) * pp;
-      if (groundY <= pCenter.y + 4) continue;
-      var pylonW = Math.max(1.5, pCenter.halfW * 0.05);
-      ctx.fillStyle = "rgba(20,30,55,0.85)";
-      ctx.fillRect(pCenter.x - pylonW / 2, pCenter.y, pylonW, groundY - pCenter.y);
+      if (groundY <= pCenter.y + 6) continue;
+      var pylonW = Math.max(2.5, pCenter.halfW * 0.07);
+      var dropH = groundY - pCenter.y;
+      // Footing solder pad on PCB (large copper ring with hole).
+      var padR = pylonW * 2.4;
+      ctx.fillStyle = "rgba(255,180,110,0.85)";
+      ctx.beginPath();
+      ctx.ellipse(pCenter.x, groundY, padR, padR * 0.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#03100a";
+      ctx.beginPath();
+      ctx.ellipse(pCenter.x, groundY, padR * 0.42, padR * 0.16, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(170,255,210,0.7)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.ellipse(pCenter.x, groundY, padR, padR * 0.4, 0, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Two-pillar truss (left and right of track centerline) to read as
+      // a real elevated structure, not a pole.
+      var leftX = pCenter.x - pylonW * 1.4;
+      var rightX = pCenter.x + pylonW * 1.4;
+      // Pillar fills with a left/right shading for pseudo-3D
+      var pillarGrad = ctx.createLinearGradient(leftX - pylonW * 0.5, 0, rightX + pylonW * 0.5, 0);
+      pillarGrad.addColorStop(0, "#0a1830");
+      pillarGrad.addColorStop(0.5, "#162a4a");
+      pillarGrad.addColorStop(1, "#06101e");
+      ctx.fillStyle = pillarGrad;
+      ctx.fillRect(leftX - pylonW / 2, pCenter.y, pylonW, dropH);
+      ctx.fillRect(rightX - pylonW / 2, pCenter.y, pylonW, dropH);
+      ctx.strokeStyle = "rgba(170,255,210,0.65)";
+      ctx.lineWidth = 1.2;
+      ctx.strokeRect(leftX - pylonW / 2, pCenter.y, pylonW, dropH);
+      ctx.strokeRect(rightX - pylonW / 2, pCenter.y, pylonW, dropH);
+
+      // Cross bracing (X) between pillars
       ctx.strokeStyle = "rgba(92,242,255,0.55)";
       ctx.lineWidth = 1;
-      ctx.strokeRect(pCenter.x - pylonW / 2, pCenter.y, pylonW, groundY - pCenter.y);
-      ctx.strokeStyle = "rgba(92,242,255,0.30)";
       ctx.beginPath();
-      ctx.moveTo(pCenter.x - pylonW / 2, pCenter.y);
-      ctx.lineTo(pCenter.x + pylonW / 2, groundY);
-      ctx.moveTo(pCenter.x + pylonW / 2, pCenter.y);
-      ctx.lineTo(pCenter.x - pylonW / 2, groundY);
+      ctx.moveTo(leftX,  pCenter.y + 4);
+      ctx.lineTo(rightX, groundY - 4);
+      ctx.moveTo(rightX, pCenter.y + 4);
+      ctx.lineTo(leftX,  groundY - 4);
       ctx.stroke();
-      // Footing pad (becomes a chip-pad on the PCB ground).
-      ctx.fillStyle = "rgba(255,90,58,0.55)";
+      // Horizontal cap brace
+      ctx.strokeStyle = "rgba(255,180,110,0.7)";
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
-      ctx.ellipse(pCenter.x, groundY, pylonW * 1.8, pylonW * 0.55, 0, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.moveTo(leftX - pylonW / 2, pCenter.y + dropH * 0.5);
+      ctx.lineTo(rightX + pylonW / 2, pCenter.y + dropH * 0.5);
+      ctx.stroke();
     }
   }
 
-  // The elevated roller-coaster ribbon. Uses sample table so far/near
-  // edges are perfectly consistent across draws.
+  // The elevated roller-coaster ribbon. Drawn as: underside face (so the
+  // track has visible depth from below), side walls (so the track has
+  // visible thickness), deck top (the riding surface), then rails and
+  // cross ties on top. This gives the track unmistakable 3D elevation,
+  // not a flat painted lane.
   function drawTrackRibbon(w, h, horizonY, t, sectionPos) {
-    // Underglow band: a soft cyan trail beneath the track.
-    for (var u = 0; u < SAMPLE_COUNT; u += 2) {
+    var DECK_THICKNESS = 0.18; // local-y offset for the underside/side walls
+
+    // ---- Underside face (drawn first, sits below the deck) ----
+    // The underside is a slightly inset darker trapezoid offset downward
+    // by DECK_THICKNESS * halfW so the track reads as a slab with depth.
+    for (var u = 0; u < SAMPLE_COUNT; u++) {
       var u0 = u / SAMPLE_COUNT;
-      var u1 = (u + 2) / SAMPLE_COUNT;
-      var uL0 = projectSample(u0, -1.20);
-      var uR0 = projectSample(u0,  1.20);
-      var uL1 = projectSample(u1, -1.20);
-      var uR1 = projectSample(u1,  1.20);
-      ctx.fillStyle = "rgba(92,242,255,0.05)";
+      var u1 = (u + 1) / SAMPLE_COUNT;
+      var uL0 = projectSample(u0, -1);
+      var uR0 = projectSample(u0,  1);
+      var uL1 = projectSample(u1, -1);
+      var uR1 = projectSample(u1,  1);
+      var thick0 = uL0.halfW * DECK_THICKNESS;
+      var thick1 = uL1.halfW * DECK_THICKNESS;
+      ctx.fillStyle = "rgba(2,8,16,0.92)";
       ctx.beginPath();
-      ctx.moveTo(uL0.x, uL0.y + 6);
-      ctx.lineTo(uR0.x, uR0.y + 6);
-      ctx.lineTo(uR1.x, uR1.y + 18);
-      ctx.lineTo(uL1.x, uL1.y + 18);
+      ctx.moveTo(uL0.x - 1, uL0.y + thick0);
+      ctx.lineTo(uR0.x + 1, uR0.y + thick0);
+      ctx.lineTo(uR1.x + 1, uR1.y + thick1);
+      ctx.lineTo(uL1.x - 1, uL1.y + thick1);
       ctx.closePath();
       ctx.fill();
+      // Underside cyan highlight ribs that run along the bottom edge so
+      // it reads as an electric monorail underbelly.
+      if (u % 2 === 0) {
+        ctx.strokeStyle = "rgba(92,242,255,0.35)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(uL0.x, uL0.y + thick0 - 1);
+        ctx.lineTo(uR0.x, uR0.y + thick0 - 1);
+        ctx.stroke();
+      }
     }
 
-    // Track body: dark trapezoidal slices for the deck.
+    // ---- Side walls ----
+    // The left/right side faces of the slab. These are what makes the
+    // track read as raised: you see the side of the structure.
+    for (var sw = 0; sw < SAMPLE_COUNT; sw++) {
+      var s0 = sw / SAMPLE_COUNT;
+      var s1 = (sw + 1) / SAMPLE_COUNT;
+      var L0 = projectSample(s0, -1);
+      var L1 = projectSample(s1, -1);
+      var R0 = projectSample(s0,  1);
+      var R1 = projectSample(s1,  1);
+      var th0 = L0.halfW * DECK_THICKNESS;
+      var th1 = L1.halfW * DECK_THICKNESS;
+      // Left side wall: receives less light, darker
+      var leftGrad = ctx.createLinearGradient(L0.x, L0.y, L0.x, L0.y + th0);
+      leftGrad.addColorStop(0, "#1a2440");
+      leftGrad.addColorStop(1, "#06101e");
+      ctx.fillStyle = leftGrad;
+      ctx.beginPath();
+      ctx.moveTo(L0.x, L0.y);
+      ctx.lineTo(L1.x, L1.y);
+      ctx.lineTo(L1.x, L1.y + th1);
+      ctx.lineTo(L0.x, L0.y + th0);
+      ctx.closePath();
+      ctx.fill();
+      // Right side wall: slightly lighter (catching sun)
+      var rightGrad = ctx.createLinearGradient(R0.x, R0.y, R0.x, R0.y + th0);
+      rightGrad.addColorStop(0, "#243456");
+      rightGrad.addColorStop(1, "#08142a");
+      ctx.fillStyle = rightGrad;
+      ctx.beginPath();
+      ctx.moveTo(R0.x, R0.y);
+      ctx.lineTo(R1.x, R1.y);
+      ctx.lineTo(R1.x, R1.y + th1);
+      ctx.lineTo(R0.x, R0.y + th0);
+      ctx.closePath();
+      ctx.fill();
+      // Glowing strip on each side wall for the "electric monorail" read
+      ctx.strokeStyle = "rgba(92,242,255,0.55)";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(L0.x, L0.y + th0 * 0.55);
+      ctx.lineTo(L1.x, L1.y + th1 * 0.55);
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(255,140,90,0.55)";
+      ctx.beginPath();
+      ctx.moveTo(R0.x, R0.y + th0 * 0.55);
+      ctx.lineTo(R1.x, R1.y + th1 * 0.55);
+      ctx.stroke();
+    }
+
+    // ---- Deck top (riding surface) ----
     for (var i = 0; i < SAMPLE_COUNT; i++) {
       var z0 = i / SAMPLE_COUNT;
       var z1 = (i + 1) / SAMPLE_COUNT;
@@ -526,8 +793,8 @@
       var p0R = projectSample(z0,  1);
       var p1L = projectSample(z1, -1);
       var p1R = projectSample(z1,  1);
-      var shade = 14 + Math.floor(z0 * 28);
-      ctx.fillStyle = "rgb(" + shade + "," + (shade + 8) + "," + (shade + 30) + ")";
+      var shade = 22 + Math.floor(z0 * 36);
+      ctx.fillStyle = "rgb(" + shade + "," + (shade + 12) + "," + (shade + 40) + ")";
       ctx.beginPath();
       ctx.moveTo(p0L.x, p0L.y);
       ctx.lineTo(p0R.x, p0R.y);
@@ -536,12 +803,16 @@
       ctx.closePath();
       ctx.fill();
 
-      // Inner copper core band.
-      var cL0 = projectSample(z0, -0.45);
-      var cR0 = projectSample(z0,  0.45);
-      var cL1 = projectSample(z1, -0.45);
-      var cR1 = projectSample(z1,  0.45);
-      ctx.fillStyle = "rgba(192,68,40," + (0.18 + z0 * 0.32).toFixed(3) + ")";
+      // Glowing copper core band running down the deck centerline.
+      var cL0 = projectSample(z0, -0.30);
+      var cR0 = projectSample(z0,  0.30);
+      var cL1 = projectSample(z1, -0.30);
+      var cR1 = projectSample(z1,  0.30);
+      var coreGrad = ctx.createLinearGradient(cL0.x, cL0.y, cR0.x, cR0.y);
+      coreGrad.addColorStop(0, "rgba(92,242,255,0.32)");
+      coreGrad.addColorStop(0.5, "rgba(255,180,110," + (0.30 + z0 * 0.4).toFixed(3) + ")");
+      coreGrad.addColorStop(1, "rgba(255,58,58,0.30)");
+      ctx.fillStyle = coreGrad;
       ctx.beginPath();
       ctx.moveTo(cL0.x, cL0.y);
       ctx.lineTo(cR0.x, cR0.y);
@@ -551,17 +822,17 @@
       ctx.fill();
     }
 
-    // Cross ties: short transverse bars sliding along the track. Time-based
-    // phase keeps them gliding smoothly even at variable framerate.
-    var TIES = 22;
+    // Cross ties: prominent transverse bars sliding along the track.
+    var TIES = 28;
     var tiePhase = (t * 0.18) % (1 / TIES);
     for (var ti = 0; ti < TIES; ti++) {
       var tz = (ti / TIES + tiePhase);
       if (tz <= 0.02 || tz >= 1) continue;
-      var tL = projectSample(tz, -0.92);
-      var tR = projectSample(tz,  0.92);
-      ctx.strokeStyle = "rgba(140,180,220," + (0.30 + tz * 0.5).toFixed(3) + ")";
-      ctx.lineWidth = Math.max(0.8, tL.halfW * 0.012);
+      var tL = projectSample(tz, -0.95);
+      var tR = projectSample(tz,  0.95);
+      ctx.strokeStyle = "rgba(170,210,240," + (0.40 + tz * 0.5).toFixed(3) + ")";
+      ctx.lineWidth = Math.max(1.2, tL.halfW * 0.018);
+      ctx.lineCap = "butt";
       ctx.beginPath();
       ctx.moveTo(tL.x, tL.y);
       ctx.lineTo(tR.x, tR.y);
@@ -569,7 +840,8 @@
     }
 
     // Side conduits drawn as long polylines so they read as continuous
-    // glowing rails, not segmented dashes.
+    // glowing rails, not segmented dashes. Drawn last so they crown the
+    // track edges.
     function drawRail(side, color, glowCol, lw) {
       ctx.strokeStyle = color;
       ctx.lineWidth = lw;
@@ -585,14 +857,14 @@
       ctx.stroke();
       ctx.shadowBlur = 0;
     }
-    drawRail(-1.05, CYAN, "rgba(92,242,255,0.85)", 3);
-    drawRail( 1.05, RED,  "rgba(255,58,58,0.85)", 3);
-    drawRail(-0.92, "rgba(180,230,255,0.7)", "rgba(92,242,255,0.5)", 1.5);
-    drawRail( 0.92, "rgba(255,170,170,0.7)", "rgba(255,58,58,0.5)", 1.5);
+    drawRail(-1.02, CYAN, "rgba(92,242,255,0.95)", 4);
+    drawRail( 1.02, RED,  "rgba(255,58,58,0.95)", 4);
+    drawRail(-0.85, "rgba(180,230,255,0.85)", "rgba(92,242,255,0.6)", 2);
+    drawRail( 0.85, "rgba(255,170,170,0.85)", "rgba(255,58,58,0.6)", 2);
 
     // Center spine.
-    ctx.strokeStyle = "rgba(255,255,255,0.30)";
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(255,255,255,0.45)";
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
     for (var s = 0; s <= SAMPLE_COUNT; s++) {
       var pp = projectSample(s / SAMPLE_COUNT, 0);
@@ -709,16 +981,65 @@
     ctx.fillStyle = color;
     ctx.fillRect(x, y, w_, h_);
   }
+  // Pseudo-isometric 3D box: front face + right side face + top cap.
+  // Centered on (cx, baseY) with width w_ and height h_. depth controls how
+  // far the side face shears to the right and how tall the top cap reads.
+  // Returns {fx, fy, fw, fh} of the front face for window grid placement.
+  function box3D(cx, baseY, w_, h_, depth, frontColor, sideColor, topColor) {
+    var fx = cx - w_ / 2;
+    var fy = baseY - h_;
+    var fw = w_;
+    var fh = h_;
+    var dx = depth * 0.85;
+    var dy = depth * 0.45;
+    // Right side face (parallelogram)
+    ctx.fillStyle = sideColor;
+    ctx.beginPath();
+    ctx.moveTo(fx + fw,        fy);
+    ctx.lineTo(fx + fw + dx,   fy - dy);
+    ctx.lineTo(fx + fw + dx,   baseY - dy);
+    ctx.lineTo(fx + fw,        baseY);
+    ctx.closePath();
+    ctx.fill();
+    // Top cap (parallelogram)
+    ctx.fillStyle = topColor;
+    ctx.beginPath();
+    ctx.moveTo(fx,             fy);
+    ctx.lineTo(fx + fw,        fy);
+    ctx.lineTo(fx + fw + dx,   fy - dy);
+    ctx.lineTo(fx + dx,        fy - dy);
+    ctx.closePath();
+    ctx.fill();
+    // Front face
+    ctx.fillStyle = frontColor;
+    ctx.fillRect(fx, fy, fw, fh);
+    // Edge highlights
+    ctx.strokeStyle = "rgba(92,242,255,0.85)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(fx + 0.5, fy + 0.5, fw - 1, fh - 1);
+    ctx.beginPath();
+    ctx.moveTo(fx + fw,      fy);
+    ctx.lineTo(fx + fw + dx, fy - dy);
+    ctx.moveTo(fx + fw + dx, fy - dy);
+    ctx.lineTo(fx + fw + dx, baseY - dy);
+    ctx.moveTo(fx + fw + dx, baseY - dy);
+    ctx.lineTo(fx + fw,      baseY);
+    ctx.moveTo(fx,           fy);
+    ctx.lineTo(fx + dx,      fy - dy);
+    ctx.lineTo(fx + fw + dx, fy - dy);
+    ctx.stroke();
+    return { fx: fx, fy: fy, fw: fw, fh: fh };
+  }
   function windowGrid(x, y, w_, h_, cols, rows, t, seed) {
     for (var c = 0; c < cols; c++) {
       for (var r = 0; r < rows; r++) {
         var on = ((Math.sin(t * 1.4 + r * 1.3 + c * 0.7 + seed) + 1) * 0.5) > 0.45;
-        var cx = x + 1.5 + c * ((w_ - 3) / cols);
-        var cy = y + 1.5 + r * ((h_ - 3) / rows);
+        var cx2 = x + 1.5 + c * ((w_ - 3) / cols);
+        var cy2 = y + 1.5 + r * ((h_ - 3) / rows);
         var cw = Math.max(1, (w_ - 3) / cols - 1);
         var ch = Math.max(1, (h_ - 3) / rows - 1.2);
-        ctx.fillStyle = on ? "rgba(92,242,255,0.85)" : "rgba(20,40,70,0.6)";
-        ctx.fillRect(cx, cy, cw, ch);
+        ctx.fillStyle = on ? "rgba(92,242,255,0.95)" : "rgba(20,40,70,0.6)";
+        ctx.fillRect(cx2, cy2, cw, ch);
       }
     }
   }
@@ -736,10 +1057,11 @@
 
   function drawSpire(p, scale, t) {
     pad(p, scale);
-    var hgt = scale * 30;
+    var hgt = scale * 36;
     var basew = scale * 3.4;
     var midw = scale * 2.4;
     var topw = scale * 1.4;
+    var depth = scale * 1.6;
 
     var seg1H = hgt * 0.45;
     var seg2H = hgt * 0.32;
@@ -749,105 +1071,108 @@
     var y2 = y1 - seg2H;
     var y3 = y2 - seg3H;
 
-    var bg = ctx.createLinearGradient(p.x, y1, p.x, y0);
-    bg.addColorStop(0, "#1a2a4a");
-    bg.addColorStop(1, "#06101e");
-    ctx.fillStyle = bg;
-    ctx.fillRect(p.x - basew, y1, basew * 2, seg1H);
-    ctx.strokeStyle = CYAN;
-    ctx.lineWidth = 1.2;
-    ctx.shadowColor = "rgba(92,242,255,0.6)";
-    ctx.shadowBlur = 6;
-    ctx.strokeRect(p.x - basew, y1, basew * 2, seg1H);
-    ctx.shadowBlur = 0;
-    windowGrid(p.x - basew, y1, basew * 2, seg1H, 6, 8, t, p.x);
+    // Bottom segment as 3D box
+    var seg1 = box3D(p.x, y0, basew * 2, seg1H, depth, "#0e1a32", "#06101e", "#1c2c4e");
+    windowGrid(seg1.fx, seg1.fy, seg1.fw, seg1.fh, 6, 9, t, p.x);
+    rectStrip(seg1.fx - 1, seg1.fy - 2, seg1.fw + 2, 2, "rgba(92,242,255,0.85)");
 
-    ctx.fillStyle = "#0d182e";
-    ctx.fillRect(p.x - midw, y2, midw * 2, seg2H);
-    ctx.strokeStyle = CYAN;
-    ctx.strokeRect(p.x - midw, y2, midw * 2, seg2H);
-    windowGrid(p.x - midw, y2, midw * 2, seg2H, 5, 6, t, p.x + 13);
+    // Mid segment
+    var seg2 = box3D(p.x, y1, midw * 2, seg2H, depth * 0.8, "#0d172a", "#05101c", "#192746");
+    windowGrid(seg2.fx, seg2.fy, seg2.fw, seg2.fh, 5, 7, t, p.x + 13);
+    rectStrip(seg2.fx - 1, seg2.fy - 2, seg2.fw + 2, 2, "rgba(92,242,255,0.7)");
 
-    ctx.fillStyle = "#0a1426";
-    ctx.fillRect(p.x - topw, y3, topw * 2, seg3H);
+    // Top segment / crown
+    var seg3 = box3D(p.x, y2, topw * 2, seg3H, depth * 0.6, "#0a1426", "#040b16", "#162241");
+    windowGrid(seg3.fx, seg3.fy, seg3.fw, seg3.fh, 3, 5, t, p.x + 41);
     ctx.strokeStyle = RED;
-    ctx.strokeRect(p.x - topw, y3, topw * 2, seg3H);
-    windowGrid(p.x - topw, y3, topw * 2, seg3H, 3, 5, t, p.x + 41);
+    ctx.lineWidth = 1.4;
+    ctx.strokeRect(seg3.fx + 0.5, seg3.fy + 0.5, seg3.fw - 1, seg3.fh - 1);
 
-    rectStrip(p.x - basew - 1, y1 - 2, basew * 2 + 2, 2, "rgba(92,242,255,0.7)");
-    rectStrip(p.x - midw - 1, y2 - 2, midw * 2 + 2, 2, "rgba(92,242,255,0.55)");
+    // Vertical light strips on the front face
+    for (var ls = 0; ls < 3; ls++) {
+      var lsx = seg1.fx + (ls + 1) * (seg1.fw / 4);
+      var lsGrad = ctx.createLinearGradient(lsx, seg1.fy, lsx, seg1.fy + seg1.fh);
+      lsGrad.addColorStop(0, "rgba(92,242,255,0)");
+      lsGrad.addColorStop(0.5, "rgba(92,242,255,0.7)");
+      lsGrad.addColorStop(1, "rgba(92,242,255,0)");
+      ctx.fillStyle = lsGrad;
+      ctx.fillRect(lsx - 0.5, seg1.fy, 1, seg1.fh);
+    }
 
+    // Crown antenna mast
     ctx.strokeStyle = RED;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1.4;
     ctx.beginPath();
     ctx.moveTo(p.x, y3);
-    ctx.lineTo(p.x, y3 - scale * 6);
+    ctx.lineTo(p.x, y3 - scale * 8);
     ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(p.x - scale * 1.2, y3 - scale * 3);
-    ctx.lineTo(p.x + scale * 1.2, y3 - scale * 3);
+    ctx.moveTo(p.x - scale * 1.4, y3 - scale * 4);
+    ctx.lineTo(p.x + scale * 1.4, y3 - scale * 4);
     ctx.stroke();
     var beaconOn = Math.sin(t * 3) > 0;
     ctx.fillStyle = beaconOn ? RED : "#ffaa55";
     ctx.shadowColor = "rgba(255,58,58,0.9)";
-    ctx.shadowBlur = beaconOn ? 10 : 4;
+    ctx.shadowBlur = beaconOn ? 12 : 5;
     ctx.beginPath();
-    ctx.arc(p.x, y3 - scale * 6, Math.max(1.4, scale * 0.5), 0, Math.PI * 2);
+    ctx.arc(p.x, y3 - scale * 8, Math.max(1.6, scale * 0.6), 0, Math.PI * 2);
     ctx.fill();
     ctx.shadowBlur = 0;
   }
 
   function drawFoundry(p, scale, t) {
     pad(p, scale);
-    var hgt = scale * 22;
+    var hgt = scale * 26;
+    var depth = scale * 1.4;
     var towers = [
-      { x: p.x - scale * 3.4, w: scale * 1.8, h: hgt },
-      { x: p.x,                w: scale * 2.2, h: hgt * 1.05 },
-      { x: p.x + scale * 3.4,  w: scale * 1.6, h: hgt * 0.85 }
+      { x: p.x - scale * 3.6, w: scale * 1.8, h: hgt },
+      { x: p.x,                w: scale * 2.4, h: hgt * 1.10 },
+      { x: p.x + scale * 3.6,  w: scale * 1.6, h: hgt * 0.85 }
     ];
+    var faces = [];
     towers.forEach(function (tw, idx) {
-      ctx.fillStyle = "#0d182e";
-      ctx.fillRect(tw.x - tw.w, p.y - tw.h, tw.w * 2, tw.h);
-      ctx.strokeStyle = CYAN;
-      ctx.lineWidth = 1.2;
-      ctx.strokeRect(tw.x - tw.w, p.y - tw.h, tw.w * 2, tw.h);
-      windowGrid(tw.x - tw.w, p.y - tw.h, tw.w * 2, tw.h, 4, 10, t, tw.x + idx * 17);
-      rectStrip(tw.x - tw.w - 1, p.y - tw.h - 2, tw.w * 2 + 2, 2, "rgba(255,90,58,0.7)");
+      var face = box3D(tw.x, p.y, tw.w * 2, tw.h, depth, "#0d182e", "#05101c", "#1a2a4a");
+      faces.push(face);
+      windowGrid(face.fx, face.fy, face.fw, face.fh, 4, 10, t, tw.x + idx * 17);
+      rectStrip(face.fx - 1, face.fy - 2, face.fw + 2, 2, "rgba(255,140,90,0.85)");
+      // Stack vent
       ctx.strokeStyle = "rgba(180,200,220,0.7)";
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(tw.x, p.y - tw.h - 2);
-      ctx.lineTo(tw.x, p.y - tw.h - scale * 3);
+      ctx.lineTo(tw.x, p.y - tw.h - scale * 4);
       ctx.stroke();
       var puff = (Math.sin(t * 1.0 + idx) + 1) * 0.5;
-      ctx.fillStyle = "rgba(255,200,160," + (0.18 + puff * 0.35).toFixed(3) + ")";
+      ctx.fillStyle = "rgba(255,200,160," + (0.20 + puff * 0.40).toFixed(3) + ")";
       ctx.beginPath();
-      ctx.arc(tw.x, p.y - tw.h - scale * 3 - puff * scale * 1.5, scale * (0.4 + puff * 0.3), 0, Math.PI * 2);
+      ctx.arc(tw.x, p.y - tw.h - scale * 4 - puff * scale * 1.8, scale * (0.5 + puff * 0.35), 0, Math.PI * 2);
       ctx.fill();
     });
-    ctx.strokeStyle = RED;
-    ctx.lineWidth = 1.5;
+    // Skybridges between towers: drawn as thin glowing horizontal beams
+    ctx.strokeStyle = "rgba(255,58,58,0.85)";
+    ctx.lineWidth = 2;
     ctx.shadowColor = "rgba(255,58,58,0.8)";
-    ctx.shadowBlur = 8;
+    ctx.shadowBlur = 10;
+    var bridgeY1 = p.y - towers[0].h * 0.65;
+    var bridgeY2 = p.y - towers[0].h * 0.40;
     ctx.beginPath();
-    ctx.moveTo(towers[0].x + towers[0].w, p.y - towers[0].h * 0.6);
-    ctx.lineTo(towers[1].x - towers[1].w, p.y - towers[1].h * 0.6);
-    ctx.moveTo(towers[1].x + towers[1].w, p.y - towers[1].h * 0.55);
-    ctx.lineTo(towers[2].x - towers[2].w, p.y - towers[2].h * 0.55);
+    ctx.moveTo(faces[0].fx + faces[0].fw, bridgeY1);
+    ctx.lineTo(faces[1].fx, bridgeY1);
+    ctx.moveTo(faces[1].fx + faces[1].fw, bridgeY1 - 6);
+    ctx.lineTo(faces[2].fx, bridgeY1 - 6);
+    ctx.moveTo(faces[0].fx + faces[0].fw, bridgeY2);
+    ctx.lineTo(faces[1].fx, bridgeY2);
     ctx.stroke();
     ctx.shadowBlur = 0;
   }
 
   function drawVoiceArray(p, scale, t) {
     pad(p, scale);
-    var hgt = scale * 28;
-    var w_ = scale * 1.6;
-    ctx.fillStyle = "#0a1426";
-    ctx.fillRect(p.x - w_, p.y - hgt * 0.7, w_ * 2, hgt * 0.7);
-    ctx.strokeStyle = CYAN;
-    ctx.lineWidth = 1.2;
-    ctx.strokeRect(p.x - w_, p.y - hgt * 0.7, w_ * 2, hgt * 0.7);
-    windowGrid(p.x - w_, p.y - hgt * 0.7, w_ * 2, hgt * 0.7, 3, 14, t, p.x);
+    var hgt = scale * 32;
+    var w_ = scale * 1.8;
+    var depth = scale * 1.0;
+    var face = box3D(p.x, p.y, w_ * 2, hgt * 0.7, depth, "#0a1426", "#040b16", "#162241");
+    windowGrid(face.fx, face.fy, face.fw, face.fh, 3, 14, t, p.x);
     ctx.strokeStyle = "rgba(170,200,255,0.85)";
     ctx.lineWidth = 1.2;
     ctx.beginPath();
@@ -888,22 +1213,20 @@
 
   function drawOpsTower(p, scale, t) {
     pad(p, scale);
-    var hgt = scale * 26;
+    var hgt = scale * 30;
     var basew = scale * 2.6;
-    ctx.fillStyle = "#0c1830";
-    ctx.fillRect(p.x - basew, p.y - hgt, basew * 2, hgt);
-    ctx.strokeStyle = CYAN;
-    ctx.lineWidth = 1.2;
-    ctx.strokeRect(p.x - basew, p.y - hgt, basew * 2, hgt);
-    windowGrid(p.x - basew, p.y - hgt, basew * 2, hgt, 5, 12, t, p.x);
-    var deckH = scale * 2.4;
-    ctx.fillStyle = "#1a2a4a";
-    ctx.fillRect(p.x - basew * 1.6, p.y - hgt - deckH, basew * 3.2, deckH);
+    var depth = scale * 1.4;
+    var face = box3D(p.x, p.y, basew * 2, hgt, depth, "#0c1830", "#05101c", "#192746");
+    windowGrid(face.fx, face.fy, face.fw, face.fh, 5, 12, t, p.x);
+    var deckH = scale * 2.6;
+    // Observation deck as its own 3D box (overhanging)
+    var deckFace = box3D(p.x, p.y - hgt, basew * 3.2, deckH, depth * 1.1, "#1a2a4a", "#0a142a", "#2a3e5e");
     ctx.strokeStyle = RED;
-    ctx.strokeRect(p.x - basew * 1.6, p.y - hgt - deckH, basew * 3.2, deckH);
+    ctx.lineWidth = 1.2;
+    ctx.strokeRect(deckFace.fx + 0.5, deckFace.fy + 0.5, deckFace.fw - 1, deckFace.fh - 1);
     for (var i = 0; i < 9; i++) {
-      ctx.fillStyle = "rgba(92,242,255,0.85)";
-      ctx.fillRect(p.x - basew * 1.55 + i * (basew * 0.36), p.y - hgt - deckH + 0.7, basew * 0.28, deckH - 1.4);
+      ctx.fillStyle = "rgba(92,242,255,0.95)";
+      ctx.fillRect(deckFace.fx + 1 + i * (deckFace.fw / 9), deckFace.fy + 0.7, deckFace.fw / 9 - 1.5, deckFace.fh - 1.4);
     }
     ctx.strokeStyle = "rgba(170,200,255,0.85)";
     ctx.lineWidth = 1;
@@ -933,25 +1256,26 @@
 
   function drawReactor(p, scale, t) {
     pad(p, scale);
-    var hgt = scale * 26;
-    var w_ = scale * 2.4;
-    ctx.fillStyle = "#0e1a2e";
-    ctx.fillRect(p.x - w_, p.y - hgt, w_ * 2, hgt);
-    ctx.strokeStyle = "rgba(255,90,58,0.85)";
-    ctx.lineWidth = 1.2;
-    ctx.strokeRect(p.x - w_, p.y - hgt, w_ * 2, hgt);
+    var hgt = scale * 30;
+    var w_ = scale * 2.6;
+    var depth = scale * 1.4;
+    var face = box3D(p.x, p.y, w_ * 2, hgt, depth, "#0e1a2e", "#06101e", "#1a2a48");
+    ctx.strokeStyle = "rgba(255,90,58,0.95)";
+    ctx.lineWidth = 1.4;
+    ctx.strokeRect(face.fx + 0.5, face.fy + 0.5, face.fw - 1, face.fh - 1);
     var pulse = 0.5 + 0.5 * Math.sin(t * 3);
-    var seamGrad = ctx.createLinearGradient(p.x, p.y - hgt, p.x, p.y);
+    // Glowing energy seam down the reactor's front
+    var seamGrad = ctx.createLinearGradient(p.x, face.fy, p.x, p.y);
     seamGrad.addColorStop(0, "rgba(255,200,120," + (0.4 + pulse * 0.4).toFixed(3) + ")");
     seamGrad.addColorStop(1, "rgba(255,90,58,0.95)");
     ctx.fillStyle = seamGrad;
-    ctx.fillRect(p.x - scale * 0.5, p.y - hgt + 2, scale, hgt - 4);
+    ctx.fillRect(p.x - scale * 0.5, face.fy + 2, scale, face.fh - 4);
     ctx.shadowColor = "rgba(255,90,58,0.95)";
     ctx.shadowBlur = 14;
-    ctx.fillRect(p.x - scale * 0.25, p.y - hgt + 2, scale * 0.5, hgt - 4);
+    ctx.fillRect(p.x - scale * 0.25, face.fy + 2, scale * 0.5, face.fh - 4);
     ctx.shadowBlur = 0;
     for (var sd = -1; sd <= 1; sd += 2) {
-      windowGrid(p.x + sd * (w_ * 0.55) - w_ * 0.35, p.y - hgt + 2, w_ * 0.7, hgt - 4, 2, 12, t, p.x + sd * 31);
+      windowGrid(p.x + sd * (w_ * 0.55) - w_ * 0.35, face.fy + 2, w_ * 0.7, face.fh - 4, 2, 12, t, p.x + sd * 31);
     }
     var coreY = p.y - hgt * 0.78;
     for (var i = 0; i < 4; i++) {
@@ -981,28 +1305,25 @@
 
   function drawContentForge(p, scale, t) {
     pad(p, scale);
-    var hgt = scale * 22;
+    var hgt = scale * 26;
     var basew = scale * 5.0;
-    ctx.fillStyle = "#0a1628";
-    ctx.fillRect(p.x - basew, p.y - hgt, basew * 2, hgt);
-    ctx.strokeStyle = CYAN;
-    ctx.lineWidth = 1.3;
-    ctx.strokeRect(p.x - basew, p.y - hgt, basew * 2, hgt);
+    var depth = scale * 1.6;
+    var face = box3D(p.x, p.y, basew * 2, hgt, depth, "#0a1628", "#040d1a", "#16263e");
     var lowerH = hgt * 0.45;
-    windowGrid(p.x - basew, p.y - lowerH, basew * 2, lowerH, 10, 4, t, p.x);
-    var facadeY = p.y - hgt + 4;
+    windowGrid(face.fx, face.fy + (hgt - lowerH), face.fw, lowerH, 10, 4, t, p.x);
+    var facadeY = face.fy + 4;
     var facadeH = hgt - lowerH - 8;
     ctx.fillStyle = "rgba(8,18,38,0.9)";
-    ctx.fillRect(p.x - basew + 4, facadeY, basew * 2 - 8, facadeH);
+    ctx.fillRect(face.fx + 4, facadeY, face.fw - 8, facadeH);
     var bars = 12;
     for (var i = 0; i < bars; i++) {
       var bh = (Math.sin(t * 1.6 + i) + 1) * 0.5 * (facadeH - 4) + 2;
-      var bx = p.x - basew + 6 + i * ((basew * 2 - 12) / bars);
-      var bw = (basew * 2 - 12) / bars - 1;
-      ctx.fillStyle = i < bars / 2 ? "rgba(92,242,255,0.85)" : "rgba(255,58,58,0.85)";
+      var bx = face.fx + 6 + i * ((face.fw - 12) / bars);
+      var bw = (face.fw - 12) / bars - 1;
+      ctx.fillStyle = i < bars / 2 ? "rgba(92,242,255,0.95)" : "rgba(255,58,58,0.95)";
       ctx.fillRect(bx, facadeY + facadeH - bh - 2, bw, bh);
     }
-    rectStrip(p.x - basew - 1, p.y - hgt - 2, basew * 2 + 2, 2, "rgba(255,90,58,0.8)");
+    rectStrip(face.fx - 1, face.fy - 2, face.fw + 2, 2, "rgba(255,140,90,0.85)");
     for (var k = -1; k <= 1; k++) {
       var on = Math.sin(t * 2.4 + k) > 0;
       ctx.fillStyle = on ? "#ffaa55" : RED;
@@ -1017,14 +1338,11 @@
 
   function drawIntegrationDome(p, scale, t) {
     pad(p, scale);
-    var towerH = scale * 16;
-    var towerW = scale * 1.3;
-    ctx.fillStyle = "#0a1426";
-    ctx.fillRect(p.x - towerW, p.y - towerH, towerW * 2, towerH);
-    ctx.strokeStyle = CYAN;
-    ctx.lineWidth = 1.1;
-    ctx.strokeRect(p.x - towerW, p.y - towerH, towerW * 2, towerH);
-    windowGrid(p.x - towerW, p.y - towerH, towerW * 2, towerH, 2, 9, t, p.x + 7);
+    var towerH = scale * 20;
+    var towerW = scale * 1.6;
+    var depth = scale * 1.0;
+    var face = box3D(p.x, p.y, towerW * 2, towerH, depth, "#0a1426", "#040b16", "#172445");
+    windowGrid(face.fx, face.fy, face.fw, face.fh, 2, 10, t, p.x + 7);
 
     var domeR = scale * 4.5;
     var cy = p.y - domeR;
@@ -1095,18 +1413,15 @@
     ctx.beginPath();
     ctx.ellipse(p.x, p.y, rRad, rRad * 0.4, 0, 0, Math.PI * 2);
     ctx.stroke();
-    var towerH = scale * 18;
-    var towerW = scale * 0.8;
-    ctx.fillStyle = "#0c1828";
-    ctx.fillRect(p.x - towerW, p.y - towerH, towerW * 2, towerH);
-    ctx.strokeStyle = CYAN;
-    ctx.lineWidth = 1.1;
-    ctx.strokeRect(p.x - towerW, p.y - towerH, towerW * 2, towerH);
-    var stripGrad = ctx.createLinearGradient(p.x, p.y - towerH, p.x, p.y);
+    var towerH = scale * 22;
+    var towerW = scale * 1.2;
+    var depthC = scale * 0.9;
+    var face = box3D(p.x, p.y, towerW * 2, towerH, depthC, "#0c1828", "#040b16", "#1a2a48");
+    var stripGrad = ctx.createLinearGradient(p.x, face.fy, p.x, p.y);
     stripGrad.addColorStop(0, "rgba(92,242,255,0)");
     stripGrad.addColorStop(1, "rgba(92,242,255,0.95)");
     ctx.fillStyle = stripGrad;
-    ctx.fillRect(p.x - 0.8, p.y - towerH, 1.6, towerH);
+    ctx.fillRect(p.x - 0.8, face.fy, 1.6, face.fh);
     var beacon = (Math.sin(t * 2.4) > 0);
     ctx.fillStyle = beacon ? RED : "#ffaa55";
     ctx.shadowColor = "rgba(255,58,58,0.9)";
@@ -1218,7 +1533,7 @@
     sizeCanvas();
     window.addEventListener("resize", sizeCanvas);
     requestAnimationFrame(frame);
-    try { console.info("[brainstorm] Canvas2D roller-circuit smooth engine running"); } catch (_) {}
+    try { console.info("[brainstorm] Canvas2D roller-circuit elevated/PCB engine running"); } catch (_) {}
   }
 
   start();
