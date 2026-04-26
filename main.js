@@ -5,6 +5,12 @@ import { DISTRICTS, AGENT_SAMPLE } from "./districts.js";
 const isMobile = window.matchMedia("(max-width: 640px)").matches;
 const isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
 const lowPower = isMobile || isCoarsePointer;
+// Honor OS-level reduced-motion preference. When true, the camera snaps between
+// section keyframes instead of gliding, the racing-current speed boost is
+// disabled, and packets/telemetry orbits stop animating.
+const reducedMotionMQ = window.matchMedia("(prefers-reduced-motion: reduce)");
+let reduceMotion = reducedMotionMQ.matches;
+reducedMotionMQ.addEventListener?.("change", e => { reduceMotion = e.matches; });
 
 const canvas = document.getElementById("scene");
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: !lowPower, powerPreference: lowPower ? "low-power" : "high-performance" });
@@ -1237,16 +1243,25 @@ let scrollSpeed = 0; // smoothed |dProgress/dt|
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.05);
   elapsed += dt;
-  // smooth scroll progress
-  scrollProgress += (targetProgress - scrollProgress) * 0.08;
+  // Smooth scroll progress. Mobile uses a softer lerp so the camera settles
+  // into each section and reads cinematically instead of zipping past.
+  // Reduced-motion: snap straight to the target so no animated camera glide.
+  const lerp = reduceMotion ? 1 : (lowPower ? 0.05 : 0.08);
+  scrollProgress += (targetProgress - scrollProgress) * lerp;
   // Track scroll velocity to drive the racing-current speed boost. When the
   // user scrolls, electricity along the roads accelerates and streaks stretch
   // longer — selling the "we're racing along the circuit board" feeling.
+  // Mobile caps the boost lower so a fling-scroll doesn't turn the current
+  // into a strobe.
   const dProg = Math.abs(scrollProgress - lastProgress);
   lastProgress = scrollProgress;
   const instSpeed = dt > 0 ? dProg / dt : 0;
   scrollSpeed += (instSpeed - scrollSpeed) * 0.18;
-  const speedBoost = 1 + Math.min(scrollSpeed * 22, 2.6); // 1x..3.6x
+  const boostCap = lowPower ? 1.4 : 2.6;
+  const boostGain = lowPower ? 14 : 22;
+  const speedBoost = reduceMotion
+    ? 1
+    : 1 + Math.min(scrollSpeed * boostGain, boostCap); // mobile: 1x..2.4x, desktop: 1x..3.6x
   // camera follows full path across 0..1
   posCurve.getPointAt(scrollProgress, tmpPos);
   lookCurve.getPointAt(scrollProgress, tmpLook);
@@ -1259,8 +1274,9 @@ function tick() {
   // Pulsing energy nodes — gentle scale + opacity breathing, plus column flicker.
   // Hero-boosted columns breathe brighter so the electric uplink reads above the
   // fold from the hero camera position.
+  // Reduced-motion: hold a steady mid-brightness instead of breathing.
   for (const n of energyNodes) {
-    const pulse = 0.5 + 0.5 * Math.sin(elapsed * 2.4 + n.phase);
+    const pulse = reduceMotion ? 0.5 : 0.5 + 0.5 * Math.sin(elapsed * 2.4 + n.phase);
     const s = 1 + pulse * 0.18;
     n.ring.scale.set(s, s, 1);
     n.ring.material.opacity = 0.35 + pulse * 0.45;
@@ -1274,36 +1290,42 @@ function tick() {
     }
   }
 
-  // Telemetry rings — slow rotation + slight bob for antigravity feel
-  for (const t of telemetryRings) {
-    t.mesh.rotation.z += dt * t.spin;
-    t.mesh.position.y = t.baseY + Math.sin(elapsed * 0.9 + t.phase) * 1.6;
+  // Telemetry rings — slow rotation + slight bob for antigravity feel.
+  // Reduced-motion: hold their rest pose so nothing drifts in peripheral vision.
+  if (!reduceMotion) {
+    for (const t of telemetryRings) {
+      t.mesh.rotation.z += dt * t.spin;
+      t.mesh.position.y = t.baseY + Math.sin(elapsed * 0.9 + t.phase) * 1.6;
+    }
+
+    // Waypoint beacons — float and softly spin
+    for (const w of waypointMarkers) {
+      w.mesh.position.y = w.baseY + Math.sin(elapsed * 1.4 + w.phase) * 2.2;
+      w.mesh.rotation.y += dt * 0.9;
+      w.mesh.rotation.x += dt * 0.4;
+    }
+
+    updatePackets(dt, speedBoost);
   }
 
-  // Waypoint beacons — float and softly spin
-  for (const w of waypointMarkers) {
-    w.mesh.position.y = w.baseY + Math.sin(elapsed * 1.4 + w.phase) * 2.2;
-    w.mesh.rotation.y += dt * 0.9;
-    w.mesh.rotation.x += dt * 0.4;
-  }
-
-  updatePackets(dt, speedBoost);
-
-  // Building port-light blinks — small router/server LED twinkles
-  for (const b of buildingBlinkers) {
-    const f = b.fastBlink ? 5.2 : 2.4;
-    const v = 0.5 + 0.5 * Math.sin(elapsed * f + b.phase);
-    b.mesh.material.opacity = b.baseOpacity * (0.45 + v * 0.55);
-  }
-  // Building core pulses — vault orb, chip core, spire apex
-  for (const c of buildingCores) {
-    const v = 0.5 + 0.5 * Math.sin(elapsed * 1.6 + c.phase);
-    c.mesh.material.opacity = c.baseOpacity + (v - 0.5) * 2 * c.amp;
-  }
-  // PCB via blinkers — slow heartbeat across the substrate
-  for (const p of pcbBlinkers) {
-    const v = 0.5 + 0.5 * Math.sin(elapsed * 1.1 + p.phase);
-    p.mesh.material.opacity = 0.4 + v * 0.55;
+  // Building port-light blinks — small router/server LED twinkles.
+  // Reduced-motion: hold mid-brightness so scene reads but nothing flickers.
+  if (!reduceMotion) {
+    for (const b of buildingBlinkers) {
+      const f = b.fastBlink ? 5.2 : 2.4;
+      const v = 0.5 + 0.5 * Math.sin(elapsed * f + b.phase);
+      b.mesh.material.opacity = b.baseOpacity * (0.45 + v * 0.55);
+    }
+    // Building core pulses — vault orb, chip core, spire apex
+    for (const c of buildingCores) {
+      const v = 0.5 + 0.5 * Math.sin(elapsed * 1.6 + c.phase);
+      c.mesh.material.opacity = c.baseOpacity + (v - 0.5) * 2 * c.amp;
+    }
+    // PCB via blinkers — slow heartbeat across the substrate
+    for (const p of pcbBlinkers) {
+      const v = 0.5 + 0.5 * Math.sin(elapsed * 1.1 + p.phase);
+      p.mesh.material.opacity = 0.4 + v * 0.55;
+    }
   }
 
   updateLabelEdgeSafety();

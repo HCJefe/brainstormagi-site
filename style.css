@@ -529,7 +529,16 @@ body::after{
   .scroll-indicator{bottom:calc(16px + var(--safe-bottom));font-size:9px;letter-spacing:.25em}
   .scroll-arrow{height:26px}
 
-  .sec{padding:140px 16px 56px;min-height:auto}
+  /* Mobile pacing: each section gets a full screen of dwell so the camera
+     keyframe has time to land and the user can read. Scroll-snap proximity
+     gives a soft settle without trapping the scroll like mandatory would. */
+  html{scroll-snap-type:y proximity}
+  .sec{
+    padding:140px 16px 64px;
+    min-height:100vh;
+    scroll-snap-align:start;
+    scroll-snap-stop:normal;
+  }
   .sec:first-of-type{padding-top:148px}
   /* Crisp panels with cyan border + red/cyan glow — restore HUD feel on mobile.
      Explicit width caps so .sec-inner can never exceed viewport minus gutters
@@ -546,13 +555,16 @@ body::after{
     margin-left:auto;margin-right:auto;
     border-radius:6px;
     border:1px solid rgba(92,242,255,.42);
-    /* More transparent panel base so the racing-current and buildings read
-       through. Body copy stays legible thanks to the dark base + scanlines. */
+    /* Mobile panel: keep the see-through framed feel but bump the base so
+       body copy stays sharp when bright currents race behind. A vertical
+       gradient is darker around the headline/body and slightly clearer at
+       the top-bottom edges, giving stronger text-on-scene contrast without
+       hiding the 3D scene. */
     background:
       linear-gradient(0deg,rgba(92,242,255,.03) 1px,transparent 1px) 0 0/18px 18px,
       linear-gradient(90deg,rgba(92,242,255,.03) 1px,transparent 1px) 0 0/18px 18px,
       repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 3px),
-      linear-gradient(180deg,rgba(6,10,20,.62),rgba(4,8,16,.56));
+      radial-gradient(ellipse at 50% 50%,rgba(2,5,12,.78) 0%,rgba(4,8,16,.66) 70%,rgba(6,10,20,.58) 100%);
     /* Stronger outer glow on mobile so the panel frames the 3D scene
        instead of hiding it. Cyan + red rim reads as a HUD bezel. */
     box-shadow:
@@ -606,8 +618,26 @@ body::after{
     font-size:34px;line-height:1.05;margin-bottom:10px;letter-spacing:-.015em;
     text-shadow:0 0 18px rgba(92,242,255,.18),0 2px 0 rgba(0,0,0,.5);
   }
-  .sec .lede{font-size:16px;line-height:1.4}
-  .sec p{font-size:14px;line-height:1.55}
+  .sec .lede{
+    font-size:16px;line-height:1.4;
+    text-shadow:0 1px 0 rgba(0,0,0,.55),0 0 14px rgba(2,5,12,.7);
+  }
+  .sec p{
+    font-size:14px;line-height:1.55;
+    text-shadow:0 1px 0 rgba(0,0,0,.5),0 0 10px rgba(2,5,12,.55);
+  }
+  /* Mobile reveal: stronger settle when a section becomes active so the
+     scroll-snap into the keyframe reads as an intentional landing rather
+     than a slow drift. Slightly slower transition matches the calmer camera. */
+  .sec{transition:opacity 1s ease, transform 1s ease}
+  .sec.active .sec-inner{
+    transform:translateY(-3px);
+    box-shadow:
+      0 22px 60px rgba(0,0,0,.6),
+      0 0 0 1px rgba(255,42,42,.30) inset,
+      0 0 70px rgba(92,242,255,.30),
+      0 0 56px rgba(255,42,42,.22);
+  }
 
   .metrics{
     display:grid;
@@ -768,7 +798,12 @@ body::after{
 
 /* Reduce motion preference: dampen pulses and animations */
 @media (prefers-reduced-motion:reduce){
-  .pulse,.scroll-arrow::after,.hud-btn.primary::after,.cta.big::after{animation:none}
+  .pulse,.scroll-arrow::after,.hud-btn.primary::after,.cta.big::after,.hero-stats::before,.m::after,.chip::before{animation:none}
   .sec{transition:none;opacity:1;transform:none}
+  .sec.active .sec-inner{transform:none}
   html,body{scroll-behavior:auto}
+  /* Disable scroll-snap so motion-sensitive users can scroll freely without
+     the page tugging into snap targets. */
+  html{scroll-snap-type:none}
+  .sec{scroll-snap-align:none}
 }
