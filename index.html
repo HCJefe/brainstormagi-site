@@ -8,18 +8,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Space+Grotesk:wght@400;500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./style.css?v=20260425-rails-artdirected-1" />
+<link rel="stylesheet" href="./style.css?v=20260425-restore-good-1" />
 </head>
 <body>
-  <!-- Primary scene: first-party Canvas2D pseudo-3D roller-coaster track
-       across a circuit-board world. Twists, banks, climbs, and dives
-       between section-specific futuristic skyscrapers. Electric current
-       flows along the track as elongated light streaks (no ball clutter).
-       No remote dependencies. Persists across every section. -->
+  <!-- 3D CANVAS STAYS FIXED -->
   <canvas id="scene"></canvas>
-  <!-- Defensive procedural fallback. Only paints if the primary engine
-       cannot acquire a 2D context. Hidden in normal operation. -->
-  <canvas id="scene-fallback" aria-hidden="true"></canvas>
 
   <!-- FIXED HUD -->
   <div class="hud">
@@ -58,7 +51,7 @@
     <div class="progress-rail"><div class="progress-fill" id="progressFill"></div></div>
   </div>
 
-  <!-- SCROLL SECTIONS (content overlays the persistent scene) -->
+  <!-- SCROLL SECTIONS (content overlays camera stops) -->
   <main id="scroll-root">
     <!-- 0. HERO -->
     <section class="sec hero" data-cam="hero">
@@ -195,52 +188,13 @@
     </section>
   </main>
 
-  <script>
-    // Hero-only scroll indicator. Independent of main.js so the cue fades
-    // even if the WebGL module fails to load.
-    (function(){
-      var el = document.querySelector('.scroll-indicator');
-      if (!el) return;
-      function update(){
-        if (window.scrollY > 40) el.classList.add('gone');
-        else el.classList.remove('gone');
-      }
-      window.addEventListener('scroll', update, { passive: true });
-      window.addEventListener('resize', update);
-      update();
-    })();
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+    }
+  }
   </script>
-  <!-- Defensive procedural fallback. Only paints if the primary engine
-       cannot acquire a 2D context. Loaded first so it is always available
-       to the watchdog. -->
-  <script src="./fallback.js?v=20260425-rails-artdirected-1"></script>
-  <!-- Primary engine: first-party Canvas2D roller-coaster circuit-board. -->
-  <script src="./main.js?v=20260425-rails-artdirected-1"></script>
-  <script>
-    // Watchdog: if the primary engine has not painted a frame within 2.5s,
-    // light up the defensive fallback so the route is never empty.
-    (function(){
-      function check(){
-        var frames = window.__brainstormRenderFrames || 0;
-        if (frames > 0) return;
-        document.documentElement.dataset.sceneEngine = "fallback-watchdog";
-        document.documentElement.classList.add("no-webgl");
-        if (typeof window.__brainstormStartFallback === "function") {
-          try { window.__brainstormStartFallback(); } catch(_) {}
-        }
-        try { console.warn("[brainstorm] primary engine did not paint within 2500ms; activating fallback"); } catch(_) {}
-      }
-      setTimeout(check, 2500);
-    })();
-    window.addEventListener("error", function(e){
-      if (e && e.target && e.target.tagName === "SCRIPT" && /main\.js/.test(e.target.src || "")) {
-        document.documentElement.dataset.sceneEngine = "script-error";
-        document.documentElement.classList.add("no-webgl");
-        if (typeof window.__brainstormStartFallback === "function") {
-          try { window.__brainstormStartFallback(); } catch(_) {}
-        }
-      }
-    }, true);
-  </script>
+  <script type="module" src="./main.js?v=20260425-restore-good-1"></script>
 </body>
 </html>
