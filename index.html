@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Space+Grotesk:wght@400;500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./style.css?v=20260425-roller-circuit-smooth-2" />
+<link rel="stylesheet" href="./style.css?v=20260425-roller-circuit-smooth-3" />
 </head>
 <body>
   <!-- Primary scene: first-party Canvas2D pseudo-3D roller-coaster track
@@ -213,9 +213,9 @@
   <!-- Defensive procedural fallback. Only paints if the primary engine
        cannot acquire a 2D context. Loaded first so it is always available
        to the watchdog. -->
-  <script src="./fallback.js?v=20260425-roller-circuit-smooth-2"></script>
+  <script src="./fallback.js?v=20260425-roller-circuit-smooth-3"></script>
   <!-- Primary engine: first-party Canvas2D roller-coaster circuit-board. -->
-  <script src="./main.js?v=20260425-roller-circuit-smooth-2"></script>
+  <script src="./main.js?v=20260425-roller-circuit-smooth-3"></script>
   <script>
     // Watchdog: if the primary engine has not painted a frame within 2.5s,
     // light up the defensive fallback so the route is never empty.
